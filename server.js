@@ -7,6 +7,7 @@ const path = require('path');
 
 const config = require('./src/config/env');
 const errorHandler = require('./src/middlewares/errorHandler');
+const fsRoutes = require('./src/routes/fs.routes');
 
 const app = express();
 
@@ -22,8 +23,16 @@ app.use(morgan('dev'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 /* ─── API Routes (Placeholders for next phases) ─── */
+/* ─── API Routes ─── */
 app.get('/api/health', (req, res) => {
     res.json({ success: true, message: 'Dimension API is running', env: config.env });
+});
+
+app.use('/api/fs', fsRoutes);
+
+// Catch-all for undefined API routes
+app.use('/api', (req, res) => {
+    res.status(404).json({ success: false, error: 'API endpoint not found' });
 });
 
 // Catch-all for undefined API routes
