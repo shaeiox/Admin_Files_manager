@@ -1,0 +1,19 @@
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment variables (Security: Never commit secrets)
+#.env
+#.env.local
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Application Data (Do not track actual server data/metadata)
+data/*.json
+!data/.gitkeep
+
+# Storage / Downloads (If testing locally)
+download/
