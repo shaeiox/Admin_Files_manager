@@ -1,13 +1,16 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
+
 <head>
   <meta charset="UTF-8">
+  <script src="assets/js/theme.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="Browse, search, and manage all files in your Dimension file server.">
   <meta name="theme-color" content="#0a0a0a">
   <title>Files · Dimension Files Manager</title>
 
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%236b62f2'/%3E%3Cpath d='M12 6 6 9v6l6 3 6-3V9z' fill='none' stroke='%23fff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%236b62f2'/%3E%3Cpath d='M12 6 6 9v6l6 3 6-3V9z' fill='none' stroke='%23fff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,8 +35,8 @@
         <a href="index.html" class="brand" aria-label="Dimension home">
           <div class="brand-mark">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M12 3 4 7v10l8 4 8-4V7l-8-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-              <path d="m4 7 8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              <path d="M12 3 4 7v10l8 4 8-4V7l-8-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+              <path d="m4 7 8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
             </svg>
           </div>
           <div class="brand-text">
@@ -148,7 +151,8 @@
         <div class="topbar-center">
           <div class="search-field">
             <i data-icon="search" data-icon-size="16" class="search-icon"></i>
-            <input id="globalSearch" class="search-input" type="search" placeholder="Search files, folders, users…" aria-label="Global search">
+            <input id="globalSearch" class="search-input" type="search" placeholder="Search files, folders, users…"
+              aria-label="Global search">
             <div class="search-kbd">
               <span class="kbd kbd-mod">⌘</span>
               <span class="kbd">K</span>
@@ -183,7 +187,8 @@
               File Browser
             </span>
             <h1 class="page-title">All files</h1>
-            <p class="page-subtitle">Browse, organize, and manage every file across your storage tiers with precision.</p>
+            <p class="page-subtitle">Browse, organize, and manage every file across your storage tiers with precision.
+            </p>
           </div>
 
           <div class="page-actions">
@@ -203,7 +208,8 @@
           <div class="toolbar-left">
             <div class="search-field toolbar-search">
               <i data-icon="search" data-icon-size="15" class="search-icon"></i>
-              <input id="filesSearch" class="search-input" type="search" placeholder="Filter files by name…" aria-label="Filter files">
+              <input id="filesSearch" class="search-input" type="search" placeholder="Filter files by name…"
+                aria-label="Filter files">
             </div>
           </div>
 
@@ -264,7 +270,8 @@
         <div class="filter-row" id="filterChips" style="margin-bottom:20px;"></div>
 
         <!-- Layout: tree + content -->
-        <div style="display:grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--spacing-20); align-items: start;">
+        <div
+          style="display:grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--spacing-20); align-items: start;">
 
           <!-- Folder tree -->
           <aside class="tree-panel" aria-label="Folder tree">
@@ -348,9 +355,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="assets/js/app.js"></script>
-  <script src="assets/js/theme.js"></script>
-  <script src="assets/js/sidebar.js"></script>
-  <script src="assets/js/files.js"></script>
+  <script src="assets/js/app.js" defer></script>
+  <script src="assets/js/sidebar.js" defer></script>
+  <script src="assets/js/files.js" defer></script>
 </body>
+
 </html>

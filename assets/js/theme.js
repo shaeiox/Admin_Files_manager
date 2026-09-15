@@ -1,6 +1,15 @@
 /* ============================================
-   THEME.JS — Light / Dark Theme Toggle System
+   THEME.JS — Light / Dark / System Theme Controller
    Admin Files Manager — Dimension Style
+
+   Architecture: Two-Phase Init
+   Phase 1 (bootstrap): Runs immediately in <head>, before first Paint.
+                        Reads localStorage and sets data-theme on <html>.
+   Phase 2 (init):      Runs after DOMContentLoaded. Binds UI controls,
+                        listens for system/storage changes.
+
+   This file has ZERO dependencies on app.js or any other module.
+   It uses localStorage directly for maximum independence.
    ============================================ */
 
 'use strict';
@@ -8,7 +17,7 @@
 const Theme = (() => {
 
   /* ── Constants ── */
-  const STORE_KEY = 'theme';
+  const STORE_KEY = 'afm:theme';
   const THEMES = ['dark', 'light'];
   const DEFAULT = 'dark';
   const TRANSITION_CLASS = 'theme-switching';
@@ -16,66 +25,45 @@ const Theme = (() => {
   /* ── State ── */
   let current = DEFAULT;
   let listeners = [];
+  let initialized = false;
 
-  /* ── Private Methods ── */
+  /* ══════════════════════════════════════════
+     PHASE 1 — IMMEDIATE BOOTSTRAP
+     Runs the moment this file is parsed in <head>.
+     No DOM dependency beyond documentElement.
+     Goal: set correct theme BEFORE first Paint.
+     ══════════════════════════════════════════ */
 
-  /** Read stored preference or system pref */
-  function resolve() {
-    const stored = AFM?.Store?.get(STORE_KEY);
-    if (stored && THEMES.includes(stored)) return stored;
+  function bootstrap() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      const stored = raw ? JSON.parse(raw) : null;
 
-    // Check system preference
-    if (window.matchMedia?.('(prefers-color-scheme: light)').matches) return 'light';
-    return DEFAULT;
+      if (stored === 'light' || stored === 'dark') {
+        current = stored;
+      } else {
+        // 'system' or no stored preference → follow OS
+        const prefersLight = window.matchMedia &&
+          window.matchMedia('(prefers-color-scheme: light)').matches;
+        current = prefersLight ? 'light' : 'dark';
+      }
+    } catch (e) {
+      current = DEFAULT;
+    }
+
+    // Apply immediately — this prevents any flash
+    document.documentElement.setAttribute('data-theme', current);
+    updateMetaColor(current);
   }
 
-  /** Apply theme to DOM */
-  function apply(theme, animate = true) {
-    const root = document.documentElement;
-    const prev = current;
+  // ★ Execute bootstrap RIGHT NOW, before any CSS is parsed
+  bootstrap();
 
-    // Short-circuit if already set
-    if (prev === theme && root.getAttribute('data-theme') === theme) return;
 
-    // Add transition-suppression class briefly when animating
-    if (animate) {
-      root.classList.add(TRANSITION_CLASS);
-    }
+  /* ══════════════════════════════════════════
+     INTERNAL HELPERS
+     ══════════════════════════════════════════ */
 
-    // Set the attribute
-    root.setAttribute('data-theme', theme);
-    current = theme;
-
-    // Persist
-    AFM?.Store?.set(STORE_KEY, theme);
-
-    // Update meta theme-color for mobile browsers
-    updateMetaColor(theme);
-
-    // Update all toggle controls
-    updateToggles(theme);
-
-    // Update theme picker cards (settings page)
-    updatePickerCards(theme);
-
-    // Remove suppression after next frame
-    if (animate) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          root.classList.remove(TRANSITION_CLASS);
-        });
-      });
-    }
-
-    // Notify listeners
-    if (prev !== theme) {
-      listeners.forEach(fn => {
-        try { fn(theme, prev); } catch (e) { console.error('[Theme] listener error', e); }
-      });
-    }
-  }
-
-  /** Update the <meta name="theme-color"> for mobile browser chrome */
   function updateMetaColor(theme) {
     let meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) {
@@ -86,17 +74,14 @@ const Theme = (() => {
     meta.content = theme === 'dark' ? '#0a0a0a' : '#fafafa';
   }
 
-  /** Sync toggle button states */
   function updateToggles(theme) {
     const isDark = theme === 'dark';
 
-    // Theme toggle switches
     document.querySelectorAll('.theme-toggle').forEach(toggle => {
       toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
       toggle.setAttribute('title', isDark ? 'Light mode' : 'Dark mode');
     });
 
-    // Icon-based toggle buttons
     document.querySelectorAll('[data-theme-toggle]').forEach(btn => {
       const sunIcon = btn.querySelector('.icon-sun');
       const moonIcon = btn.querySelector('.icon-moon');
@@ -104,13 +89,11 @@ const Theme = (() => {
       if (moonIcon) moonIcon.style.display = isDark ? 'block' : 'none';
     });
 
-    // Labeled text toggles
     document.querySelectorAll('.theme-label-text').forEach(el => {
       el.textContent = isDark ? 'Dark' : 'Light';
     });
   }
 
-  /** Highlight active card in settings theme picker */
   function updatePickerCards(theme) {
     document.querySelectorAll('.theme-option').forEach(card => {
       const cardTheme = card.getAttribute('data-theme-value');
@@ -118,57 +101,122 @@ const Theme = (() => {
     });
   }
 
-  /** Handle system preference change */
   function onSystemChange(e) {
-    // Only auto-switch if the user hasn't explicitly set a preference
-    const stored = AFM?.Store?.get(STORE_KEY);
-    if (!stored) {
-      apply(e.matches ? 'light' : 'dark');
+    // Only auto-switch if user chose 'system' or has no stored pref
+    try {
+      const stored = localStorage.getItem(STORE_KEY);
+      const val = stored ? JSON.parse(stored) : null;
+      if (!val || val === 'system') {
+        apply(e.matches ? 'light' : 'dark');
+      }
+    } catch (err) { /* ignore */ }
+  }
+
+  function onStorageChange(e) {
+    if (e.key === STORE_KEY) {
+      try {
+        const newTheme = JSON.parse(e.newValue);
+        if (newTheme && THEMES.includes(newTheme)) apply(newTheme);
+      } catch (err) { /* ignore */ }
     }
   }
 
-  /* ── Public API ── */
 
-  /** Initialize the theme system */
+  /* ══════════════════════════════════════════
+     PHASE 2 — FULL INIT (after DOM ready)
+     Binds UI controls, resolves final state,
+     sets up listeners.
+     ══════════════════════════════════════════ */
+
   function init() {
+    if (initialized) return;
+    initialized = true;
+
+    // Re-resolve to ensure consistency
     current = resolve();
     apply(current, false);
 
-    // Listen for system preference changes
-    const mq = window.matchMedia?.('(prefers-color-scheme: light)');
-    if (mq?.addEventListener) {
+    // System preference listener
+    const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)');
+    if (mq && mq.addEventListener) {
       mq.addEventListener('change', onSystemChange);
-    } else if (mq?.addListener) {
+    } else if (mq && mq.addListener) {
       mq.addListener(onSystemChange);
     }
 
-    // Bind toggle buttons
+    // Cross-tab sync
+    window.addEventListener('storage', onStorageChange);
+
+    // Bind UI
     bindToggles();
-
-    // Bind theme picker cards (settings page)
     bindPickerCards();
-
-    // Listen for storage changes from other tabs
-    window.addEventListener('storage', e => {
-      if (e.key === (AFM?.Store?.prefix || 'afm:') + STORE_KEY) {
-        const newTheme = JSON.parse(e.newValue);
-        if (newTheme && THEMES.includes(newTheme)) apply(newTheme);
-      }
-    });
   }
 
-  /** Bind click handlers for toggle buttons */
+  function resolve() {
+    // Priority 1: what bootstrap already set on <html>
+    const attr = document.documentElement.getAttribute('data-theme');
+    if (attr && THEMES.includes(attr)) return attr;
+
+    // Priority 2: localStorage
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      const stored = raw ? JSON.parse(raw) : null;
+      if (stored && THEMES.includes(stored)) return stored;
+    } catch (e) { /* ignore */ }
+
+    // Priority 3: OS preference
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      return 'light';
+    }
+
+    // Priority 4: project default
+    return DEFAULT;
+  }
+
+  function apply(theme, animate) {
+    if (animate === undefined) animate = true;
+    const root = document.documentElement;
+    const prev = current;
+
+    if (prev === theme && root.getAttribute('data-theme') === theme) return;
+
+    if (animate) root.classList.add(TRANSITION_CLASS);
+
+    root.setAttribute('data-theme', theme);
+    current = theme;
+
+    // Persist
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(theme)); } catch (e) { /* ignore */ }
+
+    updateMetaColor(theme);
+    updateToggles(theme);
+    updatePickerCards(theme);
+
+    if (animate) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          root.classList.remove(TRANSITION_CLASS);
+        });
+      });
+    }
+
+    if (prev !== theme) {
+      listeners.forEach(fn => {
+        try { fn(theme, prev); } catch (e) { console.error('[Theme] listener error', e); }
+      });
+    }
+  }
+
   function bindToggles() {
     document.addEventListener('click', e => {
-      const toggle = e.target.closest('.theme-toggle, [data-theme-toggle]');
-      if (!toggle) return;
+      const toggleEl = e.target.closest('.theme-toggle, [data-theme-toggle]');
+      if (!toggleEl) return;
       e.preventDefault();
       e.stopPropagation();
       toggle();
     });
   }
 
-  /** Bind click handlers for theme picker cards */
   function bindPickerCards() {
     document.addEventListener('click', e => {
       const card = e.target.closest('.theme-option[data-theme-value]');
@@ -176,13 +224,10 @@ const Theme = (() => {
       const val = card.getAttribute('data-theme-value');
 
       if (val === 'system') {
-        // Clear stored pref and use system
-        AFM?.Store?.remove(STORE_KEY);
-        const systemTheme = window.matchMedia?.('(prefers-color-scheme: light)').matches
-          ? 'light'
-          : 'dark';
+        try { localStorage.removeItem(STORE_KEY); } catch (e) { /* ignore */ }
+        const systemTheme = window.matchMedia &&
+          window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
         apply(systemTheme);
-        // Still mark system card as active
         document.querySelectorAll('.theme-option').forEach(c => {
           c.classList.toggle('is-active', c.getAttribute('data-theme-value') === 'system');
         });
@@ -192,27 +237,27 @@ const Theme = (() => {
     });
   }
 
-  /** Toggle between light/dark */
+
+  /* ══════════════════════════════════════════
+     PUBLIC API
+     ══════════════════════════════════════════ */
+
   function toggle() {
     apply(current === 'dark' ? 'light' : 'dark');
   }
 
-  /** Set a specific theme */
   function set(theme) {
     if (THEMES.includes(theme)) apply(theme);
   }
 
-  /** Get current theme */
   function get() {
     return current;
   }
 
-  /** Check if dark */
   function isDark() {
     return current === 'dark';
   }
 
-  /** Subscribe to theme changes */
   function onChange(fn) {
     if (typeof fn === 'function') listeners.push(fn);
     return () => { listeners = listeners.filter(f => f !== fn); };
@@ -221,10 +266,13 @@ const Theme = (() => {
   return { init, toggle, set, get, isDark, onChange };
 })();
 
-/* ── Auto-init ── */
-document.addEventListener('DOMContentLoaded', () => {
+
+/* ── Auto-init when DOM is ready ── */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => Theme.init());
+} else {
   Theme.init();
-});
+}
 
 /* Expose globally */
 window.Theme = Theme;
