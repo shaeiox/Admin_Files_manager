@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Dimension — Admin Files Manager. Manage files, folders, uploads, and downloads for your file server.">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>Dashboard · Dimension Files Manager</title>
+
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%236b62f2'/%3E%3Cpath d='M12 6 6 9v6l6 3 6-3V9z' fill='none' stroke='%23fff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E">
+
+  <!-- Preconnect for fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <!-- Stylesheets — order matters -->
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/themes.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/dashboard.css">
+</head>
+
+<body data-page="dashboard">
+
+  <div class="app-shell">
+
+    <!-- ══════════════════════════════════════════
+         SIDEBAR
+         ══════════════════════════════════════════ -->
+    <aside class="sidebar" aria-label="Primary navigation">
+
+      <div class="sidebar-header">
+        <a href="index.html" class="brand" aria-label="Dimension home">
+          <div class="brand-mark">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 3 4 7v10l8 4 8-4V7l-8-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              <path d="m4 7 8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">Dimension</span>
+            <span class="brand-sub">Files Manager</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="sidebar-body">
+
+        <!-- Overview group -->
+        <div class="nav-group">
+          <div class="nav-group-label">Overview</div>
+          <a class="nav-item" href="index.html" data-nav="dashboard">
+            <span class="nav-icon"><i data-icon="dashboard" data-icon-size="18"></i></span>
+            <span class="nav-label">Dashboard</span>
+          </a>
+          <a class="nav-item" href="files.html" data-nav="files">
+            <span class="nav-icon"><i data-icon="folder" data-icon-size="18"></i></span>
+            <span class="nav-label">All Files</span>
+            <span class="nav-badge is-neutral">24.8K</span>
+          </a>
+          <a class="nav-item" href="uploads.html" data-nav="uploads">
+            <span class="nav-icon"><i data-icon="uploadCloud" data-icon-size="18"></i></span>
+            <span class="nav-label">Uploads</span>
+            <span class="nav-badge">Live</span>
+          </a>
+          <a class="nav-item" href="files.html" data-nav="downloads">
+            <span class="nav-icon"><i data-icon="download" data-icon-size="18"></i></span>
+            <span class="nav-label">Downloads</span>
+          </a>
+        </div>
+
+        <!-- Library group -->
+        <div class="nav-group">
+          <div class="nav-group-label">Library</div>
+          <a class="nav-item" href="files.html">
+            <span class="nav-icon"><i data-icon="star" data-icon-size="18"></i></span>
+            <span class="nav-label">Starred</span>
+          </a>
+          <a class="nav-item" href="files.html">
+            <span class="nav-icon"><i data-icon="users" data-icon-size="18"></i></span>
+            <span class="nav-label">Shared</span>
+          </a>
+          <a class="nav-item" href="files.html">
+            <span class="nav-icon"><i data-icon="clock" data-icon-size="18"></i></span>
+            <span class="nav-label">Recent</span>
+          </a>
+          <a class="nav-item" href="files.html">
+            <span class="nav-icon"><i data-icon="trash" data-icon-size="18"></i></span>
+            <span class="nav-label">Trash</span>
+            <span class="nav-badge is-neutral">217</span>
+          </a>
+        </div>
+
+        <!-- System group -->
+        <div class="nav-group">
+          <div class="nav-group-label">System</div>
+          <a class="nav-item" href="#">
+            <span class="nav-icon"><i data-icon="activity" data-icon-size="18"></i></span>
+            <span class="nav-label">Analytics</span>
+          </a>
+          <a class="nav-item" href="#">
+            <span class="nav-icon"><i data-icon="server" data-icon-size="18"></i></span>
+            <span class="nav-label">Server Health</span>
+          </a>
+          <a class="nav-item" href="settings.html" data-nav="settings">
+            <span class="nav-icon"><i data-icon="settings" data-icon-size="18"></i></span>
+            <span class="nav-label">Settings</span>
+          </a>
+        </div>
+
+        <!-- Storage card -->
+        <div class="storage-card" role="group" aria-label="Storage usage">
+          <div class="storage-head">
+            <span class="storage-title">Storage</span>
+            <span class="storage-pct">68%</span>
+          </div>
+          <div class="storage-bar">
+            <div class="storage-fill" style="width: 68%"></div>
+          </div>
+          <div class="storage-meta">342 GB of 500 GB used</div>
+        </div>
+      </div>
+
+      <!-- Sidebar footer -->
+      <div class="sidebar-footer">
+        <div class="sidebar-user" role="button" tabindex="0" aria-label="User menu">
+          <div class="user-avatar">SC</div>
+          <div class="user-info">
+            <div class="user-name">Sarah Chen</div>
+            <div class="user-role">Administrator</div>
+          </div>
+          <div class="chev" style="color:var(--text-tertiary)">
+            <i data-icon="chevronsUpDown" data-icon-size="14"></i>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ══════════════════════════════════════════
+         MAIN AREA
+         ══════════════════════════════════════════ -->
+    <main class="main-area">
+
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-btn" aria-label="Open menu">
+            <i data-icon="menu" data-icon-size="18"></i>
+          </button>
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <span class="breadcrumb-item">Dimension</span>
+            <span class="breadcrumb-sep"><i data-icon="chevronRight" data-icon-size="14"></i></span>
+            <span class="breadcrumb-item is-current">Dashboard</span>
+          </nav>
+        </div>
+
+        <div class="topbar-center">
+          <div class="search-field">
+            <i data-icon="search" data-icon-size="16" class="search-icon"></i>
+            <input id="globalSearch" class="search-input" type="search" placeholder="Search files, folders, users…" aria-label="Global search">
+            <div class="search-kbd">
+              <span class="kbd kbd-mod">⌘</span>
+              <span class="kbd">K</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button class="btn-icon" id="refreshDashboard" data-tip="Refresh" aria-label="Refresh dashboard">
+            <i data-icon="refresh" data-icon-size="16"></i>
+          </button>
+
+          <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme" title="Toggle theme">
+            <span class="icon-sun"><i data-icon="sun" data-icon-size="12"></i></span>
+            <span class="icon-moon"><i data-icon="moon" data-icon-size="12"></i></span>
+          </button>
+
+          <div class="dropdown">
+            <button class="btn-icon" data-dropdown="notifDropdown" aria-label="Notifications">
+              <i data-icon="bell" data-icon-size="16"></i>
+              <span class="notif-dot"></span>
+            </button>
+            <div class="dropdown-menu" id="notifDropdown" style="min-width:280px;">
+              <div class="dropdown-label">Notifications · 3 new</div>
+              <button class="dropdown-item">
+                <i data-icon="upload" data-icon-size="15"></i>
+                <div style="flex:1;text-align:left;">
+                  <div style="color:var(--text-primary);font-size:13px;">Upload complete</div>
+                  <div style="font-size:11px;color:var(--text-tertiary);">brand-kit-v2.zip · 2m ago</div>
+                </div>
+              </button>
+              <button class="dropdown-item">
+                <i data-icon="users" data-icon-size="15"></i>
+                <div style="flex:1;text-align:left;">
+                  <div style="color:var(--text-primary);font-size:13px;">New shared folder</div>
+                  <div style="font-size:11px;color:var(--text-tertiary);">Marcus shared "Design 2025"</div>
+                </div>
+              </button>
+              <button class="dropdown-item">
+                <i data-icon="alert" data-icon-size="15"></i>
+                <div style="flex:1;text-align:left;">
+                  <div style="color:var(--text-primary);font-size:13px;">Storage 68% full</div>
+                  <div style="font-size:11px;color:var(--text-tertiary);">Consider archiving old files</div>
+                </div>
+              </button>
+              <div class="dropdown-divider"></div>
+              <button class="dropdown-item">
+                <i data-icon="inbox" data-icon-size="15"></i>
+                <span>View all notifications</span>
+              </button>
+            </div>
+          </div>
+
+          <a class="btn btn-primary btn-sm" href="uploads.html">
+            <i data-icon="plus" data-icon-size="15"></i>
+            <span>Upload</span>
+          </a>
+        </div>
+      </header>
+
+      <!-- Page -->
+      <div class="page">
+
+        <!-- Status banner -->
+        <div style="display:flex;justify-content:center;margin-bottom:24px;">
+          <a href="#" class="status-banner">
+            <span class="sparkle"><i data-icon="sparkle" data-icon-size="14"></i></span>
+            <span>Storage optimization saved 12.4 GB this week</span>
+            <span class="arrow"><i data-icon="arrowRight" data-icon-size="14"></i></span>
+          </a>
+        </div>
+
+        <!-- HERO PANEL -->
+        <section class="hero-panel" aria-label="Welcome">
+          <div class="hero-inner">
+            <div class="hero-content">
+              <span class="hero-eyebrow">
+                <i data-icon="sparkle" data-icon-size="13"></i>
+                Admin control center
+              </span>
+              <h1 class="hero-title">
+                Command your file<br>infrastructure <span class="soft">at a glance.</span>
+              </h1>
+              <p class="hero-desc">
+                Every file, every folder, every download — orchestrated from one calm, focused workspace built for admins who value clarity over chaos.
+              </p>
+
+              <div class="hero-bullets">
+                <div class="hero-bullet">
+                  <span class="bullet-icon"><i data-icon="check" data-icon-size="12"></i></span>
+                  Real-time upload & download telemetry
+                </div>
+                <div class="hero-bullet">
+                  <span class="bullet-icon"><i data-icon="check" data-icon-size="12"></i></span>
+                  Multi-tier storage with instant tiering
+                </div>
+                <div class="hero-bullet">
+                  <span class="bullet-icon"><i data-icon="check" data-icon-size="12"></i></span>
+                  Granular access control & audit trails
+                </div>
+              </div>
+
+              <div class="hero-actions">
+                <a class="btn-hero" href="uploads.html">
+                  <i data-icon="uploadCloud" data-icon-size="16"></i>
+                  Upload files
+                </a>
+                <a class="btn-hero-ghost" href="files.html">
+                  Browse files
+                  <i data-icon="arrowRight" data-icon-size="16"></i>
+                </a>
+              </div>
+            </div>
+
+            <!-- Device mockup -->
+            <div class="hero-mockup" aria-hidden="true">
+              <div class="mockup-bar">
+                <div class="mockup-dot"></div>
+                <div class="mockup-dot"></div>
+                <div class="mockup-dot"></div>
+                <div class="mockup-path">dimension.io / files / releases</div>
+              </div>
+              <div class="mockup-body">
+                <div class="mockup-row">
+                  <div class="mockup-ico"><i data-icon="folder" data-icon-size="12"></i></div>
+                  <div class="mockup-line w-60"></div>
+                  <div class="mockup-meta"></div>
+                </div>
+                <div class="mockup-row">
+                  <div class="mockup-ico"><i data-icon="video" data-icon-size="12"></i></div>
+                  <div class="mockup-line w-75"></div>
+                  <div class="mockup-meta"></div>
+                </div>
+                <div class="mockup-row">
+                  <div class="mockup-ico"><i data-icon="fileText" data-icon-size="12"></i></div>
+                  <div class="mockup-line w-50"></div>
+                  <div class="mockup-meta"></div>
+                </div>
+                <div class="mockup-row">
+                  <div class="mockup-ico"><i data-icon="image" data-icon-size="12"></i></div>
+                  <div class="mockup-line w-40"></div>
+                  <div class="mockup-meta"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- STAT CARDS -->
+        <section class="section" aria-label="Key metrics">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Overview</h2>
+              <div class="section-desc">Last 30 days · compared to prior period</div>
+            </div>
+            <div class="segmented" role="tablist">
+              <button class="is-active">30d</button>
+              <button>7d</button>
+              <button>24h</button>
+            </div>
+          </div>
+          <div class="grid-stats" id="statsGrid"></div>
+        </section>
+
+        <!-- SPLIT: chart + storage donut -->
+        <section class="section">
+          <div class="grid-sidebar-split">
+
+            <!-- Traffic chart -->
+            <div class="card chart-panel card-accent">
+              <div class="chart-head">
+                <div>
+                  <h3 class="card-title">Traffic activity</h3>
+                  <div class="card-desc">Uploads, downloads & shares over the last 14 days</div>
+                </div>
+                <div class="chart-legend" id="chartLegend"></div>
+              </div>
+              <div class="chart-area">
+                <div class="chart-canvas-wrap" id="trafficChart"></div>
+              </div>
+            </div>
+
+            <!-- Storage donut -->
+            <div class="card card-accent">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+                <div>
+                  <h3 class="card-title">Storage breakdown</h3>
+                  <div class="card-desc">By file type</div>
+                </div>
+                <div class="badge badge-accent">
+                  <span class="live-dot"></span> Live
+                </div>
+              </div>
+              <div id="storageDonut"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- QUICK ACTIONS -->
+        <section class="section">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Quick actions</h2>
+              <div class="section-desc">Shortcuts to the most common admin tasks</div>
+            </div>
+          </div>
+          <div class="quick-grid" id="quickActions"></div>
+        </section>
+
+        <!-- SPLIT: activity + top files -->
+        <section class="section">
+          <div class="grid-sidebar-split">
+
+            <!-- Activity feed -->
+            <div class="card chart-panel">
+              <div class="chart-head">
+                <div>
+                  <h3 class="card-title">Recent activity</h3>
+                  <div class="card-desc">Live feed of file operations across your workspace</div>
+                </div>
+                <button class="btn btn-subtle btn-sm">
+                  <i data-icon="history" data-icon-size="14"></i>
+                  View all
+                </button>
+              </div>
+              <div class="activity-list" id="activityFeed"></div>
+            </div>
+
+            <!-- Top files -->
+            <div class="card chart-panel">
+              <div class="chart-head">
+                <div>
+                  <h3 class="card-title">Top downloads</h3>
+                  <div class="card-desc">Most requested files</div>
+                </div>
+              </div>
+              <div class="rank-list" id="topFiles"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ACCENT DIVIDER -->
+        <div class="accent-divider"></div>
+
+        <!-- SPLIT: capabilities + server health -->
+        <section class="section">
+          <div class="grid-sidebar-split">
+
+            <!-- Numbered capabilities list -->
+            <div class="card">
+              <div style="margin-bottom:24px;">
+                <h3 class="section-title">What Dimension handles for you</h3>
+                <p style="color:var(--text-secondary);font-size:15px;margin-top:8px;max-width:52ch;">
+                  A calm workspace built on top of a serious infrastructure. Focus on managing files — we handle the rest.
+                </p>
+              </div>
+              <div class="numbered-list" id="capabilities"></div>
+            </div>
+
+            <!-- Server health -->
+            <div class="card card-accent">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+                <div>
+                  <h3 class="card-title">Server health</h3>
+                  <div class="card-desc">All systems operational</div>
+                </div>
+                <div class="badge badge-success badge-dot">Healthy</div>
+              </div>
+              <div class="health-list" id="serverHealth"></div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Scripts — order matters -->
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/sidebar.js"></script>
+  <script src="assets/js/dashboard.js"></script>
+</body>
+</html>

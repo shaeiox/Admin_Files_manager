@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Browse, search, and manage all files in your Dimension file server.">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>Files · Dimension Files Manager</title>
+
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%236b62f2'/%3E%3Cpath d='M12 6 6 9v6l6 3 6-3V9z' fill='none' stroke='%23fff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/themes.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/files.css">
+</head>
+
+<body data-page="files">
+
+  <div class="app-shell">
+
+    <!-- ══════════════════════════════════════════
+         SIDEBAR
+         ══════════════════════════════════════════ -->
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="sidebar-header">
+        <a href="index.html" class="brand" aria-label="Dimension home">
+          <div class="brand-mark">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 3 4 7v10l8 4 8-4V7l-8-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              <path d="m4 7 8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">Dimension</span>
+            <span class="brand-sub">Files Manager</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="sidebar-body">
+        <div class="nav-group">
+          <div class="nav-group-label">Overview</div>
+          <a class="nav-item" href="index.html" data-nav="dashboard">
+            <span class="nav-icon"><i data-icon="dashboard" data-icon-size="18"></i></span>
+            <span class="nav-label">Dashboard</span>
+          </a>
+          <a class="nav-item" href="files.html" data-nav="files">
+            <span class="nav-icon"><i data-icon="folder" data-icon-size="18"></i></span>
+            <span class="nav-label">All Files</span>
+            <span class="nav-badge is-neutral">24.8K</span>
+          </a>
+          <a class="nav-item" href="uploads.html" data-nav="uploads">
+            <span class="nav-icon"><i data-icon="uploadCloud" data-icon-size="18"></i></span>
+            <span class="nav-label">Uploads</span>
+            <span class="nav-badge">Live</span>
+          </a>
+          <a class="nav-item" href="files.html" data-nav="downloads">
+            <span class="nav-icon"><i data-icon="download" data-icon-size="18"></i></span>
+            <span class="nav-label">Downloads</span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-label">Library</div>
+          <a class="nav-item" href="files.html">
+            <span class="nav-icon"><i data-icon="star" data-icon-size="18"></i></span>
+            <span class="nav-label">Starred</span>
+          </a>
+          <a class="nav-item" href="files.html">
+            <span class="nav-icon"><i data-icon="users" data-icon-size="18"></i></span>
+            <span class="nav-label">Shared</span>
+          </a>
+          <a class="nav-item" href="files.html">
+            <span class="nav-icon"><i data-icon="clock" data-icon-size="18"></i></span>
+            <span class="nav-label">Recent</span>
+          </a>
+          <a class="nav-item" href="files.html">
+            <span class="nav-icon"><i data-icon="trash" data-icon-size="18"></i></span>
+            <span class="nav-label">Trash</span>
+            <span class="nav-badge is-neutral">217</span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-label">System</div>
+          <a class="nav-item" href="#">
+            <span class="nav-icon"><i data-icon="activity" data-icon-size="18"></i></span>
+            <span class="nav-label">Analytics</span>
+          </a>
+          <a class="nav-item" href="#">
+            <span class="nav-icon"><i data-icon="server" data-icon-size="18"></i></span>
+            <span class="nav-label">Server Health</span>
+          </a>
+          <a class="nav-item" href="settings.html" data-nav="settings">
+            <span class="nav-icon"><i data-icon="settings" data-icon-size="18"></i></span>
+            <span class="nav-label">Settings</span>
+          </a>
+        </div>
+
+        <div class="storage-card">
+          <div class="storage-head">
+            <span class="storage-title">Storage</span>
+            <span class="storage-pct">68%</span>
+          </div>
+          <div class="storage-bar">
+            <div class="storage-fill" style="width: 68%"></div>
+          </div>
+          <div class="storage-meta">342 GB of 500 GB used</div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user" role="button" tabindex="0" aria-label="User menu">
+          <div class="user-avatar">SC</div>
+          <div class="user-info">
+            <div class="user-name">Sarah Chen</div>
+            <div class="user-role">Administrator</div>
+          </div>
+          <div class="chev" style="color:var(--text-tertiary)">
+            <i data-icon="chevronsUpDown" data-icon-size="14"></i>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ══════════════════════════════════════════
+         MAIN AREA
+         ══════════════════════════════════════════ -->
+    <main class="main-area">
+
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-btn" aria-label="Open menu">
+            <i data-icon="menu" data-icon-size="18"></i>
+          </button>
+          <nav class="breadcrumb" id="breadcrumb" aria-label="Breadcrumb">
+            <span class="breadcrumb-item">Files</span>
+          </nav>
+        </div>
+
+        <div class="topbar-center">
+          <div class="search-field">
+            <i data-icon="search" data-icon-size="16" class="search-icon"></i>
+            <input id="globalSearch" class="search-input" type="search" placeholder="Search files, folders, users…" aria-label="Global search">
+            <div class="search-kbd">
+              <span class="kbd kbd-mod">⌘</span>
+              <span class="kbd">K</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme" title="Toggle theme">
+            <span class="icon-sun"><i data-icon="sun" data-icon-size="12"></i></span>
+            <span class="icon-moon"><i data-icon="moon" data-icon-size="12"></i></span>
+          </button>
+          <button class="btn-icon" data-tip="Notifications" aria-label="Notifications">
+            <i data-icon="bell" data-icon-size="16"></i>
+            <span class="notif-dot"></span>
+          </button>
+          <a class="btn btn-primary btn-sm" href="uploads.html">
+            <i data-icon="plus" data-icon-size="15"></i>
+            <span>Upload</span>
+          </a>
+        </div>
+      </header>
+
+      <!-- Page -->
+      <div class="page">
+
+        <!-- Page header -->
+        <div class="page-header">
+          <div class="page-title-group">
+            <span class="page-eyebrow">
+              <span class="dot"></span>
+              File Browser
+            </span>
+            <h1 class="page-title">All files</h1>
+            <p class="page-subtitle">Browse, organize, and manage every file across your storage tiers with precision.</p>
+          </div>
+
+          <div class="page-actions">
+            <button class="btn btn-ghost btn-sm" data-quick="newFolder">
+              <i data-icon="folderPlus" data-icon-size="15"></i>
+              <span>New folder</span>
+            </button>
+            <a class="btn btn-primary btn-sm" href="uploads.html">
+              <i data-icon="upload" data-icon-size="15"></i>
+              <span>Upload files</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="files-toolbar">
+          <div class="toolbar-left">
+            <div class="search-field toolbar-search">
+              <i data-icon="search" data-icon-size="15" class="search-icon"></i>
+              <input id="filesSearch" class="search-input" type="search" placeholder="Filter files by name…" aria-label="Filter files">
+            </div>
+          </div>
+
+          <div class="toolbar-right">
+            <div class="btn-group" role="tablist" aria-label="View mode">
+              <button class="btn-icon is-active" data-view="list" data-tip="List view" aria-label="List view">
+                <i data-icon="list" data-icon-size="15"></i>
+              </button>
+              <button class="btn-icon" data-view="grid" data-tip="Grid view" aria-label="Grid view">
+                <i data-icon="grid" data-icon-size="15"></i>
+              </button>
+            </div>
+
+            <div class="dropdown">
+              <button class="btn btn-ghost btn-sm" data-dropdown="sortDropdown">
+                <i data-icon="sort" data-icon-size="14"></i>
+                Sort
+              </button>
+              <div class="dropdown-menu" id="sortDropdown">
+                <div class="dropdown-label">Sort by</div>
+                <button class="dropdown-item"><i data-icon="fileText" data-icon-size="15"></i> Name</button>
+                <button class="dropdown-item"><i data-icon="hardDrive" data-icon-size="15"></i> Size</button>
+                <button class="dropdown-item"><i data-icon="calendar" data-icon-size="15"></i> Date modified</button>
+                <button class="dropdown-item"><i data-icon="download" data-icon-size="15"></i> Downloads</button>
+              </div>
+            </div>
+
+            <div class="dropdown">
+              <button class="btn-icon is-bordered" data-dropdown="moreDropdown" data-tip="More actions">
+                <i data-icon="moreVertical" data-icon-size="16"></i>
+              </button>
+              <div class="dropdown-menu" id="moreDropdown">
+                <div class="dropdown-label">Actions</div>
+                <button class="dropdown-item">
+                  <i data-icon="download" data-icon-size="15"></i>
+                  Export list
+                  <span class="shortcut">CSV</span>
+                </button>
+                <button class="dropdown-item">
+                  <i data-icon="refresh" data-icon-size="15"></i>
+                  Refresh
+                </button>
+                <button class="dropdown-item">
+                  <i data-icon="scan" data-icon-size="15"></i>
+                  Scan for duplicates
+                </button>
+                <div class="dropdown-divider"></div>
+                <button class="dropdown-item">
+                  <i data-icon="sliders" data-icon-size="15"></i>
+                  Column settings
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter chips row -->
+        <div class="filter-row" id="filterChips" style="margin-bottom:20px;"></div>
+
+        <!-- Layout: tree + content -->
+        <div style="display:grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--spacing-20); align-items: start;">
+
+          <!-- Folder tree -->
+          <aside class="tree-panel" aria-label="Folder tree">
+            <div class="tree-head">
+              <div class="tree-title">Folders</div>
+              <button class="btn-icon btn-icon-sm" data-quick="newFolder" data-tip="New folder">
+                <i data-icon="plus" data-icon-size="13"></i>
+              </button>
+            </div>
+            <div class="tree" id="folderTree"></div>
+          </aside>
+
+          <!-- Files container (list or grid) -->
+          <section id="filesContainer" aria-label="Files"></section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       BULK ACTION BAR
+       ══════════════════════════════════════════ -->
+  <div class="bulk-bar" id="bulkBar" role="toolbar" aria-label="Bulk actions">
+    <div class="bulk-count"><span class="num">0</span> selected</div>
+    <div class="divider-v"></div>
+    <div class="bulk-actions">
+      <button class="btn-icon" id="bulkDownload" data-tip="Download selected">
+        <i data-icon="download" data-icon-size="16"></i>
+      </button>
+      <button class="btn-icon" data-tip="Move to folder">
+        <i data-icon="move" data-icon-size="16"></i>
+      </button>
+      <button class="btn-icon" data-tip="Share">
+        <i data-icon="share" data-icon-size="16"></i>
+      </button>
+      <button class="btn-icon" data-tip="Star">
+        <i data-icon="star" data-icon-size="16"></i>
+      </button>
+      <button class="btn-icon" id="bulkDelete" data-tip="Delete">
+        <i data-icon="trash" data-icon-size="16"></i>
+      </button>
+    </div>
+    <div class="divider-v"></div>
+    <button class="btn-icon btn-icon-sm" id="bulkClear" data-tip="Clear selection">
+      <i data-icon="x" data-icon-size="15"></i>
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       FILE DETAILS DRAWER
+       ══════════════════════════════════════════ -->
+  <aside class="drawer" id="fileDrawer" aria-label="File details" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-title">File details</div>
+      <button class="btn-icon btn-icon-sm" id="drawerClose" data-tip="Close" aria-label="Close details">
+        <i data-icon="x" data-icon-size="15"></i>
+      </button>
+    </div>
+    <div class="drawer-body"></div>
+    <div class="drawer-footer">
+      <button class="btn btn-ghost btn-sm">
+        <i data-icon="share" data-icon-size="14"></i>
+        Share
+      </button>
+      <button class="btn btn-primary btn-sm" style="flex:1;">
+        <i data-icon="download" data-icon-size="14"></i>
+        Download
+      </button>
+    </div>
+  </aside>
+
+  <!-- ══════════════════════════════════════════
+       DRAG & DROP OVERLAY
+       ══════════════════════════════════════════ -->
+  <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-inner">
+      <i data-icon="uploadCloud" data-icon-size="44"></i>
+      <div class="drop-title">Drop files to upload</div>
+      <div class="drop-desc">Release to add files to your queue</div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/sidebar.js"></script>
+  <script src="assets/js/files.js"></script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+/* ============================================
+   TOKENS.CSS — Design Tokens & CSS Custom Properties
+   Admin Files Manager — Dimension Style
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400;1,9..40,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  /* ── Color Tokens ── */
+  --color-void-canvas: #0a0a0a;
+  --color-graphite: #161616;
+  --color-frosted-glass: #d4d4d4;
+  --color-ink-black: #000000;
+  --color-snow-white: #ffffff;
+  --color-bone: #ededed;
+  --color-ash: #c2c2c2;
+  --color-slate: #686868;
+  --color-smoke: #b2b2b2;
+  --color-hairline: #e5e5e5;
+  --color-dusk-violet: #6b62f2;
+  --color-dusk-violet-rgb: 107, 98, 242;
+
+  /* ── Gradient Tokens ── */
+  --gradient-dusk-violet: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0),
+    rgba(0, 0, 0, 0) 40%,
+    rgba(107, 98, 242, 0.565) 50%,
+    rgba(0, 0, 0, 0) 60%,
+    rgba(0, 0, 0, 0)
+  );
+  --gradient-hero-horizon: linear-gradient(
+    135deg,
+    #d97706 0%,
+    #ea580c 25%,
+    #7c3aed 50%,
+    #2563eb 75%,
+    #1d4ed8 100%
+  );
+  --gradient-radial-spotlight: radial-gradient(
+    circle at 50% 50%,
+    rgba(107, 98, 242, 0.3) 0%,
+    rgba(107, 98, 242, 0.05) 50%,
+    transparent 70%
+  );
+
+  /* ── Typography — Font Families ── */
+  --font-dm-sans: 'DM Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-geist: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-system-ui: system-ui, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* ── Typography — Scale ── */
+  --text-caption: 13px;
+  --leading-caption: 1.5;
+  --tracking-caption: 0.33px;
+
+  --text-body-sm: 14px;
+  --leading-body-sm: 1.5;
+
+  --text-body: 16px;
+  --leading-body: 1.5;
+
+  --text-subheading: 18px;
+  --leading-subheading: 1.5;
+
+  --text-heading-sm: 24px;
+  --leading-heading-sm: 1.33;
+
+  --text-heading: 36px;
+  --leading-heading: 1.11;
+
+  --text-heading-lg: 48px;
+  --leading-heading-lg: 1;
+
+  --text-display: 72px;
+  --leading-display: 1;
+  --tracking-display: -2.52px;
+
+  /* ── Typography — Weights ── */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* ── Spacing Scale ── */
+  --spacing-2: 2px;
+  --spacing-4: 4px;
+  --spacing-6: 6px;
+  --spacing-8: 8px;
+  --spacing-10: 10px;
+  --spacing-12: 12px;
+  --spacing-14: 14px;
+  --spacing-16: 16px;
+  --spacing-20: 20px;
+  --spacing-22: 22px;
+  --spacing-24: 24px;
+  --spacing-28: 28px;
+  --spacing-32: 32px;
+  --spacing-40: 40px;
+  --spacing-44: 44px;
+  --spacing-48: 48px;
+  --spacing-56: 56px;
+  --spacing-64: 64px;
+  --spacing-80: 80px;
+
+  /* ── Border Radius ── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-ui: 10px;
+  --radius-lg: 16px;
+  --radius-2xl: 19px;
+  --radius-cards: 24px;
+  --radius-largecards: 40px;
+  --radius-panels: 42px;
+  --radius-pill: 9999px;
+  --radius-icons: 4px;
+
+  /* ── Shadows ── */
+  --shadow-subtle: rgba(255, 255, 255, 0.1) 0px 0px 0px 1px inset;
+  --shadow-float: rgba(255, 255, 255, 0.02) 0px 3px 4.5px,
+                  rgba(0, 0, 0, 0.04) 0px 10px 8px,
+                  rgba(0, 0, 0, 0.1) 0px 4px 3px;
+  --shadow-glow: 0 0 40px rgba(107, 98, 242, 0.15);
+
+  /* ── Layout ── */
+  --page-max-width: 1200px;
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 72px;
+  --topbar-height: 64px;
+  --section-gap: 64px;
+  --card-padding: 28px;
+  --element-gap: 16px;
+
+  /* ── Transitions ── */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-sidebar: 300ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── Z-Index Scale ── */
+  --z-base: 1;
+  --z-sidebar: 100;
+  --z-topbar: 200;
+  --z-dropdown: 300;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-toast: 600;
+  --z-tooltip: 700;
+
+  /* ── Semantic Tokens (Dark Theme Default) ── */
+  --bg-primary: var(--color-void-canvas);
+  --bg-secondary: var(--color-graphite);
+  --bg-tertiary: rgba(212, 212, 212, 0.06);
+  --bg-elevated: var(--color-graphite);
+  --bg-frosted: rgba(212, 212, 212, 0.08);
+  --bg-hover: rgba(212, 212, 212, 0.1);
+  --bg-active: rgba(212, 212, 212, 0.14);
+  --bg-input: rgba(212, 212, 212, 0.06);
+
+  --text-primary: var(--color-bone);
+  --text-secondary: var(--color-ash);
+  --text-tertiary: var(--color-slate);
+  --text-muted: var(--color-smoke);
+  --text-inverse: var(--color-void-canvas);
+
+  --border-primary: rgba(229, 229, 229, 0.12);
+  --border-secondary: rgba(229, 229, 229, 0.08);
+  --border-hover: rgba(229, 229, 229, 0.2);
+  --border-focus: rgba(107, 98, 242, 0.5);
+
+  --accent-primary: var(--color-dusk-violet);
+  --accent-glow: rgba(107, 98, 242, 0.15);
+  --accent-subtle: rgba(107, 98, 242, 0.1);
+
+  /* ── Status Colors ── */
+  --color-success: #22c55e;
+  --color-success-bg: rgba(34, 197, 94, 0.1);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-error: #ef4444;
+  --color-error-bg: rgba(239, 68, 68, 0.1);
+  --color-info: #3b82f6;
+  --color-info-bg: rgba(59, 130, 246, 0.1);
+
+  /* ── File Type Colors ── */
+  --file-image: #f472b6;
+  --file-video: #a78bfa;
+  --file-audio: #34d399;
+  --file-document: #60a5fa;
+  --file-archive: #fbbf24;
+  --file-code: #fb923c;
+  --file-other: var(--color-slate);
+
+  /* ── Scrollbar ── */
+  --scrollbar-width: 6px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(212, 212, 212, 0.15);
+  --scrollbar-thumb-hover: rgba(212, 212, 212, 0.25);
+}
