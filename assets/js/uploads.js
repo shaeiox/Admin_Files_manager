@@ -14,10 +14,10 @@ const Uploads = (() => {
      ══════════════════════════════════════════ */
 
   const state = {
-    queue: [],             // { id, name, size, uploaded, speed, status, ext, type, error, startTime, endTime }
+    queue: [],             // { id, name, size, uploaded, speed, status, ext, type, error, startTime, endTime, file, abort }
     concurrency: 3,
     activeCount: 0,
-    destination: '/releases/2025',
+    destination: '/',      // Root path mapping to Linux /download
     preset: 'balanced',
     options: {
       autoStart: true,
@@ -32,9 +32,8 @@ const Uploads = (() => {
       bytesUploaded: 0,
       speedHistory: new Array(20).fill(0),
     },
-    ticker: null,
+    metricsTimer: null,    // Replaced 'ticker' with metrics loop
   };
-
   /* ══════════════════════════════════════════
      PRESETS
      ══════════════════════════════════════════ */
@@ -195,12 +194,14 @@ const Uploads = (() => {
   }
 
   /* ══════════════════════════════════════════
-     SIMULATED UPLOAD ENGINE
+     UPLOAD ENGINE
      ══════════════════════════════════════════ */
 
   function startUploads() {
-    if (state.ticker) return;
-    state.ticker = setInterval(tick, 200);
+    if (!state.metricsTimer) {
+      // Start a lightweight loop solely for updating speed metrics and global UI
+      state.metricsTimer = setInterval(updateMetricsLoop, 1000);
+    }
     fillActive();
   }
 
@@ -208,93 +209,114 @@ const Uploads = (() => {
     while (state.activeCount < state.concurrency) {
       const next = state.queue.find(q => q.status === 'queued');
       if (!next) return;
-      next.status = 'uploading';
-      next.startTime = Date.now();
+
       state.activeCount++;
+      processUpload(next);
     }
   }
 
-  function tick() {
-    let anyActive = false;
-    const now = Date.now();
+  async function processUpload(item) {
+    item.status = 'uploading';
+    item.startTime = Date.now();
+    item.lastBytes = 0;
+    item.lastTime = Date.now();
+    item.speed = 0;
+    item.error = null;
 
-    state.queue.forEach(item => {
-      if (item.status !== 'uploading') return;
-      anyActive = true;
+    renderQueueItem(item.id);
 
-      // Simulated speed 2–30 MB/s per file, scaled inversely by size
-      const baseSpeed = clamp(item.size / 10, 2_000_000, 30_000_000);
-      const jitter = randBetween(0.7, 1.3);
-      const chunk = (baseSpeed * jitter) * 0.2; // 200ms tick
+    const formData = new FormData();
+    formData.append('file', item.file);
+    formData.append('destination', state.destination);
+    formData.append('overwrite', state.options.overwrite.toString());
+    formData.append('preservePath', state.options.preservePath.toString());
 
-      item.uploaded = Math.min(item.size, item.uploaded + chunk);
-      item.speed = baseSpeed * jitter;
+    // Call the XHR upload method defined in api.js
+    const { promise, abort } = window.API.upload('/fs/upload', formData, (loaded, total) => {
+      const now = Date.now();
+      const deltaT = (now - item.lastTime) / 1000; // in seconds
 
-      // 1.5% chance of random failure past 30% (feels realistic, not annoying)
-      if (item.uploaded > item.size * 0.3 && item.uploaded < item.size * 0.95) {
-        if (Math.random() < 0.0015) {
-          item.status = 'failed';
-          item.error = 'Connection reset';
-          item.endTime = now;
-          state.activeCount--;
-          renderQueueItem(item.id);
-          fillActive();
-          return;
-        }
+      // Calculate speed every 500ms to avoid UI jitter
+      if (deltaT > 0.5) {
+        const deltaB = loaded - item.lastBytes;
+        item.speed = deltaB / deltaT;
+        item.lastBytes = loaded;
+        item.lastTime = now;
       }
 
-      if (item.uploaded >= item.size) {
-        item.uploaded = item.size;
-        item.status = 'done';
-        item.endTime = now;
-        item.speed = 0;
-        state.activeCount--;
-        state.metrics.totalUploaded++;
-        renderQueueItem(item.id);
-        fillActive();
-        Toast.success('Upload complete', item.name, 2400);
-      } else {
-        updateItemProgress(item);
-      }
+      item.uploaded = loaded;
+      // Visually update the progress bar without re-rendering the whole row
+      updateItemProgress(item);
     });
 
-    // Update global speed history
-    const totalSpeed = state.queue
-      .filter(q => q.status === 'uploading')
-      .reduce((s, q) => s + q.speed, 0);
+    // Store the abort function so it can be triggered by pause/cancel buttons
+    item.abort = abort;
+
+    try {
+      // Wait for the network request to finish
+      await promise;
+
+      item.status = 'done';
+      item.uploaded = item.size;
+      item.endTime = Date.now();
+      item.speed = 0;
+      state.metrics.totalUploaded++;
+      Toast.success('Upload complete', item.name, 2400);
+
+    } catch (error) {
+      // Differentiate between intentional cancellation and actual network failures
+      if (item.status !== 'paused' && item.status !== 'cancelled') {
+        item.status = 'failed';
+        item.error = error.message || 'Network error';
+      }
+    } finally {
+      // Cleanup and trigger the next file in the queue
+      item.abort = null;
+      state.activeCount--;
+      renderQueueItem(item.id);
+      fillActive();
+    }
+  }
+
+  function updateMetricsLoop() {
+    const activeItems = state.queue.filter(q => q.status === 'uploading');
+
+    // Stop the loop if queue is completely idle
+    if (activeItems.length === 0 && !state.queue.some(q => q.status === 'queued')) {
+      clearInterval(state.metricsTimer);
+      state.metricsTimer = null;
+    }
+
+    // Aggregate global speed
+    const totalSpeed = activeItems.reduce((sum, q) => sum + (q.speed || 0), 0);
     state.metrics.speedHistory.shift();
     state.metrics.speedHistory.push(totalSpeed);
 
-    // Recompute bytes uploaded
-    state.metrics.bytesUploaded = state.queue.reduce((s, q) => s + q.uploaded, 0);
+    state.metrics.bytesUploaded = state.queue.reduce((sum, q) => sum + q.uploaded, 0);
 
     renderMetrics();
     renderGlobalProgress();
     renderQueueStats();
-
-    // Stop ticker when queue is idle
-    if (!anyActive && !state.queue.some(q => q.status === 'queued')) {
-      clearInterval(state.ticker);
-      state.ticker = null;
-    }
   }
 
   /* ══════════════════════════════════════════
-     ITEM ACTIONS
-     ══════════════════════════════════════════ */
+   ITEM ACTIONS
+   ══════════════════════════════════════════ */
 
   function pauseItem(id) {
     const item = state.queue.find(q => q.id === id);
     if (!item) return;
+
     if (item.status === 'uploading') {
       item.status = 'paused';
-      state.activeCount--;
-      fillActive();
+      item.speed = 0;
+      // Abort the ongoing XHR request
+      if (typeof item.abort === 'function') item.abort();
     } else if (item.status === 'paused' || item.status === 'failed') {
       item.status = 'queued';
       item.error = null;
-      if (state.ticker == null) startUploads();
-      else fillActive();
+      item.uploaded = 0; // Standard pause without chunking restarts from 0
+      startUploads();
     }
     renderQueueItem(id);
   }
@@ -305,15 +327,19 @@ const Uploads = (() => {
     item.status = 'queued';
     item.error = null;
     item.uploaded = 0;
-    if (state.ticker == null) startUploads();
-    else fillActive();
+    startUploads();
     renderQueueItem(id);
   }
 
   function cancelItem(id) {
     const item = state.queue.find(q => q.id === id);
     if (!item) return;
-    if (item.status === 'uploading') state.activeCount--;
+
+    item.status = 'cancelled';
+    // Abort network request if active
+    if (typeof item.abort === 'function') item.abort();
+
+    // Remove from queue
     state.queue = state.queue.filter(q => q.id !== id);
     renderQueue();
     renderMetrics();
@@ -324,7 +350,6 @@ const Uploads = (() => {
     state.queue = state.queue.filter(q => q.status !== 'done');
     renderQueue();
     renderMetrics();
-    Toast.info('Completed uploads cleared');
   }
 
   function retryAllFailed() {
@@ -339,8 +364,7 @@ const Uploads = (() => {
     });
     if (n) {
       Toast.info(`Retrying ${n} failed upload${n !== 1 ? 's' : ''}`);
-      if (state.ticker == null) startUploads();
-      else fillActive();
+      startUploads();
       renderQueue();
     }
   }
@@ -349,7 +373,8 @@ const Uploads = (() => {
     state.queue.forEach(item => {
       if (item.status === 'uploading') {
         item.status = 'paused';
-        state.activeCount--;
+        item.speed = 0;
+        if (typeof item.abort === 'function') item.abort();
       }
     });
     renderQueue();
@@ -357,28 +382,41 @@ const Uploads = (() => {
 
   function resumeAll() {
     state.queue.forEach(item => {
-      if (item.status === 'paused') item.status = 'queued';
+      if (item.status === 'paused') {
+        item.status = 'queued';
+        item.uploaded = 0;
+      }
     });
-    if (state.ticker == null) startUploads();
-    else fillActive();
+    startUploads();
     renderQueue();
   }
 
   async function cancelAll() {
     if (!state.queue.length) return;
+
     const ok = await Modal.confirm({
       title: 'Cancel all uploads?',
-      message: 'This will remove all queued and active uploads. Completed files will remain uploaded.',
+      message: 'This will abort all active transfers and clear the queue. Completed files will remain on the server.',
       confirmText: 'Cancel all',
       danger: true,
     });
+
     if (!ok) return;
+
+    state.queue.forEach(item => {
+      item.status = 'cancelled';
+      if (typeof item.abort === 'function') item.abort();
+    });
+
     state.queue = state.queue.filter(q => q.status === 'done');
-    state.activeCount = 0;
-    if (state.ticker) { clearInterval(state.ticker); state.ticker = null; }
+
+    if (state.metricsTimer) {
+      clearInterval(state.metricsTimer);
+      state.metricsTimer = null;
+    }
+
     renderQueue();
     renderMetrics();
-    Toast.info('All pending uploads cancelled');
   }
 
   /* ══════════════════════════════════════════
@@ -534,9 +572,9 @@ const Uploads = (() => {
 
     const counts = {
       uploading: state.queue.filter(q => q.status === 'uploading').length,
-      queued:    state.queue.filter(q => q.status === 'queued').length,
-      done:      state.queue.filter(q => q.status === 'done').length,
-      failed:    state.queue.filter(q => q.status === 'failed').length,
+      queued: state.queue.filter(q => q.status === 'queued').length,
+      done: state.queue.filter(q => q.status === 'done').length,
+      failed: state.queue.filter(q => q.status === 'failed').length,
     };
 
     wrap.innerHTML = `
@@ -558,8 +596,8 @@ const Uploads = (() => {
     wrap.style.display = '';
 
     const totalBytes = state.queue.reduce((s, q) => s + q.size, 0);
-    const uploaded   = state.queue.reduce((s, q) => s + q.uploaded, 0);
-    const pct        = totalBytes ? (uploaded / totalBytes) * 100 : 0;
+    const uploaded = state.queue.reduce((s, q) => s + q.uploaded, 0);
+    const pct = totalBytes ? (uploaded / totalBytes) * 100 : 0;
     const totalSpeed = state.queue
       .filter(q => q.status === 'uploading')
       .reduce((s, q) => s + q.speed, 0);
@@ -598,7 +636,7 @@ const Uploads = (() => {
       .reduce((s, q) => s + q.speed, 0);
 
     const uploadedCount = state.queue.filter(q => q.status === 'done').length;
-    const totalBytesUp  = state.queue
+    const totalBytesUp = state.queue
       .filter(q => q.status === 'done')
       .reduce((s, q) => s + q.size, 0);
     const activeCount = state.queue.filter(q => q.status === 'uploading').length;
@@ -689,13 +727,13 @@ const Uploads = (() => {
     if (!wrap) return;
 
     const recent = [
-      { name: 'launch-video.mp4',       size: 328 * 1024 * 1024, time: Date.now() - 6 * 60 * 1000 },
-      { name: 'brand-kit.zip',          size: 84  * 1024 * 1024, time: Date.now() - 22 * 60 * 1000 },
-      { name: 'annual-report.pdf',      size: 12  * 1024 * 1024, time: Date.now() - 55 * 60 * 1000 },
-      { name: 'user-research.docx',     size: 4.2 * 1024 * 1024, time: Date.now() - 2 * 3600 * 1000 },
-      { name: 'ui-mockup.png',          size: 3.8 * 1024 * 1024, time: Date.now() - 3 * 3600 * 1000 },
-      { name: 'api-reference.zip',      size: 45  * 1024 * 1024, time: Date.now() - 5 * 3600 * 1000 },
-      { name: 'podcast-episode-14.mp3', size: 68  * 1024 * 1024, time: Date.now() - 9 * 3600 * 1000 },
+      { name: 'launch-video.mp4', size: 328 * 1024 * 1024, time: Date.now() - 6 * 60 * 1000 },
+      { name: 'brand-kit.zip', size: 84 * 1024 * 1024, time: Date.now() - 22 * 60 * 1000 },
+      { name: 'annual-report.pdf', size: 12 * 1024 * 1024, time: Date.now() - 55 * 60 * 1000 },
+      { name: 'user-research.docx', size: 4.2 * 1024 * 1024, time: Date.now() - 2 * 3600 * 1000 },
+      { name: 'ui-mockup.png', size: 3.8 * 1024 * 1024, time: Date.now() - 3 * 3600 * 1000 },
+      { name: 'api-reference.zip', size: 45 * 1024 * 1024, time: Date.now() - 5 * 3600 * 1000 },
+      { name: 'podcast-episode-14.mp3', size: 68 * 1024 * 1024, time: Date.now() - 9 * 3600 * 1000 },
     ];
 
     wrap.innerHTML = recent.map(r => {
@@ -748,11 +786,11 @@ const Uploads = (() => {
      ══════════════════════════════════════════ */
 
   function bindGlobalActions() {
-    $('#pauseAll')?.addEventListener('click',   pauseAll);
-    $('#resumeAll')?.addEventListener('click',  resumeAll);
+    $('#pauseAll')?.addEventListener('click', pauseAll);
+    $('#resumeAll')?.addEventListener('click', resumeAll);
     $('#retryFailed')?.addEventListener('click', retryAllFailed);
-    $('#clearDone')?.addEventListener('click',  clearCompleted);
-    $('#cancelAll')?.addEventListener('click',  cancelAll);
+    $('#clearDone')?.addEventListener('click', clearCompleted);
+    $('#cancelAll')?.addEventListener('click', cancelAll);
   }
 
   /* ══════════════════════════════════════════

@@ -40,10 +40,10 @@ This document defines the path for connecting the frontend to a backend integrat
 
 ## ✍️ Phase 4: Linux File-System Operations (`js/files.js`)
 
-* [ ] **Create Folder:** Send the target path to the API and execute the equivalent of the Linux `mkdir` command.
-* [ ] **Rename:** Send the new name and execute the equivalent of `mv old_path new_path`.
-* [ ] **Delete:** Move the file to a hidden folder such as `/download/.trash` instead of permanently deleting it, or execute `rm`.
-* [ ] Implement **Bulk Actions** by sending an array of file paths to the backend.
+* [ x] **Create Folder:** Send the target path to the API and execute the equivalent of the Linux `mkdir` command.
+* [ x] **Rename:** Send the new name and execute the equivalent of `mv old_path new_path`.
+* [ x] **Delete:** Move the file to a hidden folder such as `/download/.trash` instead of permanently deleting it, or execute `rm`.
+* [ x] Implement **Bulk Actions** by sending an array of file paths to the backend.
 
 ---
 
