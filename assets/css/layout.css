@@ -51,9 +51,9 @@
   flex-direction: column;
   z-index: var(--z-sidebar);
   transition: width var(--transition-sidebar),
-              transform var(--transition-sidebar),
-              background-color var(--transition-slow);
-  overflow: hidden;
+    transform var(--transition-sidebar),
+    background-color var(--transition-slow);
+  overflow: visible;
 }
 
 /* Sidebar top accent wash */
@@ -75,13 +75,11 @@
   right: 0;
   width: 1px;
   height: 100%;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(107, 98, 242, 0.35) 30%,
-    rgba(107, 98, 242, 0.15) 60%,
-    transparent 100%
-  );
+  background: linear-gradient(180deg,
+      transparent 0%,
+      rgba(107, 98, 242, 0.35) 30%,
+      rgba(107, 98, 242, 0.15) 60%,
+      transparent 100%);
   pointer-events: none;
   opacity: 0.8;
 }
@@ -137,11 +135,9 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.28) 0%,
-    transparent 55%
-  );
+  background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.28) 0%,
+      transparent 55%);
 }
 
 .brand-text {
@@ -174,6 +170,8 @@
 .sidebar.is-collapsed .brand-text {
   opacity: 0;
   pointer-events: none;
+  width: 0;
+  overflow: hidden;
 }
 
 .sidebar.is-collapsed .sidebar-header {
@@ -242,7 +240,7 @@
   letter-spacing: 0.01em;
   white-space: nowrap;
   transition: background-color var(--transition-fast),
-              color var(--transition-fast);
+    color var(--transition-fast);
   cursor: pointer;
   user-select: none;
 }
@@ -424,12 +422,10 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.35),
-    transparent
-  );
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.35),
+      transparent);
   background-size: 200% 100%;
   animation: shimmer 2.4s ease-in-out infinite;
 }
@@ -581,7 +577,7 @@
   transition: margin-left var(--transition-sidebar);
 }
 
-.sidebar.is-collapsed ~ .main-area {
+.sidebar.is-collapsed~.main-area {
   margin-left: var(--sidebar-collapsed-width);
 }
 
@@ -939,7 +935,7 @@
   }
 
   .main-area,
-  .sidebar.is-collapsed ~ .main-area {
+  .sidebar.is-collapsed~.main-area {
     margin-left: 0;
   }
 
@@ -971,6 +967,7 @@
 }
 
 @media (max-width: 560px) {
+
   .breadcrumb .breadcrumb-item:not(.is-current):not(:first-child),
   .breadcrumb .breadcrumb-sep:not(:last-of-type) {
     display: none;
