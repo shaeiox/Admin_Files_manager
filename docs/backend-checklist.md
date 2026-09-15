@@ -3,16 +3,16 @@
 This document outlines the atomic steps to build a secure, high-performance Node.js backend that acts as a bridge between the Dimension UI and the Linux File System (`/download` directory).
 
 ## 🏗️ Phase 1: Project Setup & Core Server
-- [ ] Initialize Node.js project (`npm init -y`).
-- [ ] Install core dependencies (`express`, `cors`, `dotenv`, `helmet`).
-- [ ] Setup standard folder structure (`/src/controllers`, `/src/routes`, `/src/services`, `/src/utils`).
-- [ ] Create basic Express server (`server.js`) with global error handling middleware.
-- [ ] Configure Environment Variables (`.env`) for the storage root path (e.g., `STORAGE_ROOT=/download`).
+- [x] Initialize Node.js project (`npm init -y`).
+- [x] Install core dependencies (`express`, `cors`, `dotenv`, `helmet`).
+- [x] Setup standard folder structure (`/src/controllers`, `/src/routes`, `/src/services`, `/src/utils`).
+- [x] Create basic Express server (`server.js`) with global error handling middleware.
+- [x] Configure Environment Variables (`.env`) for the storage root path (e.g., `STORAGE_ROOT=/download`).
 
 ## 🛡️ Phase 2: Security & FS Service Layer
-- [ ] Create `PathService` to securely resolve and sanitize client paths against `STORAGE_ROOT` (Prevent Directory Traversal attacks).
-- [ ] Create `FileSystemService` wrapping Node's `fs/promises` (`stat`, `readdir`, `mkdir`, `rename`, `rm`).
-- [ ] Implement a safe `exists` and `isDirectory` check mechanism.
+- [x] Create `PathService` to securely resolve and sanitize client paths against `STORAGE_ROOT` (Prevent Directory Traversal attacks).
+- [x] Create `FileSystemService` wrapping Node's `fs/promises` (`stat`, `readdir`, `mkdir`, `rename`, `rm`).
+- [x] Implement a safe `exists` and `isDirectory` check mechanism.
 
 ## 💾 Phase 3: Metadata Service (JSON Database)
 - [ ] Create `MetadataService` to manage `metadata.json` (stored outside the public download folder).
