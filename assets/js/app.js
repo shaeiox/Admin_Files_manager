@@ -868,6 +868,55 @@ function initCopyButtons() {
 }
 
 /* ══════════════════════════════════════════
+   GLOBAL DATA FETCHER (API)
+   ══════════════════════════════════════════ */
+
+async function loadGlobalData() {
+  try {
+    const user = await window.API.get('/user/profile');
+    updateUserUI(user);
+  } catch (e) {
+    console.warn('Backend not ready. Using fallback user data.');
+    updateUserUI({ name: 'Linux Admin', role: 'System Operator', initials: 'LA' });
+  }
+
+  try {
+    const storage = await window.API.get('/storage/quota');
+    updateStorageUI(storage);
+  } catch (e) {
+    updateStorageUI({ used: 342 * 1024 ** 3, total: 500 * 1024 ** 3 });
+  }
+}
+
+function updateUserUI(user) {
+  const nameEl = document.querySelector('.user-name');
+  const roleEl = document.querySelector('.user-role');
+  const avatarEl = document.querySelector('.user-avatar');
+
+  if (nameEl) nameEl.textContent = user.name;
+  if (roleEl) roleEl.textContent = user.role;
+  if (avatarEl) avatarEl.textContent = user.initials || user.name.substring(0, 2).toUpperCase();
+}
+
+function updateStorageUI(data) {
+  const pctEl = document.querySelector('.storage-pct');
+  const fillEl = document.querySelector('.storage-fill');
+  const metaEl = document.querySelector('.storage-meta');
+
+  if (!pctEl || !fillEl || !metaEl) return;
+
+  const pct = data.total > 0 ? (data.used / data.total) * 100 : 0;
+
+  pctEl.textContent = pct.toFixed(1) + '%';
+  fillEl.style.width = pct + '%';
+
+  const usedStr = Format.bytes(data.used, 0);
+  const totalStr = Format.bytes(data.total, 0);
+  metaEl.textContent = `${usedStr} of ${totalStr} used`;
+}
+
+
+/* ══════════════════════════════════════════
    BOOTSTRAP
    ══════════════════════════════════════════ */
 
@@ -880,7 +929,8 @@ function initApp() {
   attachRipples();
   markActiveNav();
   initScrollReveal();
-
+  loadGlobalData();
+  
   // Mark platform for kbd hints
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   $$('.kbd-mod').forEach(k => k.textContent = isMac ? '⌘' : 'Ctrl');

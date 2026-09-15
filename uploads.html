@@ -121,288 +121,288 @@
 
       <div class="sidebar-footer">
         <div class="sidebar-user" role="button" tabindex="0" aria-label="User menu">
-          <div class="user-avatar">SC</div>
+          <div class="user-avatar">?</div>
           <div class="user-info">
-            <div class="user-name">Sarah Chen</div>
-            <div class="user-role">Administrator</div>
+            <div class="user-name">Loading...</div>
+            <div class="user-role">...</div>
           </div>
           <div class="chev" style="color:var(--text-tertiary)">
             <i data-icon="chevronsUpDown" data-icon-size="14"></i>
           </div>
         </div>
       </div>
-    </aside>
 
-    <!-- ══════════════════════════════════════════
+      <!-- ══════════════════════════════════════════
          MAIN AREA
          ══════════════════════════════════════════ -->
-    <main class="main-area">
+      <main class="main-area">
 
-      <!-- Topbar -->
-      <header class="topbar">
-        <div class="topbar-left">
-          <button class="mobile-menu-btn" aria-label="Open menu">
-            <i data-icon="menu" data-icon-size="18"></i>
-          </button>
-          <nav class="breadcrumb" aria-label="Breadcrumb">
-            <span class="breadcrumb-item">Dimension</span>
-            <span class="breadcrumb-sep"><i data-icon="chevronRight" data-icon-size="14"></i></span>
-            <span class="breadcrumb-item is-current">Uploads</span>
-          </nav>
-        </div>
+        <!-- Topbar -->
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="mobile-menu-btn" aria-label="Open menu">
+              <i data-icon="menu" data-icon-size="18"></i>
+            </button>
+            <nav class="breadcrumb" aria-label="Breadcrumb">
+              <span class="breadcrumb-item">Dimension</span>
+              <span class="breadcrumb-sep"><i data-icon="chevronRight" data-icon-size="14"></i></span>
+              <span class="breadcrumb-item is-current">Uploads</span>
+            </nav>
+          </div>
 
-        <div class="topbar-center">
-          <div class="search-field">
-            <i data-icon="search" data-icon-size="16" class="search-icon"></i>
-            <input id="globalSearch" class="search-input" type="search" placeholder="Search files, folders, users…"
-              aria-label="Global search">
-            <div class="search-kbd">
-              <span class="kbd kbd-mod">⌘</span>
-              <span class="kbd">K</span>
+          <div class="topbar-center">
+            <div class="search-field">
+              <i data-icon="search" data-icon-size="16" class="search-icon"></i>
+              <input id="globalSearch" class="search-input" type="search" placeholder="Search files, folders, users…"
+                aria-label="Global search">
+              <div class="search-kbd">
+                <span class="kbd kbd-mod">⌘</span>
+                <span class="kbd">K</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="topbar-right">
-          <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme" title="Toggle theme">
-            <span class="icon-sun"><i data-icon="sun" data-icon-size="12"></i></span>
-            <span class="icon-moon"><i data-icon="moon" data-icon-size="12"></i></span>
-          </button>
-          <button class="btn-icon" data-tip="Notifications" aria-label="Notifications">
-            <i data-icon="bell" data-icon-size="16"></i>
-            <span class="notif-dot"></span>
-          </button>
-          <a class="btn btn-ghost btn-sm" href="files.html">
-            <i data-icon="folder" data-icon-size="15"></i>
-            <span>Browse files</span>
-          </a>
-        </div>
-      </header>
-
-      <!-- Page -->
-      <div class="page">
-
-        <!-- Page header -->
-        <div class="page-header">
-          <div class="page-title-group">
-            <span class="page-eyebrow">
-              <span class="dot"></span>
-              Upload Manager
-            </span>
-            <h1 class="page-title">Upload files</h1>
-            <p class="page-subtitle">Drop files, orchestrate parallel transfers, and watch every byte land — with
-              real-time progress, pause & resume.</p>
-          </div>
-
-          <div class="page-actions">
-            <button class="btn btn-ghost btn-sm" id="pauseAll">
-              <i data-icon="pause" data-icon-size="15"></i>
-              Pause all
+          <div class="topbar-right">
+            <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme" title="Toggle theme">
+              <span class="icon-sun"><i data-icon="sun" data-icon-size="12"></i></span>
+              <span class="icon-moon"><i data-icon="moon" data-icon-size="12"></i></span>
             </button>
-            <button class="btn btn-ghost btn-sm" id="resumeAll">
-              <i data-icon="play" data-icon-size="15"></i>
-              Resume all
+            <button class="btn-icon" data-tip="Notifications" aria-label="Notifications">
+              <i data-icon="bell" data-icon-size="16"></i>
+              <span class="notif-dot"></span>
             </button>
-          </div>
-        </div>
-
-        <!-- Upload metrics -->
-        <div class="upload-metrics" id="uploadMetrics"></div>
-
-        <!-- Dropzone -->
-        <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Drop files to upload">
-          <div class="dz-icon">
-            <i data-icon="uploadCloud" data-icon-size="28"></i>
-          </div>
-          <div class="dz-title">
-            Drop files here or <span class="accent">browse</span>
-          </div>
-          <div class="dz-desc">
-            Files upload in parallel with automatic retries, checksum verification, and instant CDN distribution across
-            42 edge points-of-presence.
-          </div>
-
-          <div class="dz-actions">
-            <button class="btn btn-primary btn-sm" id="browseFiles">
-              <i data-icon="file" data-icon-size="15"></i>
-              Choose files
-            </button>
-            <button class="btn btn-ghost btn-sm" id="browseFolder">
+            <a class="btn btn-ghost btn-sm" href="files.html">
               <i data-icon="folder" data-icon-size="15"></i>
-              Choose folder
-            </button>
+              <span>Browse files</span>
+            </a>
           </div>
+        </header>
 
-          <div class="dz-specs">
-            <span class="spec-pill">
-              <i data-icon="package" data-icon-size="12"></i>
-              Max 5 GB per file
-            </span>
-            <span class="spec-pill">
-              <i data-icon="zap" data-icon-size="12"></i>
-              Up to 8 parallel
-            </span>
-            <span class="spec-pill">
-              <i data-icon="shield" data-icon-size="12"></i>
-              Auto-encrypted in transit
-            </span>
-            <span class="spec-pill">
-              <i data-icon="refresh" data-icon-size="12"></i>
-              Auto-retry on failure
-            </span>
-          </div>
+        <!-- Page -->
+        <div class="page">
 
-          <input type="file" id="fileInput" class="dz-input" multiple aria-hidden="true">
-          <input type="file" id="folderInput" class="dz-input" webkitdirectory directory multiple aria-hidden="true">
-        </div>
-
-        <!-- Destination strip -->
-        <div class="dest-strip">
-          <div class="dest-label">
-            <i data-icon="folder" data-icon-size="14"></i>
-            Destination
-          </div>
-          <span class="dest-path" id="destPath">
-            <i data-icon="folder" data-icon-size="13"></i>
-            /releases/2025
-          </span>
-          <button class="btn btn-subtle btn-sm" id="changeDestination">
-            <i data-icon="edit" data-icon-size="13"></i>
-            Change
-          </button>
-
-          <div class="dest-options">
-            <label class="dest-opt">
-              <label class="switch">
-                <input type="checkbox" data-option="autoStart" checked>
-                <span class="track"></span>
-              </label>
-              Auto-start uploads
-            </label>
-            <label class="dest-opt">
-              <label class="switch">
-                <input type="checkbox" data-option="overwrite">
-                <span class="track"></span>
-              </label>
-              Overwrite duplicates
-            </label>
-            <label class="dest-opt">
-              <label class="switch">
-                <input type="checkbox" data-option="preservePath" checked>
-                <span class="track"></span>
-              </label>
-              Preserve folder structure
-            </label>
-          </div>
-        </div>
-
-        <!-- Presets section -->
-        <section class="section" style="margin-top:var(--spacing-32);">
-          <div class="section-header">
-            <div>
-              <h2 class="section-title">Upload preset</h2>
-              <div class="section-desc">Optimize the transfer for your workload</div>
-            </div>
-          </div>
-          <div class="preset-grid" id="presetGrid"></div>
-        </section>
-
-        <!-- Upload Queue -->
-        <section class="section">
-          <div class="queue-panel">
-
-            <!-- Queue header -->
-            <div class="queue-head">
-              <div class="queue-title-group">
-                <h3 class="queue-title">Upload queue</h3>
-                <div class="queue-stats" id="queueStats"></div>
-              </div>
-
-              <div style="display:flex;align-items:center;gap:var(--spacing-8);flex-wrap:wrap;">
-                <button class="btn btn-subtle btn-sm" id="retryFailed">
-                  <i data-icon="refresh" data-icon-size="14"></i>
-                  Retry failed
-                </button>
-                <button class="btn btn-ghost btn-sm" id="clearDone">
-                  <i data-icon="checkCircle" data-icon-size="14"></i>
-                  Clear completed
-                </button>
-              </div>
+          <!-- Page header -->
+          <div class="page-header">
+            <div class="page-title-group">
+              <span class="page-eyebrow">
+                <span class="dot"></span>
+                Upload Manager
+              </span>
+              <h1 class="page-title">Upload files</h1>
+              <p class="page-subtitle">Drop files, orchestrate parallel transfers, and watch every byte land — with
+                real-time progress, pause & resume.</p>
             </div>
 
-            <!-- Global progress -->
-            <div class="queue-global" id="queueGlobal" style="display:none;"></div>
-
-            <!-- Queue list -->
-            <div class="queue-list" id="queueList"></div>
-
-            <!-- Footer -->
-            <div class="queue-footer">
-              <div style="font-size:var(--text-caption);color:var(--text-tertiary);">
-                Uploads resume automatically after network interruptions.
-              </div>
-              <button class="btn btn-danger btn-sm" id="cancelAll">
-                <i data-icon="x" data-icon-size="14"></i>
-                Cancel all pending
+            <div class="page-actions">
+              <button class="btn btn-ghost btn-sm" id="pauseAll">
+                <i data-icon="pause" data-icon-size="15"></i>
+                Pause all
+              </button>
+              <button class="btn btn-ghost btn-sm" id="resumeAll">
+                <i data-icon="play" data-icon-size="15"></i>
+                Resume all
               </button>
             </div>
           </div>
-        </section>
 
-        <!-- Recent uploads strip -->
-        <section class="section">
-          <div class="section-header">
-            <div>
-              <h2 class="section-title">Recently uploaded</h2>
-              <div class="section-desc">Latest completed transfers · from all admins</div>
+          <!-- Upload metrics -->
+          <div class="upload-metrics" id="uploadMetrics"></div>
+
+          <!-- Dropzone -->
+          <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Drop files to upload">
+            <div class="dz-icon">
+              <i data-icon="uploadCloud" data-icon-size="28"></i>
             </div>
-            <a class="btn btn-subtle btn-sm" href="files.html">
-              View all
-              <i data-icon="arrowRight" data-icon-size="14"></i>
-            </a>
+            <div class="dz-title">
+              Drop files here or <span class="accent">browse</span>
+            </div>
+            <div class="dz-desc">
+              Files upload in parallel with automatic retries, checksum verification, and instant CDN distribution
+              across
+              42 edge points-of-presence.
+            </div>
+
+            <div class="dz-actions">
+              <button class="btn btn-primary btn-sm" id="browseFiles">
+                <i data-icon="file" data-icon-size="15"></i>
+                Choose files
+              </button>
+              <button class="btn btn-ghost btn-sm" id="browseFolder">
+                <i data-icon="folder" data-icon-size="15"></i>
+                Choose folder
+              </button>
+            </div>
+
+            <div class="dz-specs">
+              <span class="spec-pill">
+                <i data-icon="package" data-icon-size="12"></i>
+                Max 5 GB per file
+              </span>
+              <span class="spec-pill">
+                <i data-icon="zap" data-icon-size="12"></i>
+                Up to 8 parallel
+              </span>
+              <span class="spec-pill">
+                <i data-icon="shield" data-icon-size="12"></i>
+                Auto-encrypted in transit
+              </span>
+              <span class="spec-pill">
+                <i data-icon="refresh" data-icon-size="12"></i>
+                Auto-retry on failure
+              </span>
+            </div>
+
+            <input type="file" id="fileInput" class="dz-input" multiple aria-hidden="true">
+            <input type="file" id="folderInput" class="dz-input" webkitdirectory directory multiple aria-hidden="true">
           </div>
-          <div class="recent-strip" id="recentUploads"></div>
-        </section>
 
-        <!-- Accent divider -->
-        <div class="accent-divider"></div>
+          <!-- Destination strip -->
+          <div class="dest-strip">
+            <div class="dest-label">
+              <i data-icon="folder" data-icon-size="14"></i>
+              Destination
+            </div>
+            <span class="dest-path" id="destPath">
+              <i data-icon="folder" data-icon-size="13"></i>
+              /releases/2025
+            </span>
+            <button class="btn btn-subtle btn-sm" id="changeDestination">
+              <i data-icon="edit" data-icon-size="13"></i>
+              Change
+            </button>
 
-        <!-- Tips card -->
-        <section class="section">
-          <div class="card card-accent">
-            <div style="display:flex; align-items:flex-start; gap:var(--spacing-20); flex-wrap:wrap;">
-              <div
-                style="width:44px; height:44px; border-radius:var(--radius-ui); background:var(--bg-badge); color:var(--accent-primary); display:grid; place-items:center; border:1px solid rgba(107, 98, 242, 0.25); flex-shrink:0;">
-                <i data-icon="sparkle" data-icon-size="20"></i>
+            <div class="dest-options">
+              <label class="dest-opt">
+                <label class="switch">
+                  <input type="checkbox" data-option="autoStart" checked>
+                  <span class="track"></span>
+                </label>
+                Auto-start uploads
+              </label>
+              <label class="dest-opt">
+                <label class="switch">
+                  <input type="checkbox" data-option="overwrite">
+                  <span class="track"></span>
+                </label>
+                Overwrite duplicates
+              </label>
+              <label class="dest-opt">
+                <label class="switch">
+                  <input type="checkbox" data-option="preservePath" checked>
+                  <span class="track"></span>
+                </label>
+                Preserve folder structure
+              </label>
+            </div>
+          </div>
+
+          <!-- Presets section -->
+          <section class="section" style="margin-top:var(--spacing-32);">
+            <div class="section-header">
+              <div>
+                <h2 class="section-title">Upload preset</h2>
+                <div class="section-desc">Optimize the transfer for your workload</div>
+              </div>
+            </div>
+            <div class="preset-grid" id="presetGrid"></div>
+          </section>
+
+          <!-- Upload Queue -->
+          <section class="section">
+            <div class="queue-panel">
+
+              <!-- Queue header -->
+              <div class="queue-head">
+                <div class="queue-title-group">
+                  <h3 class="queue-title">Upload queue</h3>
+                  <div class="queue-stats" id="queueStats"></div>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:var(--spacing-8);flex-wrap:wrap;">
+                  <button class="btn btn-subtle btn-sm" id="retryFailed">
+                    <i data-icon="refresh" data-icon-size="14"></i>
+                    Retry failed
+                  </button>
+                  <button class="btn btn-ghost btn-sm" id="clearDone">
+                    <i data-icon="checkCircle" data-icon-size="14"></i>
+                    Clear completed
+                  </button>
+                </div>
               </div>
 
-              <div style="flex:1; min-width:260px;">
-                <h3 class="card-title" style="margin-bottom:8px;">Pro tips for large uploads</h3>
-                <div class="numbered-list" style="margin-top:16px;">
-                  <div class="numbered-row">
-                    <div class="numbered-name">Use the "Fast Transfer" preset for batches over 10 GB</div>
-                    <div class="numbered-index">01</div>
-                  </div>
-                  <div class="numbered-row">
-                    <div class="numbered-name">Enable "Optimize Storage" for archives to save up to 40% space</div>
-                    <div class="numbered-index">02</div>
-                  </div>
-                  <div class="numbered-row">
-                    <div class="numbered-name">Drop entire folders — the structure is preserved automatically</div>
-                    <div class="numbered-index">03</div>
-                  </div>
-                  <div class="numbered-row">
-                    <div class="numbered-name">Uploads resume from the last checkpoint if the connection drops</div>
-                    <div class="numbered-index">04</div>
+              <!-- Global progress -->
+              <div class="queue-global" id="queueGlobal" style="display:none;"></div>
+
+              <!-- Queue list -->
+              <div class="queue-list" id="queueList"></div>
+
+              <!-- Footer -->
+              <div class="queue-footer">
+                <div style="font-size:var(--text-caption);color:var(--text-tertiary);">
+                  Uploads resume automatically after network interruptions.
+                </div>
+                <button class="btn btn-danger btn-sm" id="cancelAll">
+                  <i data-icon="x" data-icon-size="14"></i>
+                  Cancel all pending
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Recent uploads strip -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <h2 class="section-title">Recently uploaded</h2>
+                <div class="section-desc">Latest completed transfers · from all admins</div>
+              </div>
+              <a class="btn btn-subtle btn-sm" href="files.html">
+                View all
+                <i data-icon="arrowRight" data-icon-size="14"></i>
+              </a>
+            </div>
+            <div class="recent-strip" id="recentUploads"></div>
+          </section>
+
+          <!-- Accent divider -->
+          <div class="accent-divider"></div>
+
+          <!-- Tips card -->
+          <section class="section">
+            <div class="card card-accent">
+              <div style="display:flex; align-items:flex-start; gap:var(--spacing-20); flex-wrap:wrap;">
+                <div
+                  style="width:44px; height:44px; border-radius:var(--radius-ui); background:var(--bg-badge); color:var(--accent-primary); display:grid; place-items:center; border:1px solid rgba(107, 98, 242, 0.25); flex-shrink:0;">
+                  <i data-icon="sparkle" data-icon-size="20"></i>
+                </div>
+
+                <div style="flex:1; min-width:260px;">
+                  <h3 class="card-title" style="margin-bottom:8px;">Pro tips for large uploads</h3>
+                  <div class="numbered-list" style="margin-top:16px;">
+                    <div class="numbered-row">
+                      <div class="numbered-name">Use the "Fast Transfer" preset for batches over 10 GB</div>
+                      <div class="numbered-index">01</div>
+                    </div>
+                    <div class="numbered-row">
+                      <div class="numbered-name">Enable "Optimize Storage" for archives to save up to 40% space</div>
+                      <div class="numbered-index">02</div>
+                    </div>
+                    <div class="numbered-row">
+                      <div class="numbered-name">Drop entire folders — the structure is preserved automatically</div>
+                      <div class="numbered-index">03</div>
+                    </div>
+                    <div class="numbered-row">
+                      <div class="numbered-name">Uploads resume from the last checkpoint if the connection drops</div>
+                      <div class="numbered-index">04</div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-      </div>
-    </main>
+        </div>
+      </main>
   </div>
 
   <!-- Scripts -->

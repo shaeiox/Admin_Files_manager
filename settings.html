@@ -121,976 +121,978 @@
 
       <div class="sidebar-footer">
         <div class="sidebar-user" role="button" tabindex="0" aria-label="User menu">
-          <div class="user-avatar">SC</div>
+          <div class="user-avatar">?</div>
           <div class="user-info">
-            <div class="user-name">Sarah Chen</div>
-            <div class="user-role">Administrator</div>
+            <div class="user-name">Loading...</div>
+            <div class="user-role">...</div>
           </div>
           <div class="chev" style="color:var(--text-tertiary)">
             <i data-icon="chevronsUpDown" data-icon-size="14"></i>
           </div>
         </div>
       </div>
-    </aside>
 
-    <!-- ══════════════════════════════════════════
+      <!-- ══════════════════════════════════════════
          MAIN AREA
          ══════════════════════════════════════════ -->
-    <main class="main-area">
+      <main class="main-area">
 
-      <!-- Topbar -->
-      <header class="topbar">
-        <div class="topbar-left">
-          <button class="mobile-menu-btn" aria-label="Open menu">
-            <i data-icon="menu" data-icon-size="18"></i>
-          </button>
-          <nav class="breadcrumb" aria-label="Breadcrumb">
-            <span class="breadcrumb-item">Dimension</span>
-            <span class="breadcrumb-sep"><i data-icon="chevronRight" data-icon-size="14"></i></span>
-            <span class="breadcrumb-item is-current">Settings</span>
-          </nav>
-        </div>
+        <!-- Topbar -->
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="mobile-menu-btn" aria-label="Open menu">
+              <i data-icon="menu" data-icon-size="18"></i>
+            </button>
+            <nav class="breadcrumb" aria-label="Breadcrumb">
+              <span class="breadcrumb-item">Dimension</span>
+              <span class="breadcrumb-sep"><i data-icon="chevronRight" data-icon-size="14"></i></span>
+              <span class="breadcrumb-item is-current">Settings</span>
+            </nav>
+          </div>
 
-        <div class="topbar-center">
-          <div class="search-field">
-            <i data-icon="search" data-icon-size="16" class="search-icon"></i>
-            <input id="globalSearch" class="search-input" type="search" placeholder="Search settings…"
-              aria-label="Search">
-            <div class="search-kbd">
-              <span class="kbd kbd-mod">⌘</span>
-              <span class="kbd">K</span>
+          <div class="topbar-center">
+            <div class="search-field">
+              <i data-icon="search" data-icon-size="16" class="search-icon"></i>
+              <input id="globalSearch" class="search-input" type="search" placeholder="Search settings…"
+                aria-label="Search">
+              <div class="search-kbd">
+                <span class="kbd kbd-mod">⌘</span>
+                <span class="kbd">K</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="topbar-right">
-          <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme" title="Toggle theme">
-            <span class="icon-sun"><i data-icon="sun" data-icon-size="12"></i></span>
-            <span class="icon-moon"><i data-icon="moon" data-icon-size="12"></i></span>
-          </button>
-          <button class="btn-icon" data-tip="Notifications" aria-label="Notifications">
-            <i data-icon="bell" data-icon-size="16"></i>
-            <span class="notif-dot"></span>
-          </button>
-          <a class="btn btn-primary btn-sm" href="uploads.html">
-            <i data-icon="plus" data-icon-size="15"></i>
-            <span>Upload</span>
-          </a>
-        </div>
-      </header>
-
-      <!-- Page -->
-      <div class="page">
-
-        <!-- Page header -->
-        <div class="page-header">
-          <div class="page-title-group">
-            <span class="page-eyebrow">
-              <span class="dot"></span>
-              Preferences
-            </span>
-            <h1 class="page-title">Settings</h1>
-            <p class="page-subtitle">Fine-tune your workspace — appearance, storage, security, and integrations. Changes
-              apply instantly.</p>
-          </div>
-        </div>
-
-        <!-- Settings layout -->
-        <div class="settings-layout">
-
-          <!-- Side navigation -->
-          <nav class="settings-nav" aria-label="Settings sections">
-            <div class="settings-nav-label">Workspace</div>
-            <button class="settings-nav-item is-active" data-pane="general">
-              <i data-icon="sliders" data-icon-size="16"></i>
-              General
+          <div class="topbar-right">
+            <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme" title="Toggle theme">
+              <span class="icon-sun"><i data-icon="sun" data-icon-size="12"></i></span>
+              <span class="icon-moon"><i data-icon="moon" data-icon-size="12"></i></span>
             </button>
-            <button class="settings-nav-item" data-pane="appearance">
-              <i data-icon="sun" data-icon-size="16"></i>
-              Appearance
-            </button>
-            <button class="settings-nav-item" data-pane="storage">
-              <i data-icon="hardDrive" data-icon-size="16"></i>
-              Storage
-            </button>
-
-            <div class="settings-nav-label" style="margin-top:12px;">Access</div>
-            <button class="settings-nav-item" data-pane="security">
-              <i data-icon="shield" data-icon-size="16"></i>
-              Security
-            </button>
-            <button class="settings-nav-item" data-pane="api">
-              <i data-icon="key" data-icon-size="16"></i>
-              API Keys
-            </button>
-            <button class="settings-nav-item" data-pane="integrations">
-              <i data-icon="package" data-icon-size="16"></i>
-              Integrations
-            </button>
-
-            <div class="settings-nav-label" style="margin-top:12px;">Account</div>
-            <button class="settings-nav-item" data-pane="notifications">
+            <button class="btn-icon" data-tip="Notifications" aria-label="Notifications">
               <i data-icon="bell" data-icon-size="16"></i>
-              Notifications
+              <span class="notif-dot"></span>
             </button>
-            <button class="settings-nav-item" data-pane="danger">
-              <i data-icon="alert" data-icon-size="16"></i>
-              Danger Zone
-            </button>
-          </nav>
+            <a class="btn btn-primary btn-sm" href="uploads.html">
+              <i data-icon="plus" data-icon-size="15"></i>
+              <span>Upload</span>
+            </a>
+          </div>
+        </header>
 
-          <!-- Content -->
-          <div class="settings-content">
+        <!-- Page -->
+        <div class="page">
 
-            <!-- ══════════════════════
+          <!-- Page header -->
+          <div class="page-header">
+            <div class="page-title-group">
+              <span class="page-eyebrow">
+                <span class="dot"></span>
+                Preferences
+              </span>
+              <h1 class="page-title">Settings</h1>
+              <p class="page-subtitle">Fine-tune your workspace — appearance, storage, security, and integrations.
+                Changes
+                apply instantly.</p>
+            </div>
+          </div>
+
+          <!-- Settings layout -->
+          <div class="settings-layout">
+
+            <!-- Side navigation -->
+            <nav class="settings-nav" aria-label="Settings sections">
+              <div class="settings-nav-label">Workspace</div>
+              <button class="settings-nav-item is-active" data-pane="general">
+                <i data-icon="sliders" data-icon-size="16"></i>
+                General
+              </button>
+              <button class="settings-nav-item" data-pane="appearance">
+                <i data-icon="sun" data-icon-size="16"></i>
+                Appearance
+              </button>
+              <button class="settings-nav-item" data-pane="storage">
+                <i data-icon="hardDrive" data-icon-size="16"></i>
+                Storage
+              </button>
+
+              <div class="settings-nav-label" style="margin-top:12px;">Access</div>
+              <button class="settings-nav-item" data-pane="security">
+                <i data-icon="shield" data-icon-size="16"></i>
+                Security
+              </button>
+              <button class="settings-nav-item" data-pane="api">
+                <i data-icon="key" data-icon-size="16"></i>
+                API Keys
+              </button>
+              <button class="settings-nav-item" data-pane="integrations">
+                <i data-icon="package" data-icon-size="16"></i>
+                Integrations
+              </button>
+
+              <div class="settings-nav-label" style="margin-top:12px;">Account</div>
+              <button class="settings-nav-item" data-pane="notifications">
+                <i data-icon="bell" data-icon-size="16"></i>
+                Notifications
+              </button>
+              <button class="settings-nav-item" data-pane="danger">
+                <i data-icon="alert" data-icon-size="16"></i>
+                Danger Zone
+              </button>
+            </nav>
+
+            <!-- Content -->
+            <div class="settings-content">
+
+              <!-- ══════════════════════
                  PANE: GENERAL
                  ══════════════════════ -->
-            <div class="settings-pane is-active" data-pane-content="general">
+              <div class="settings-pane is-active" data-pane-content="general">
 
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="user" data-icon-size="18"></i>
-                    Workspace profile
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="user" data-icon-size="18"></i>
+                      Workspace profile
+                    </div>
+                    <div class="sg-desc">Public information about your Dimension workspace.</div>
                   </div>
-                  <div class="sg-desc">Public information about your Dimension workspace.</div>
-                </div>
-                <div class="sg-body">
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Workspace name</div>
-                      <div class="setting-hint">Shown in the sidebar and shared file links.</div>
-                    </div>
-                    <div class="setting-control">
-                      <input class="input" type="text" value="Dimension HQ">
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Workspace URL</div>
-                      <div class="setting-hint">The base URL for all shared download links.</div>
-                    </div>
-                    <div class="setting-control">
-                      <input class="input" type="text" value="dl.dimension.io">
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Default language</div>
-                      <div class="setting-hint">Interface language for all admins.</div>
-                    </div>
-                    <div class="setting-control">
-                      <select class="select">
-                        <option>English (US)</option>
-                        <option>English (UK)</option>
-                        <option>Français</option>
-                        <option>Deutsch</option>
-                        <option>日本語</option>
-                        <option>Português (BR)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Time zone</div>
-                      <div class="setting-hint">All timestamps display in this zone.</div>
-                    </div>
-                    <div class="setting-control">
-                      <select class="select">
-                        <option>UTC</option>
-                        <option>America/New_York</option>
-                        <option>America/Los_Angeles</option>
-                        <option>Europe/London</option>
-                        <option>Europe/Berlin</option>
-                        <option>Asia/Tokyo</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="folder" data-icon-size="18"></i>
-                    Default folder behavior
-                  </div>
-                  <div class="sg-desc">Rules that apply to newly uploaded files.</div>
-                </div>
-                <div class="sg-body">
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Default upload folder</div>
-                      <div class="setting-hint">Where files land when no destination is set.</div>
-                    </div>
-                    <div class="setting-control">
-                      <input class="input" type="text" value="/inbox">
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Auto-organize by type</div>
-                      <div class="setting-hint">Sort uploads into subfolders based on file type (images/, videos/,
-                        etc.).</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="track"></span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Auto-generate thumbnails</div>
-                      <div class="setting-hint">Create previews for images and videos on upload.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="track"></span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Deduplication</div>
-                      <div class="setting-hint">Detect identical files by hash and link instead of storing duplicates.
+                  <div class="sg-body">
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Workspace name</div>
+                        <div class="setting-hint">Shown in the sidebar and shared file links.</div>
+                      </div>
+                      <div class="setting-control">
+                        <input class="input" type="text" value="Dimension HQ">
                       </div>
                     </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="track"></span>
-                      </label>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Workspace URL</div>
+                        <div class="setting-hint">The base URL for all shared download links.</div>
+                      </div>
+                      <div class="setting-control">
+                        <input class="input" type="text" value="dl.dimension.io">
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Default language</div>
+                        <div class="setting-hint">Interface language for all admins.</div>
+                      </div>
+                      <div class="setting-control">
+                        <select class="select">
+                          <option>English (US)</option>
+                          <option>English (UK)</option>
+                          <option>Français</option>
+                          <option>Deutsch</option>
+                          <option>日本語</option>
+                          <option>Português (BR)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Time zone</div>
+                        <div class="setting-hint">All timestamps display in this zone.</div>
+                      </div>
+                      <div class="setting-control">
+                        <select class="select">
+                          <option>UTC</option>
+                          <option>America/New_York</option>
+                          <option>America/Los_Angeles</option>
+                          <option>Europe/London</option>
+                          <option>Europe/Berlin</option>
+                          <option>Asia/Tokyo</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div class="sg-footer">
-                  <div class="sg-footer-note">Changes to organization rules apply to future uploads only.</div>
+
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="folder" data-icon-size="18"></i>
+                      Default folder behavior
+                    </div>
+                    <div class="sg-desc">Rules that apply to newly uploaded files.</div>
+                  </div>
+                  <div class="sg-body">
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Default upload folder</div>
+                        <div class="setting-hint">Where files land when no destination is set.</div>
+                      </div>
+                      <div class="setting-control">
+                        <input class="input" type="text" value="/inbox">
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Auto-organize by type</div>
+                        <div class="setting-hint">Sort uploads into subfolders based on file type (images/, videos/,
+                          etc.).</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" checked>
+                          <span class="track"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Auto-generate thumbnails</div>
+                        <div class="setting-hint">Create previews for images and videos on upload.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" checked>
+                          <span class="track"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Deduplication</div>
+                        <div class="setting-hint">Detect identical files by hash and link instead of storing duplicates.
+                        </div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" checked>
+                          <span class="track"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="sg-footer">
+                    <div class="sg-footer-note">Changes to organization rules apply to future uploads only.</div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- ══════════════════════
+              <!-- ══════════════════════
                  PANE: APPEARANCE
                  ══════════════════════ -->
-            <div class="settings-pane" data-pane-content="appearance">
+              <div class="settings-pane" data-pane-content="appearance">
 
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="monitor" data-icon-size="18"></i>
-                    Theme
-                  </div>
-                  <div class="sg-desc">Choose how Dimension looks on this device.</div>
-                </div>
-
-                <div class="theme-picker">
-                  <button class="theme-option" data-theme-value="dark">
-                    <div class="theme-preview dark">
-                      <div class="tp-side">
-                        <div class="tp-line accent" style="width:80%"></div>
-                        <div class="tp-line" style="width:60%"></div>
-                        <div class="tp-line" style="width:70%"></div>
-                      </div>
-                      <div class="tp-main">
-                        <div class="tp-line" style="width:50%"></div>
-                        <div class="tp-block"></div>
-                      </div>
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="monitor" data-icon-size="18"></i>
+                      Theme
                     </div>
-                    <div>
-                      <div class="theme-option-name">Dusk (Dark)</div>
-                      <div class="theme-option-desc">Signature look · low-glare</div>
-                    </div>
-                  </button>
-
-                  <button class="theme-option" data-theme-value="light">
-                    <div class="theme-preview light">
-                      <div class="tp-side">
-                        <div class="tp-line accent" style="width:80%"></div>
-                        <div class="tp-line" style="width:60%"></div>
-                        <div class="tp-line" style="width:70%"></div>
-                      </div>
-                      <div class="tp-main">
-                        <div class="tp-line" style="width:50%"></div>
-                        <div class="tp-block"></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div class="theme-option-name">Dawn (Light)</div>
-                      <div class="theme-option-desc">Bright · high-clarity</div>
-                    </div>
-                  </button>
-
-                  <button class="theme-option" data-theme-value="system">
-                    <div class="theme-preview system">
-                      <div class="tp-side">
-                        <div class="tp-line accent" style="width:80%"></div>
-                        <div class="tp-line" style="width:60%"></div>
-                      </div>
-                      <div class="tp-main">
-                        <div class="tp-line" style="width:50%"></div>
-                        <div class="tp-block"></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div class="theme-option-name">System</div>
-                      <div class="theme-option-desc">Follows OS setting</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="sliders" data-icon-size="18"></i>
-                    Interface density
-                  </div>
-                  <div class="sg-desc">Adjust how much breathing room the layout uses.</div>
-                </div>
-                <div class="sg-body">
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Density</div>
-                      <div class="setting-hint">Comfortable is the design's native rhythm.</div>
-                    </div>
-                    <div class="setting-control">
-                      <div class="segmented">
-                        <button>Compact</button>
-                        <button class="is-active">Comfortable</button>
-                        <button>Spacious</button>
-                      </div>
-                    </div>
+                    <div class="sg-desc">Choose how Dimension looks on this device.</div>
                   </div>
 
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Reduce motion</div>
-                      <div class="setting-hint">Disable subtle animations and transitions.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox">
-                        <span class="track"></span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Show file thumbnails</div>
-                      <div class="setting-hint">Display preview images in list and grid views.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="track"></span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Default view</div>
-                      <div class="setting-hint">The layout used when opening the file browser.</div>
-                    </div>
-                    <div class="setting-control">
-                      <div class="segmented">
-                        <button class="is-active">List</button>
-                        <button>Grid</button>
+                  <div class="theme-picker">
+                    <button class="theme-option" data-theme-value="dark">
+                      <div class="theme-preview dark">
+                        <div class="tp-side">
+                          <div class="tp-line accent" style="width:80%"></div>
+                          <div class="tp-line" style="width:60%"></div>
+                          <div class="tp-line" style="width:70%"></div>
+                        </div>
+                        <div class="tp-main">
+                          <div class="tp-line" style="width:50%"></div>
+                          <div class="tp-block"></div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                      <div>
+                        <div class="theme-option-name">Dusk (Dark)</div>
+                        <div class="theme-option-desc">Signature look · low-glare</div>
+                      </div>
+                    </button>
 
-            <!-- ══════════════════════
-                 PANE: STORAGE
-                 ══════════════════════ -->
-            <div class="settings-pane" data-pane-content="storage">
+                    <button class="theme-option" data-theme-value="light">
+                      <div class="theme-preview light">
+                        <div class="tp-side">
+                          <div class="tp-line accent" style="width:80%"></div>
+                          <div class="tp-line" style="width:60%"></div>
+                          <div class="tp-line" style="width:70%"></div>
+                        </div>
+                        <div class="tp-main">
+                          <div class="tp-line" style="width:50%"></div>
+                          <div class="tp-block"></div>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="theme-option-name">Dawn (Light)</div>
+                        <div class="theme-option-desc">Bright · high-clarity</div>
+                      </div>
+                    </button>
 
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="hardDrive" data-icon-size="18"></i>
-                    Storage quota
-                  </div>
-                  <div class="sg-desc">Current usage across all storage tiers.</div>
-                </div>
-
-                <div class="quota-panel">
-                  <div class="quota-top">
-                    <div class="quota-used">
-                      342 GB <span class="of">of 500 GB</span>
-                    </div>
-                    <button class="btn btn-primary btn-sm">
-                      <i data-icon="arrowUp" data-icon-size="14"></i>
-                      Upgrade quota
+                    <button class="theme-option" data-theme-value="system">
+                      <div class="theme-preview system">
+                        <div class="tp-side">
+                          <div class="tp-line accent" style="width:80%"></div>
+                          <div class="tp-line" style="width:60%"></div>
+                        </div>
+                        <div class="tp-main">
+                          <div class="tp-line" style="width:50%"></div>
+                          <div class="tp-block"></div>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="theme-option-name">System</div>
+                        <div class="theme-option-desc">Follows OS setting</div>
+                      </div>
                     </button>
                   </div>
-
-                  <div class="quota-bar">
-                    <div class="quota-seg" style="width:29%; background:#a78bfa;" data-tip="Videos"></div>
-                    <div class="quota-seg" style="width:16.4%; background:#f472b6;" data-tip="Images"></div>
-                    <div class="quota-seg" style="width:10.8%; background:#60a5fa;" data-tip="Documents"></div>
-                    <div class="quota-seg" style="width:7.6%; background:#fbbf24;" data-tip="Archives"></div>
-                    <div class="quota-seg" style="width:4.6%; background:#34d399;" data-tip="Other"></div>
-                  </div>
-
-                  <div class="quota-legend">
-                    <div class="ql-item"><span class="ql-swatch" style="background:#a78bfa"></span><span
-                        class="ql-name">Videos</span><span class="ql-val">145 GB</span></div>
-                    <div class="ql-item"><span class="ql-swatch" style="background:#f472b6"></span><span
-                        class="ql-name">Images</span><span class="ql-val">82 GB</span></div>
-                    <div class="ql-item"><span class="ql-swatch" style="background:#60a5fa"></span><span
-                        class="ql-name">Documents</span><span class="ql-val">54 GB</span></div>
-                    <div class="ql-item"><span class="ql-swatch" style="background:#fbbf24"></span><span
-                        class="ql-name">Archives</span><span class="ql-val">38 GB</span></div>
-                    <div class="ql-item"><span class="ql-swatch" style="background:#34d399"></span><span
-                        class="ql-name">Other</span><span class="ql-val">23 GB</span></div>
-                  </div>
                 </div>
-              </div>
 
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="clock" data-icon-size="18"></i>
-                    Retention & lifecycle
-                  </div>
-                  <div class="sg-desc">Automate cleanup and tier transitions.</div>
-                </div>
-                <div class="sg-body">
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Trash retention</div>
-                      <div class="setting-hint">How long deleted files stay recoverable before permanent removal.</div>
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="sliders" data-icon-size="18"></i>
+                      Interface density
                     </div>
-                    <div class="setting-control">
-                      <select class="select">
-                        <option>7 days</option>
-                        <option selected>30 days</option>
-                        <option>90 days</option>
-                        <option>Never delete</option>
-                      </select>
-                    </div>
+                    <div class="sg-desc">Adjust how much breathing room the layout uses.</div>
                   </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Move to cold storage after</div>
-                      <div class="setting-hint">Files untouched for this period are moved to slower, cheaper storage.
+                  <div class="sg-body">
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Density</div>
+                        <div class="setting-hint">Comfortable is the design's native rhythm.</div>
+                      </div>
+                      <div class="setting-control">
+                        <div class="segmented">
+                          <button>Compact</button>
+                          <button class="is-active">Comfortable</button>
+                          <button>Spacious</button>
+                        </div>
                       </div>
                     </div>
-                    <div class="setting-control">
-                      <select class="select">
-                        <option>Never</option>
-                        <option>30 days</option>
-                        <option selected>90 days</option>
-                        <option>180 days</option>
-                        <option>1 year</option>
-                      </select>
-                    </div>
-                  </div>
 
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Auto-purge temp folder</div>
-                      <div class="setting-hint">Clear /temp weekly to reclaim space.</div>
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Reduce motion</div>
+                        <div class="setting-hint">Disable subtle animations and transitions.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox">
+                          <span class="track"></span>
+                        </label>
+                      </div>
                     </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="track"></span>
-                      </label>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Show file thumbnails</div>
+                        <div class="setting-hint">Display preview images in list and grid views.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" checked>
+                          <span class="track"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Default view</div>
+                        <div class="setting-hint">The layout used when opening the file browser.</div>
+                      </div>
+                      <div class="setting-control">
+                        <div class="segmented">
+                          <button class="is-active">List</button>
+                          <button>Grid</button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- ══════════════════════
+              <!-- ══════════════════════
+                 PANE: STORAGE
+                 ══════════════════════ -->
+              <div class="settings-pane" data-pane-content="storage">
+
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="hardDrive" data-icon-size="18"></i>
+                      Storage quota
+                    </div>
+                    <div class="sg-desc">Current usage across all storage tiers.</div>
+                  </div>
+
+                  <div class="quota-panel">
+                    <div class="quota-top">
+                      <div class="quota-used">
+                        342 GB <span class="of">of 500 GB</span>
+                      </div>
+                      <button class="btn btn-primary btn-sm">
+                        <i data-icon="arrowUp" data-icon-size="14"></i>
+                        Upgrade quota
+                      </button>
+                    </div>
+
+                    <div class="quota-bar">
+                      <div class="quota-seg" style="width:29%; background:#a78bfa;" data-tip="Videos"></div>
+                      <div class="quota-seg" style="width:16.4%; background:#f472b6;" data-tip="Images"></div>
+                      <div class="quota-seg" style="width:10.8%; background:#60a5fa;" data-tip="Documents"></div>
+                      <div class="quota-seg" style="width:7.6%; background:#fbbf24;" data-tip="Archives"></div>
+                      <div class="quota-seg" style="width:4.6%; background:#34d399;" data-tip="Other"></div>
+                    </div>
+
+                    <div class="quota-legend">
+                      <div class="ql-item"><span class="ql-swatch" style="background:#a78bfa"></span><span
+                          class="ql-name">Videos</span><span class="ql-val">145 GB</span></div>
+                      <div class="ql-item"><span class="ql-swatch" style="background:#f472b6"></span><span
+                          class="ql-name">Images</span><span class="ql-val">82 GB</span></div>
+                      <div class="ql-item"><span class="ql-swatch" style="background:#60a5fa"></span><span
+                          class="ql-name">Documents</span><span class="ql-val">54 GB</span></div>
+                      <div class="ql-item"><span class="ql-swatch" style="background:#fbbf24"></span><span
+                          class="ql-name">Archives</span><span class="ql-val">38 GB</span></div>
+                      <div class="ql-item"><span class="ql-swatch" style="background:#34d399"></span><span
+                          class="ql-name">Other</span><span class="ql-val">23 GB</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="clock" data-icon-size="18"></i>
+                      Retention & lifecycle
+                    </div>
+                    <div class="sg-desc">Automate cleanup and tier transitions.</div>
+                  </div>
+                  <div class="sg-body">
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Trash retention</div>
+                        <div class="setting-hint">How long deleted files stay recoverable before permanent removal.
+                        </div>
+                      </div>
+                      <div class="setting-control">
+                        <select class="select">
+                          <option>7 days</option>
+                          <option selected>30 days</option>
+                          <option>90 days</option>
+                          <option>Never delete</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Move to cold storage after</div>
+                        <div class="setting-hint">Files untouched for this period are moved to slower, cheaper storage.
+                        </div>
+                      </div>
+                      <div class="setting-control">
+                        <select class="select">
+                          <option>Never</option>
+                          <option>30 days</option>
+                          <option selected>90 days</option>
+                          <option>180 days</option>
+                          <option>1 year</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Auto-purge temp folder</div>
+                        <div class="setting-hint">Clear /temp weekly to reclaim space.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" checked>
+                          <span class="track"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ══════════════════════
                  PANE: SECURITY
                  ══════════════════════ -->
-            <div class="settings-pane" data-pane-content="security">
+              <div class="settings-pane" data-pane-content="security">
 
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="lock" data-icon-size="18"></i>
-                    Authentication
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="lock" data-icon-size="18"></i>
+                      Authentication
+                    </div>
+                    <div class="sg-desc">Protect admin access with strong authentication.</div>
                   </div>
-                  <div class="sg-desc">Protect admin access with strong authentication.</div>
-                </div>
-                <div class="sg-body">
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">
-                        Two-factor authentication
-                        <span class="badge badge-success">Enabled</span>
+                  <div class="sg-body">
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">
+                          Two-factor authentication
+                          <span class="badge badge-success">Enabled</span>
+                        </div>
+                        <div class="setting-hint">Require a second factor when signing in.</div>
                       </div>
-                      <div class="setting-hint">Require a second factor when signing in.</div>
+                      <div class="setting-control">
+                        <button class="btn btn-ghost btn-sm">Manage</button>
+                      </div>
                     </div>
-                    <div class="setting-control">
-                      <button class="btn btn-ghost btn-sm">Manage</button>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Single sign-on (SSO)</div>
+                        <div class="setting-hint">Connect Okta, Azure AD, or Google Workspace.</div>
+                      </div>
+                      <div class="setting-control">
+                        <button class="btn btn-ghost btn-sm">Configure</button>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Session timeout</div>
+                        <div class="setting-hint">Automatically sign out inactive sessions.</div>
+                      </div>
+                      <div class="setting-control">
+                        <select class="select">
+                          <option>15 min</option>
+                          <option>1 hour</option>
+                          <option selected>8 hours</option>
+                          <option>24 hours</option>
+                          <option>Never</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
+                </div>
 
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Single sign-on (SSO)</div>
-                      <div class="setting-hint">Connect Okta, Azure AD, or Google Workspace.</div>
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="shield" data-icon-size="18"></i>
+                      File protection
                     </div>
-                    <div class="setting-control">
-                      <button class="btn btn-ghost btn-sm">Configure</button>
-                    </div>
+                    <div class="sg-desc">Security policies applied to all files.</div>
                   </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Session timeout</div>
-                      <div class="setting-hint">Automatically sign out inactive sessions.</div>
+                  <div class="sg-body">
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Encryption at rest</div>
+                        <div class="setting-hint">AES-256 encryption for all stored files.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" checked disabled>
+                          <span class="track"></span>
+                        </label>
+                      </div>
                     </div>
-                    <div class="setting-control">
-                      <select class="select">
-                        <option>15 min</option>
-                        <option>1 hour</option>
-                        <option selected>8 hours</option>
-                        <option>24 hours</option>
-                        <option>Never</option>
-                      </select>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Virus scanning</div>
+                        <div class="setting-hint">Scan uploads against ClamAV signature database.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" checked>
+                          <span class="track"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Password-protected links</div>
+                        <div class="setting-hint">Require a password for all new share links by default.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox">
+                          <span class="track"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Download watermarking</div>
+                        <div class="setting-hint">Add invisible watermarks to downloaded documents.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox">
+                          <span class="track"></span>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="shield" data-icon-size="18"></i>
-                    File protection
-                  </div>
-                  <div class="sg-desc">Security policies applied to all files.</div>
-                </div>
-                <div class="sg-body">
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Encryption at rest</div>
-                      <div class="setting-hint">AES-256 encryption for all stored files.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox" checked disabled>
-                        <span class="track"></span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Virus scanning</div>
-                      <div class="setting-hint">Scan uploads against ClamAV signature database.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="track"></span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Password-protected links</div>
-                      <div class="setting-hint">Require a password for all new share links by default.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox">
-                        <span class="track"></span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Download watermarking</div>
-                      <div class="setting-hint">Add invisible watermarks to downloaded documents.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox">
-                        <span class="track"></span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- ══════════════════════
+              <!-- ══════════════════════
                  PANE: API KEYS
                  ══════════════════════ -->
-            <div class="settings-pane" data-pane-content="api">
+              <div class="settings-pane" data-pane-content="api">
 
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="key" data-icon-size="18"></i>
-                    API keys
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="key" data-icon-size="18"></i>
+                      API keys
+                    </div>
+                    <div class="sg-desc">Programmatic access tokens for the Dimension REST API.</div>
                   </div>
-                  <div class="sg-desc">Programmatic access tokens for the Dimension REST API.</div>
+
+                  <div class="sg-body">
+                    <div class="token-row">
+                      <div class="token-ico"><i data-icon="key" data-icon-size="15"></i></div>
+                      <div class="token-body">
+                        <div class="token-name">
+                          Production API
+                          <span class="badge badge-success badge-dot">Active</span>
+                        </div>
+                        <div class="token-key">
+                          <span>dim_live_</span><span class="masked">••••••••••••••••</span><span>a8f2</span>
+                          <button class="btn-icon btn-icon-sm" data-tip="Copy" data-copy="dim_live_a8f2">
+                            <i data-icon="copy" data-icon-size="13"></i>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="token-meta">
+                        Created Jan 4<br>
+                        Last used 2m ago
+                      </div>
+                    </div>
+
+                    <div class="token-row">
+                      <div class="token-ico"><i data-icon="key" data-icon-size="15"></i></div>
+                      <div class="token-body">
+                        <div class="token-name">
+                          Staging Deploy
+                          <span class="badge badge-success badge-dot">Active</span>
+                        </div>
+                        <div class="token-key">
+                          <span>dim_test_</span><span class="masked">••••••••••••••••</span><span>3b17</span>
+                          <button class="btn-icon btn-icon-sm" data-tip="Copy" data-copy="dim_test_3b17">
+                            <i data-icon="copy" data-icon-size="13"></i>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="token-meta">
+                        Created Feb 12<br>
+                        Last used 3h ago
+                      </div>
+                    </div>
+
+                    <div class="token-row">
+                      <div class="token-ico"><i data-icon="key" data-icon-size="15"></i></div>
+                      <div class="token-body">
+                        <div class="token-name">
+                          Legacy Migration
+                          <span class="badge badge-warning">Expiring soon</span>
+                        </div>
+                        <div class="token-key">
+                          <span>dim_live_</span><span class="masked">••••••••••••••••</span><span>c412</span>
+                          <button class="btn-icon btn-icon-sm" data-tip="Copy" data-copy="dim_live_c412">
+                            <i data-icon="copy" data-icon-size="13"></i>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="token-meta">
+                        Created Oct 3, 2024<br>
+                        Expires in 6 days
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="sg-footer">
+                    <div class="sg-footer-note">API keys grant full access. Never share them publicly.</div>
+                    <button class="btn btn-primary btn-sm">
+                      <i data-icon="plus" data-icon-size="14"></i>
+                      Generate new key
+                    </button>
+                  </div>
                 </div>
 
-                <div class="sg-body">
-                  <div class="token-row">
-                    <div class="token-ico"><i data-icon="key" data-icon-size="15"></i></div>
-                    <div class="token-body">
-                      <div class="token-name">
-                        Production API
-                        <span class="badge badge-success badge-dot">Active</span>
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="globe" data-icon-size="18"></i>
+                      Webhooks
+                    </div>
+                    <div class="sg-desc">Notify external systems when file events occur.</div>
+                  </div>
+                  <div class="sg-body">
+                    <div class="setting-row is-stacked">
+                      <div class="setting-info">
+                        <div class="setting-name">Webhook endpoint URL</div>
+                        <div class="setting-hint">POST events to this HTTPS endpoint.</div>
                       </div>
-                      <div class="token-key">
-                        <span>dim_live_</span><span class="masked">••••••••••••••••</span><span>a8f2</span>
-                        <button class="btn-icon btn-icon-sm" data-tip="Copy" data-copy="dim_live_a8f2">
-                          <i data-icon="copy" data-icon-size="13"></i>
-                        </button>
+                      <div class="setting-control is-wide">
+                        <input class="input" type="text" placeholder="https://your-app.com/webhooks/dimension">
                       </div>
                     </div>
-                    <div class="token-meta">
-                      Created Jan 4<br>
-                      Last used 2m ago
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Trigger events</div>
+                        <div class="setting-hint">Which file operations should fire a webhook.</div>
+                      </div>
+                      <div class="setting-control">
+                        <div class="swatch-row">
+                          <span class="tag">upload.completed</span>
+                          <span class="tag">file.deleted</span>
+                          <span class="tag">share.created</span>
+                          <button class="btn-icon btn-icon-sm" data-tip="Add event">
+                            <i data-icon="plus" data-icon-size="13"></i>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  <div class="token-row">
-                    <div class="token-ico"><i data-icon="key" data-icon-size="15"></i></div>
-                    <div class="token-body">
-                      <div class="token-name">
-                        Staging Deploy
-                        <span class="badge badge-success badge-dot">Active</span>
-                      </div>
-                      <div class="token-key">
-                        <span>dim_test_</span><span class="masked">••••••••••••••••</span><span>3b17</span>
-                        <button class="btn-icon btn-icon-sm" data-tip="Copy" data-copy="dim_test_3b17">
-                          <i data-icon="copy" data-icon-size="13"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="token-meta">
-                      Created Feb 12<br>
-                      Last used 3h ago
-                    </div>
-                  </div>
-
-                  <div class="token-row">
-                    <div class="token-ico"><i data-icon="key" data-icon-size="15"></i></div>
-                    <div class="token-body">
-                      <div class="token-name">
-                        Legacy Migration
-                        <span class="badge badge-warning">Expiring soon</span>
-                      </div>
-                      <div class="token-key">
-                        <span>dim_live_</span><span class="masked">••••••••••••••••</span><span>c412</span>
-                        <button class="btn-icon btn-icon-sm" data-tip="Copy" data-copy="dim_live_c412">
-                          <i data-icon="copy" data-icon-size="13"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="token-meta">
-                      Created Oct 3, 2024<br>
-                      Expires in 6 days
-                    </div>
-                  </div>
-                </div>
-
-                <div class="sg-footer">
-                  <div class="sg-footer-note">API keys grant full access. Never share them publicly.</div>
-                  <button class="btn btn-primary btn-sm">
-                    <i data-icon="plus" data-icon-size="14"></i>
-                    Generate new key
-                  </button>
                 </div>
               </div>
 
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="globe" data-icon-size="18"></i>
-                    Webhooks
-                  </div>
-                  <div class="sg-desc">Notify external systems when file events occur.</div>
-                </div>
-                <div class="sg-body">
-                  <div class="setting-row is-stacked">
-                    <div class="setting-info">
-                      <div class="setting-name">Webhook endpoint URL</div>
-                      <div class="setting-hint">POST events to this HTTPS endpoint.</div>
-                    </div>
-                    <div class="setting-control is-wide">
-                      <input class="input" type="text" placeholder="https://your-app.com/webhooks/dimension">
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Trigger events</div>
-                      <div class="setting-hint">Which file operations should fire a webhook.</div>
-                    </div>
-                    <div class="setting-control">
-                      <div class="swatch-row">
-                        <span class="tag">upload.completed</span>
-                        <span class="tag">file.deleted</span>
-                        <span class="tag">share.created</span>
-                        <button class="btn-icon btn-icon-sm" data-tip="Add event">
-                          <i data-icon="plus" data-icon-size="13"></i>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- ══════════════════════
+              <!-- ══════════════════════
                  PANE: INTEGRATIONS
                  ══════════════════════ -->
-            <div class="settings-pane" data-pane-content="integrations">
+              <div class="settings-pane" data-pane-content="integrations">
 
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="package" data-icon-size="18"></i>
-                    Connected services
-                  </div>
-                  <div class="sg-desc">Sync files with external cloud providers and productivity tools.</div>
-                </div>
-
-                <div class="integration-grid">
-                  <div class="integration-card">
-                    <div class="integration-ico" style="color:#4285F4"><i data-icon="cloud" data-icon-size="17"></i>
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="package" data-icon-size="18"></i>
+                      Connected services
                     </div>
-                    <div class="integration-body">
-                      <div class="integration-name">Google Drive</div>
-                      <div class="integration-status connected"><span class="dot"></span> Connected</div>
-                    </div>
-                    <button class="btn btn-ghost btn-sm">Manage</button>
+                    <div class="sg-desc">Sync files with external cloud providers and productivity tools.</div>
                   </div>
 
-                  <div class="integration-card">
-                    <div class="integration-ico" style="color:#0061FF"><i data-icon="cloud" data-icon-size="17"></i>
+                  <div class="integration-grid">
+                    <div class="integration-card">
+                      <div class="integration-ico" style="color:#4285F4"><i data-icon="cloud" data-icon-size="17"></i>
+                      </div>
+                      <div class="integration-body">
+                        <div class="integration-name">Google Drive</div>
+                        <div class="integration-status connected"><span class="dot"></span> Connected</div>
+                      </div>
+                      <button class="btn btn-ghost btn-sm">Manage</button>
                     </div>
-                    <div class="integration-body">
-                      <div class="integration-name">Dropbox</div>
-                      <div class="integration-status connected"><span class="dot"></span> Connected</div>
-                    </div>
-                    <button class="btn btn-ghost btn-sm">Manage</button>
-                  </div>
 
-                  <div class="integration-card">
-                    <div class="integration-ico"><i data-icon="fileText" data-icon-size="17"></i></div>
-                    <div class="integration-body">
-                      <div class="integration-name">Notion</div>
-                      <div class="integration-status"><span class="dot"></span> Not connected</div>
+                    <div class="integration-card">
+                      <div class="integration-ico" style="color:#0061FF"><i data-icon="cloud" data-icon-size="17"></i>
+                      </div>
+                      <div class="integration-body">
+                        <div class="integration-name">Dropbox</div>
+                        <div class="integration-status connected"><span class="dot"></span> Connected</div>
+                      </div>
+                      <button class="btn btn-ghost btn-sm">Manage</button>
                     </div>
-                    <button class="btn btn-primary btn-sm">Connect</button>
-                  </div>
 
-                  <div class="integration-card">
-                    <div class="integration-ico" style="color:#4A154B"><i data-icon="mail" data-icon-size="17"></i>
+                    <div class="integration-card">
+                      <div class="integration-ico"><i data-icon="fileText" data-icon-size="17"></i></div>
+                      <div class="integration-body">
+                        <div class="integration-name">Notion</div>
+                        <div class="integration-status"><span class="dot"></span> Not connected</div>
+                      </div>
+                      <button class="btn btn-primary btn-sm">Connect</button>
                     </div>
-                    <div class="integration-body">
-                      <div class="integration-name">Slack</div>
-                      <div class="integration-status connected"><span class="dot"></span> Notifications on</div>
-                    </div>
-                    <button class="btn btn-ghost btn-sm">Manage</button>
-                  </div>
 
-                  <div class="integration-card">
-                    <div class="integration-ico"><i data-icon="database" data-icon-size="17"></i></div>
-                    <div class="integration-body">
-                      <div class="integration-name">Amazon S3</div>
-                      <div class="integration-status"><span class="dot"></span> Not connected</div>
+                    <div class="integration-card">
+                      <div class="integration-ico" style="color:#4A154B"><i data-icon="mail" data-icon-size="17"></i>
+                      </div>
+                      <div class="integration-body">
+                        <div class="integration-name">Slack</div>
+                        <div class="integration-status connected"><span class="dot"></span> Notifications on</div>
+                      </div>
+                      <button class="btn btn-ghost btn-sm">Manage</button>
                     </div>
-                    <button class="btn btn-primary btn-sm">Connect</button>
-                  </div>
 
-                  <div class="integration-card">
-                    <div class="integration-ico"><i data-icon="code" data-icon-size="17"></i></div>
-                    <div class="integration-body">
-                      <div class="integration-name">GitHub</div>
-                      <div class="integration-status"><span class="dot"></span> Not connected</div>
+                    <div class="integration-card">
+                      <div class="integration-ico"><i data-icon="database" data-icon-size="17"></i></div>
+                      <div class="integration-body">
+                        <div class="integration-name">Amazon S3</div>
+                        <div class="integration-status"><span class="dot"></span> Not connected</div>
+                      </div>
+                      <button class="btn btn-primary btn-sm">Connect</button>
                     </div>
-                    <button class="btn btn-primary btn-sm">Connect</button>
+
+                    <div class="integration-card">
+                      <div class="integration-ico"><i data-icon="code" data-icon-size="17"></i></div>
+                      <div class="integration-body">
+                        <div class="integration-name">GitHub</div>
+                        <div class="integration-status"><span class="dot"></span> Not connected</div>
+                      </div>
+                      <button class="btn btn-primary btn-sm">Connect</button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- ══════════════════════
+              <!-- ══════════════════════
                  PANE: NOTIFICATIONS
                  ══════════════════════ -->
-            <div class="settings-pane" data-pane-content="notifications">
+              <div class="settings-pane" data-pane-content="notifications">
 
-              <div class="settings-group">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="bell" data-icon-size="18"></i>
-                    Notification preferences
+                <div class="settings-group">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="bell" data-icon-size="18"></i>
+                      Notification preferences
+                    </div>
+                    <div class="sg-desc">Choose which events reach you and where.</div>
                   </div>
-                  <div class="sg-desc">Choose which events reach you and where.</div>
-                </div>
-                <div class="sg-body">
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Upload complete</div>
-                      <div class="setting-hint">Notify when a large upload finishes.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
-                    </div>
-                  </div>
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Storage 80% full</div>
-                      <div class="setting-hint">Alert when workspace storage nears capacity.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
-                    </div>
-                  </div>
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Failed uploads</div>
-                      <div class="setting-hint">Notify when a file fails after all retries.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
-                    </div>
-                  </div>
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">New share links</div>
-                      <div class="setting-hint">When another admin creates a public share.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch"><input type="checkbox"><span class="track"></span></label>
-                    </div>
-                  </div>
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Weekly summary email</div>
-                      <div class="setting-hint">A digest of activity delivered every Monday.</div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- ══════════════════════
-                 PANE: DANGER ZONE
-                 ══════════════════════ -->
-            <div class="settings-pane" data-pane-content="danger">
-
-              <div class="settings-group danger-zone">
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="alert" data-icon-size="18"></i>
-                    Danger zone
-                  </div>
-                  <div class="sg-desc">These actions are permanent and cannot be undone. Please proceed with care.</div>
-                </div>
-                <div class="sg-body">
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Empty trash</div>
-                      <div class="setting-hint">Permanently delete all 217 files currently in the trash.</div>
-                    </div>
-                    <div class="setting-control">
-                      <button class="btn btn-danger btn-sm" data-danger="empty-trash">
-                        <i data-icon="trash" data-icon-size="14"></i>
-                        Empty trash
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Revoke all API keys</div>
-                      <div class="setting-hint">Immediately invalidate all API keys. Any integration using them will
-                        stop working.</div>
-                    </div>
-                    <div class="setting-control">
-                      <button class="btn btn-danger btn-sm" data-danger="revoke-keys">
-                        <i data-icon="key" data-icon-size="14"></i>
-                        Revoke all
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Transfer workspace ownership</div>
-                      <div class="setting-hint">Move ownership to another administrator. You'll be demoted to admin.
+                  <div class="sg-body">
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Upload complete</div>
+                        <div class="setting-hint">Notify when a large upload finishes.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
                       </div>
                     </div>
-                    <div class="setting-control">
-                      <button class="btn btn-danger btn-sm">
-                        <i data-icon="users" data-icon-size="14"></i>
-                        Transfer
-                      </button>
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Storage 80% full</div>
+                        <div class="setting-hint">Alert when workspace storage nears capacity.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+                      </div>
                     </div>
-                  </div>
-
-                  <div class="setting-row">
-                    <div class="setting-info">
-                      <div class="setting-name">Delete workspace</div>
-                      <div class="setting-hint">Permanently delete this workspace and all 24,837 files. There is no
-                        recovery.</div>
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Failed uploads</div>
+                        <div class="setting-hint">Notify when a file fails after all retries.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+                      </div>
                     </div>
-                    <div class="setting-control">
-                      <button class="btn btn-danger btn-sm" data-danger="delete-workspace">
-                        <i data-icon="trash" data-icon-size="14"></i>
-                        Delete workspace
-                      </button>
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">New share links</div>
+                        <div class="setting-hint">When another admin creates a public share.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch"><input type="checkbox"><span class="track"></span></label>
+                      </div>
+                    </div>
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Weekly summary email</div>
+                        <div class="setting-hint">A digest of activity delivered every Monday.</div>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+
+              <!-- ══════════════════════
+                 PANE: DANGER ZONE
+                 ══════════════════════ -->
+              <div class="settings-pane" data-pane-content="danger">
+
+                <div class="settings-group danger-zone">
+                  <div class="sg-head">
+                    <div class="sg-title">
+                      <i data-icon="alert" data-icon-size="18"></i>
+                      Danger zone
+                    </div>
+                    <div class="sg-desc">These actions are permanent and cannot be undone. Please proceed with care.
+                    </div>
+                  </div>
+                  <div class="sg-body">
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Empty trash</div>
+                        <div class="setting-hint">Permanently delete all 217 files currently in the trash.</div>
+                      </div>
+                      <div class="setting-control">
+                        <button class="btn btn-danger btn-sm" data-danger="empty-trash">
+                          <i data-icon="trash" data-icon-size="14"></i>
+                          Empty trash
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Revoke all API keys</div>
+                        <div class="setting-hint">Immediately invalidate all API keys. Any integration using them will
+                          stop working.</div>
+                      </div>
+                      <div class="setting-control">
+                        <button class="btn btn-danger btn-sm" data-danger="revoke-keys">
+                          <i data-icon="key" data-icon-size="14"></i>
+                          Revoke all
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Transfer workspace ownership</div>
+                        <div class="setting-hint">Move ownership to another administrator. You'll be demoted to admin.
+                        </div>
+                      </div>
+                      <div class="setting-control">
+                        <button class="btn btn-danger btn-sm">
+                          <i data-icon="users" data-icon-size="14"></i>
+                          Transfer
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-info">
+                        <div class="setting-name">Delete workspace</div>
+                        <div class="setting-hint">Permanently delete this workspace and all 24,837 files. There is no
+                          recovery.</div>
+                      </div>
+                      <div class="setting-control">
+                        <button class="btn btn-danger btn-sm" data-danger="delete-workspace">
+                          <i data-icon="trash" data-icon-size="14"></i>
+                          Delete workspace
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
-
           </div>
+
+          <!-- Sticky save bar -->
+          <div class="save-bar" id="saveBar">
+            <div class="save-bar-text">
+              <span class="dot"></span>
+              You have unsaved changes
+            </div>
+            <div class="save-bar-actions">
+              <button class="btn btn-ghost btn-sm" id="discardChanges">Discard</button>
+              <button class="btn btn-primary btn-sm" id="saveChanges">
+                <i data-icon="save" data-icon-size="14"></i>
+                Save changes
+              </button>
+            </div>
+          </div>
+
         </div>
-
-        <!-- Sticky save bar -->
-        <div class="save-bar" id="saveBar">
-          <div class="save-bar-text">
-            <span class="dot"></span>
-            You have unsaved changes
-          </div>
-          <div class="save-bar-actions">
-            <button class="btn btn-ghost btn-sm" id="discardChanges">Discard</button>
-            <button class="btn btn-primary btn-sm" id="saveChanges">
-              <i data-icon="save" data-icon-size="14"></i>
-              Save changes
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </main>
+      </main>
   </div>
 
   <!-- Scripts -->
