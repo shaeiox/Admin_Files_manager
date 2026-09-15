@@ -6,18 +6,18 @@ This document defines the path for connecting the frontend to a backend integrat
 
 ## 🛠️ Architecture Prerequisites
 
-* [ ] **Choose the backend language:** Node.js / Python / Go / PHP, with the ability to read and manage Linux file-system paths.
-* [ ] **Define Permissions:** Ensure that the backend has Read/Write access to the Linux `/download` directory and all of its subdirectories (configure `chmod` and `chown` as required).
-* [ ] **Decide on Metadata Storage (Auxiliary Database):** Determine whether download statistics, activity logs, and starred files should be stored using SQLite/JSON alongside the files, or whether these features should be removed from the UI.
+* [ x] **Choose the backend language:** Node.js / Python / Go / PHP, with the ability to read and manage Linux file-system paths.
+* [ x] **Define Permissions:** Ensure that the backend has Read/Write access to the Linux `/download` directory and all of its subdirectories (configure `chmod` and `chown` as required).
+* [x ] **Decide on Metadata Storage (Auxiliary Database):** Determine whether download statistics, activity logs, and starred files should be stored using SQLite/JSON alongside the files, or whether these features should be removed from the UI.
 
 ---
 
 ## 📦 Phase 1: Network Communication Layer (`API Bridge`)
 
-* [ ] Create a new `js/api.js` file to centralize `fetch` requests.
-* [ ] Implement the core API methods with a focus on sending **paths** instead of IDs (e.g. `GET /api/fs?path=/media`).
-* [ ] Handle operating-system-level errors, such as `403 Access Denied` or `404 Not Found` when a file has been deleted directly from the server.
-* [ ] Add the `api.js` script to the `<head>` section of all HTML files.
+* [ x] Create a new `js/api.js` file to centralize `fetch` requests.
+* [ x] Implement the core API methods with a focus on sending **paths** instead of IDs (e.g. `GET /api/fs?path=/media`).
+* [ x] Handle operating-system-level errors, such as `403 Access Denied` or `404 Not Found` when a file has been deleted directly from the server.
+* [ x] Add the `api.js` script to the `<head>` section of all HTML files.
 
 ---
 
