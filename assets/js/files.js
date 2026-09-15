@@ -1,5 +1,5 @@
 /* ============================================
-   FILES.JS — File Browser Page Logic
+   FILES.JS — Enterprise File Browser Logic
    Admin Files Manager — Dimension Style
    ============================================ */
 
@@ -7,120 +7,82 @@
 
 const Files = (() => {
 
-  const { $, $$, el, icon, Format, Toast, Modal, ContextMenu, copyToClipboard, resolveType, Store } = window.AFM;
-
-  /* ══════════════════════════════════════════
-     MOCK DATA
-     ══════════════════════════════════════════ */
-
-  const folderTree = [
-    { id: 'root', name: 'All Files', icon: 'hardDrive', count: 24837, children: [
-      { id: 'releases', name: 'Releases', count: 1240, children: [
-        { id: 'mac',     name: 'macOS',   count: 340 },
-        { id: 'win',     name: 'Windows', count: 512 },
-        { id: 'linux',   name: 'Linux',   count: 388 },
-      ]},
-      { id: 'media', name: 'Media', count: 8912, children: [
-        { id: 'videos',  name: 'Videos', count: 3402 },
-        { id: 'images',  name: 'Images', count: 5510 },
-      ]},
-      { id: 'docs',     name: 'Documents', count: 4302 },
-      { id: 'design',   name: 'Design',    count: 2144 },
-      { id: 'reports',  name: 'Reports',   count: 981 },
-      { id: 'archive',  name: 'Archive',   count: 7258 },
-    ]},
-    { id: 'shared',  name: 'Shared with me', icon: 'users',    count: 428 },
-    { id: 'starred', name: 'Starred',        icon: 'star',     count: 34  },
-    { id: 'recent',  name: 'Recent',         icon: 'clock',    count: 128 },
-    { id: 'trash',   name: 'Trash',          icon: 'trash',    count: 217 },
-  ];
-
-  const fileNames = [
-    'launch-video-final-v3.mp4',
-    'brand-guidelines-2025.pdf',
-    'installer-v4.2.dmg',
-    'annual-report.pdf',
-    'ui-mockup-dashboard.png',
-    'product-shots-batch-04.zip',
-    'onboarding-flow.fig',
-    'api-reference-v2.zip',
-    'quarterly-review.docx',
-    'team-photo-2024.jpg',
-    'demo-recording.mov',
-    'roadmap-q1-q2.xlsx',
-    'logo-primary-dark.svg',
-    'user-research-notes.pdf',
-    'marketing-assets.zip',
-    'podcast-episode-14.mp3',
-    'infrastructure-diagram.png',
-    'config.yaml',
-    'deploy-script.sh',
-    'legal-agreement.pdf',
-    'launch-checklist.md',
-    'design-system.sketch',
-    'analytics-export.csv',
-    'server-logs-dec.gz',
-    'welcome-banner.webp',
-    'source-code-snapshot.tar',
-    'meeting-recap.docx',
-    'feature-spec.pdf',
-  ];
-
-  const authors = ['Sarah Chen', 'Marcus Weber', 'Priya Ramesh', 'Alex Torres', 'Yuki Tanaka', 'Elena Petrov', 'James Okonkwo', 'Mira Patel'];
-  const statuses = ['public', 'internal', 'private'];
-
-  function makeFiles() {
-    const items = [];
-    // Add a few folders first
-    ['Marketing Assets', 'Product Design', 'Legal Documents', 'Beta Releases'].forEach((name, i) => {
-      items.push({
-        id: `fld_${i}`,
-        name,
-        isFolder: true,
-        size: null,
-        items: 40 + Math.floor(Math.random() * 300),
-        downloads: null,
-        modified: Date.now() - Math.random() * 14 * 86400 * 1000,
-        author: authors[Math.floor(Math.random() * authors.length)],
-        status: 'internal',
-        starred: false,
-        path: '/root',
-      });
-    });
-
-    fileNames.forEach((name, i) => {
-      items.push({
-        id: `f_${i}`,
-        name,
-        isFolder: false,
-        size: Math.round(Math.random() * 500 * 1024 * 1024) + 30000,
-        downloads: Math.floor(Math.random() * 3500),
-        modified: Date.now() - Math.random() * 30 * 86400 * 1000,
-        author: authors[Math.floor(Math.random() * authors.length)],
-        status: statuses[Math.floor(Math.random() * statuses.length)],
-        starred: Math.random() < 0.15,
-        path: '/root/media',
-      });
-    });
-    return items;
-  }
+  const { $, $$, icon, Format, Toast, Modal, ContextMenu, copyToClipboard, resolveType, Store } = window.AFM;
 
   /* ══════════════════════════════════════════
      STATE
      ══════════════════════════════════════════ */
 
   const state = {
-    all: [],
-    filtered: [],
-    view: Store.get('files-view', 'list'),   // 'list' | 'grid'
+    tree: [],               // Folder hierarchy from API
+    files: [],              // Current page items from API
+    totalFiles: 0,          // Total items in current folder matching filters
+    typeCounts: {},         // Counts for filter chips
+
+    view: Store.get('files-view', 'list'), // 'list' | 'grid'
     sort: { key: 'modified', dir: 'desc' },
-    filter: 'all',                            // 'all'|'folder'|'image'|'video'|'audio'|'document'|'archive'|'code'
+    filter: 'all',          // 'all'|'folder'|'image'|'video'|'audio'|'document'|'archive'|'code'
     search: '',
     selected: new Set(),
     page: 1,
     perPage: 20,
-    currentFolder: 'root',
+    currentPath: '/',       // Root is represented as '/'
+
+    isLoading: false
   };
+
+  /* ══════════════════════════════════════════
+     DATA FETCHING (API INTEGRATION)
+     ══════════════════════════════════════════ */
+
+  async function loadTree() {
+    try {
+      const data = await window.API.get('/fs/tree');
+      state.tree = Array.isArray(data) ? data : [data];
+      renderTree();
+    } catch (e) {
+      console.warn('[Files] Failed to load tree, using fallback');
+      // Minimal fallback structure if API is unreachable
+      state.tree = [{ id: '/', name: 'All Files', path: '/', icon: 'hardDrive', children: [] }];
+      renderTree();
+    }
+  }
+
+  async function loadFiles() {
+    state.isLoading = true;
+    renderView(); // Re-render to show loading state (can be enhanced with skeletons)
+
+    try {
+      const params = new URLSearchParams({
+        path: state.currentPath,
+        page: state.page,
+        limit: state.perPage,
+        sort: state.sort.key,
+        dir: state.sort.dir,
+        search: state.search,
+        type: state.filter
+      });
+
+      const res = await window.API.get(`/fs/list?${params.toString()}`);
+
+      state.files = res.items || [];
+      state.totalFiles = res.total || 0;
+      state.typeCounts = res.counts || {};
+
+    } catch (e) {
+      console.warn('[Files] Failed to load files list');
+      state.files = [];
+      state.totalFiles = 0;
+      state.typeCounts = {};
+    } finally {
+      state.isLoading = false;
+      // Clear selection when folder changes or reloads
+      state.selected.clear();
+      updateBulkBar();
+      renderFilterChips();
+      renderView();
+    }
+  }
 
   /* ══════════════════════════════════════════
      RENDER — FOLDER TREE
@@ -131,20 +93,20 @@ const Files = (() => {
     if (!wrap) return;
 
     function walk(nodes, depth = 0) {
+      if (!nodes) return '';
       return nodes.map(n => {
         const hasChildren = Array.isArray(n.children) && n.children.length > 0;
-        const isOpen = depth === 0 || n.id === 'root' || n.id === 'media';
-        const isActive = n.id === state.currentFolder;
+        const isOpen = depth === 0; // Keep root open by default
+        const isActive = n.path === state.currentPath;
 
         return `
-          <div class="tree-node ${isOpen ? 'is-open' : ''}" data-id="${n.id}">
-            <div class="tree-item ${isActive ? 'is-active' : ''}" data-tree-id="${n.id}">
+          <div class="tree-node ${isOpen ? 'is-open' : ''}" data-path="${n.path}">
+            <div class="tree-item ${isActive ? 'is-active' : ''}" data-tree-path="${n.path}">
               <span class="tree-caret ${hasChildren ? '' : 'is-empty'}">
                 ${hasChildren ? icon('chevronRight', 11) : ''}
               </span>
               <span class="tree-ico">${icon(n.icon || 'folder', 14)}</span>
               <span class="tree-name">${n.name}</span>
-              ${n.count != null ? `<span class="tree-count">${Format.compact(n.count)}</span>` : ''}
             </div>
             ${hasChildren ? `<div class="tree-children">${walk(n.children, depth + 1)}</div>` : ''}
           </div>
@@ -152,9 +114,9 @@ const Files = (() => {
       }).join('');
     }
 
-    wrap.innerHTML = walk(folderTree);
+    wrap.innerHTML = walk(state.tree);
 
-    // Bind clicks
+    // Bind tree clicks
     wrap.querySelectorAll('.tree-caret').forEach(c => {
       c.addEventListener('click', e => {
         e.stopPropagation();
@@ -164,10 +126,20 @@ const Files = (() => {
 
     wrap.querySelectorAll('.tree-item').forEach(item => {
       item.addEventListener('click', () => {
-        state.currentFolder = item.getAttribute('data-tree-id');
+        const newPath = item.getAttribute('data-tree-path');
+        if (newPath === state.currentPath) return; // Already there
+
+        state.currentPath = newPath;
+        state.page = 1;
+        state.search = '';
+        const searchInput = $('#filesSearch');
+        if (searchInput) searchInput.value = '';
+
         wrap.querySelectorAll('.tree-item').forEach(i => i.classList.remove('is-active'));
         item.classList.add('is-active');
+
         updateBreadcrumb();
+        loadFiles();
       });
     });
   }
@@ -180,98 +152,65 @@ const Files = (() => {
     const wrap = $('#filterChips');
     if (!wrap) return;
 
-    const counts = {
-      all: state.all.length,
-      folder: state.all.filter(f => f.isFolder).length,
-      image: state.all.filter(f => !f.isFolder && resolveType(f.name).key === 'image').length,
-      video: state.all.filter(f => !f.isFolder && resolveType(f.name).key === 'video').length,
-      document: state.all.filter(f => !f.isFolder && resolveType(f.name).key === 'document').length,
-      audio: state.all.filter(f => !f.isFolder && resolveType(f.name).key === 'audio').length,
-      archive: state.all.filter(f => !f.isFolder && resolveType(f.name).key === 'archive').length,
-      code: state.all.filter(f => !f.isFolder && resolveType(f.name).key === 'code').length,
-    };
-
     const chips = [
-      { key: 'all',      label: 'All',       icon: 'layers' },
-      { key: 'folder',   label: 'Folders',   icon: 'folder' },
-      { key: 'image',    label: 'Images',    icon: 'image' },
-      { key: 'video',    label: 'Videos',    icon: 'video' },
+      { key: 'all', label: 'All', icon: 'layers' },
+      { key: 'folder', label: 'Folders', icon: 'folder' },
+      { key: 'image', label: 'Images', icon: 'image' },
+      { key: 'video', label: 'Videos', icon: 'video' },
       { key: 'document', label: 'Documents', icon: 'fileText' },
-      { key: 'audio',    label: 'Audio',     icon: 'music' },
-      { key: 'archive',  label: 'Archives',  icon: 'archive' },
-      { key: 'code',     label: 'Code',      icon: 'code' },
+      { key: 'audio', label: 'Audio', icon: 'music' },
+      { key: 'archive', label: 'Archives', icon: 'archive' },
+      { key: 'code', label: 'Code', icon: 'code' },
     ];
 
-    wrap.innerHTML = chips.map(c => `
-      <button class="filter-chip ${state.filter === c.key ? 'is-active' : ''}" data-filter="${c.key}">
-        ${icon(c.icon, 13)}
-        ${c.label}
-        <span class="count">${Format.compact(counts[c.key] || 0)}</span>
-      </button>
-    `).join('');
+    wrap.innerHTML = chips.map(c => {
+      // Show count if provided by API, otherwise omit it to prevent "0" spam when offline
+      const countStr = state.typeCounts[c.key] !== undefined
+        ? `<span class="count">${Format.compact(state.typeCounts[c.key])}</span>`
+        : '';
+
+      return `
+        <button class="filter-chip ${state.filter === c.key ? 'is-active' : ''}" data-filter="${c.key}">
+          ${icon(c.icon, 13)}
+          ${c.label}
+          ${countStr}
+        </button>
+      `;
+    }).join('');
   }
 
   /* ══════════════════════════════════════════
-     APPLY FILTERS / SORT
-     ══════════════════════════════════════════ */
-
-  function applyFilters() {
-    let items = state.all.slice();
-
-    // Type filter
-    if (state.filter === 'folder') {
-      items = items.filter(f => f.isFolder);
-    } else if (state.filter !== 'all') {
-      items = items.filter(f => !f.isFolder && resolveType(f.name).key === state.filter);
-    }
-
-    // Search
-    if (state.search.trim()) {
-      const q = state.search.toLowerCase();
-      items = items.filter(f => f.name.toLowerCase().includes(q));
-    }
-
-    // Sort — folders always first
-    items.sort((a, b) => {
-      if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
-      let av = a[state.sort.key], bv = b[state.sort.key];
-      if (av == null) av = 0;
-      if (bv == null) bv = 0;
-      if (typeof av === 'string') { av = av.toLowerCase(); bv = bv.toLowerCase(); }
-      if (av < bv) return state.sort.dir === 'asc' ? -1 : 1;
-      if (av > bv) return state.sort.dir === 'asc' ?  1 : -1;
-      return 0;
-    });
-
-    state.filtered = items;
-    state.page = Math.min(state.page, Math.max(1, Math.ceil(items.length / state.perPage)));
-  }
-
-  /* ══════════════════════════════════════════
-     RENDER — LIST VIEW (table)
+     RENDER — LIST VIEW (TABLE)
      ══════════════════════════════════════════ */
 
   function renderList() {
     const wrap = $('#filesContainer');
     if (!wrap) return;
 
-    const start = (state.page - 1) * state.perPage;
-    const pageItems = state.filtered.slice(start, start + state.perPage);
-    const allSelected = pageItems.length && pageItems.every(f => state.selected.has(f.id));
-    const anySelected = pageItems.some(f => state.selected.has(f.id));
+    if (state.isLoading) {
+      wrap.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-tertiary);">Loading files...</div>`;
+      return;
+    }
 
-    if (!pageItems.length) {
+    if (!state.files.length) {
       wrap.innerHTML = renderEmpty();
       updateBulkBar();
       return;
     }
 
-    const rows = pageItems.map(f => {
+    const allSelected = state.files.length > 0 && state.files.every(f => state.selected.has(f.id));
+    const anySelected = state.files.some(f => state.selected.has(f.id));
+
+    const rows = state.files.map(f => {
       const t = resolveType(f.name, f.isFolder);
       const isSel = state.selected.has(f.id);
-      const statusBadge = f.isFolder
-        ? `<span class="badge">${f.items} items</span>`
-        : `<span class="badge badge-${statusColor(f.status)}">${f.status}</span>`;
+
+      let statusBadge = '';
+      if (f.isFolder) {
+        statusBadge = `<span class="badge">${f.itemsCount !== undefined ? f.itemsCount + ' items' : 'Folder'}</span>`;
+      } else if (f.status) {
+        statusBadge = `<span class="badge badge-${statusColor(f.status)}">${f.status}</span>`;
+      }
 
       return `
         <tr data-id="${f.id}" class="${isSel ? 'is-selected' : ''}">
@@ -285,7 +224,9 @@ const Files = (() => {
             <div class="fname-cell">
               <div class="ftype-icon ${t.key}">${icon(t.icon, 16)}</div>
               <div class="fname-text">
-                <div class="fname">${f.name} ${f.starred ? '<span style="color:#fbbf24">★</span>' : ''}</div>
+                <div class="fname" style="cursor:${f.isFolder ? 'pointer' : 'default'}" ${f.isFolder ? `data-navigate="${f.path}"` : ''}>
+                  ${f.name} ${f.starred ? '<span style="color:#fbbf24">★</span>' : ''}
+                </div>
                 <div class="fpath">${f.path}</div>
               </div>
             </div>
@@ -297,7 +238,7 @@ const Files = (() => {
           <td class="col-status">${statusBadge}</td>
           <td class="col-actions">
             <div class="row-actions">
-              <button class="btn-icon btn-icon-sm" data-tip="Download" data-act="download" data-id="${f.id}">${icon('download', 15)}</button>
+              ${!f.isFolder ? `<button class="btn-icon btn-icon-sm" data-tip="Download" data-act="download" data-id="${f.id}">${icon('download', 15)}</button>` : ''}
               <button class="btn-icon btn-icon-sm" data-tip="More" data-act="more" data-id="${f.id}">${icon('moreHorizontal', 15)}</button>
             </div>
           </td>
@@ -340,9 +281,7 @@ const Files = (() => {
     `;
 
     const selectAll = $('#selectAll');
-    if (selectAll) {
-      selectAll.indeterminate = anySelected && !allSelected;
-    }
+    if (selectAll) selectAll.indeterminate = anySelected && !allSelected;
 
     bindRowInteractions();
     updateBulkBar();
@@ -356,22 +295,24 @@ const Files = (() => {
     const wrap = $('#filesContainer');
     if (!wrap) return;
 
-    const start = (state.page - 1) * state.perPage;
-    const pageItems = state.filtered.slice(start, start + state.perPage);
+    if (state.isLoading) {
+      wrap.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-tertiary);">Loading files...</div>`;
+      return;
+    }
 
-    if (!pageItems.length) {
+    if (!state.files.length) {
       wrap.innerHTML = renderEmpty();
       updateBulkBar();
       return;
     }
 
-    const cards = pageItems.map((f, i) => {
+    const cards = state.files.map((f, i) => {
       const t = resolveType(f.name, f.isFolder);
       const isSel = state.selected.has(f.id);
       const ext = t.ext ? t.ext.toUpperCase() : (f.isFolder ? 'FOLDER' : '');
 
       return `
-        <div class="file-card ${isSel ? 'is-selected' : ''}" data-id="${f.id}" style="animation-delay:${i * 20}ms">
+        <div class="file-card ${isSel ? 'is-selected' : ''}" data-id="${f.id}" style="animation-delay:${i * 20}ms" ${f.isFolder ? `data-navigate="${f.path}"` : ''}>
           <div class="file-card-check">
             <label class="checkbox">
               <input type="checkbox" data-check="${f.id}" ${isSel ? 'checked' : ''}>
@@ -388,7 +329,7 @@ const Files = (() => {
           <div class="file-card-info">
             <div class="file-card-name">${f.name}</div>
             <div class="file-card-meta">
-              <span>${f.isFolder ? f.items + ' items' : Format.bytes(f.size)}</span>
+              <span>${f.isFolder ? (f.itemsCount || 0) + ' items' : Format.bytes(f.size)}</span>
               <span class="sep"></span>
               <span>${Format.relative(f.modified)}</span>
             </div>
@@ -407,11 +348,9 @@ const Files = (() => {
      ══════════════════════════════════════════ */
 
   function renderFooter() {
-    const total = state.filtered.length;
-    const totalPages = Math.max(1, Math.ceil(total / state.perPage));
-    const start = total === 0 ? 0 : (state.page - 1) * state.perPage + 1;
-    const end = Math.min(state.page * state.perPage, total);
-
+    const totalPages = Math.max(1, Math.ceil(state.totalFiles / state.perPage));
+    const start = state.totalFiles === 0 ? 0 : (state.page - 1) * state.perPage + 1;
+    const end = Math.min(state.page * state.perPage, state.totalFiles);
     const pageNumbers = buildPageNumbers(state.page, totalPages);
 
     return `
@@ -424,15 +363,15 @@ const Files = (() => {
           rows
         </div>
         <div class="footer-info">
-          Showing <strong>${start}–${end}</strong> of <strong>${Format.number(total)}</strong>
+          Showing <strong>${start}–${end}</strong> of <strong>${Format.number(state.totalFiles)}</strong>
         </div>
         <div class="pagination">
           <button class="page-btn" data-page="prev" ${state.page === 1 ? 'disabled' : ''}>${icon('chevronLeft', 15)}</button>
           ${pageNumbers.map(p =>
-            p === '…'
-              ? `<span class="page-btn" style="cursor:default;pointer-events:none">…</span>`
-              : `<button class="page-btn ${p === state.page ? 'is-active' : ''}" data-page="${p}">${p}</button>`
-          ).join('')}
+      p === '…'
+        ? `<span class="page-btn" style="cursor:default;pointer-events:none">…</span>`
+        : `<button class="page-btn ${p === state.page ? 'is-active' : ''}" data-page="${p}">${p}</button>`
+    ).join('')}
           <button class="page-btn" data-page="next" ${state.page === totalPages ? 'disabled' : ''}>${icon('chevronRight', 15)}</button>
         </div>
       </div>
@@ -450,13 +389,17 @@ const Files = (() => {
   }
 
   function renderEmpty() {
+    let msg = 'No files found in this directory.';
+    if (state.search) msg = `No results found for "${window.AFM.escapeHtml(state.search)}".`;
+    else if (state.filter !== 'all') msg = `No files matching the "${state.filter}" filter.`;
+
     return `
       <div class="empty-state">
         <div class="empty-icon">${icon('inbox', 26)}</div>
-        <div class="empty-title">No files match your filters</div>
-        <div class="empty-desc">Try clearing filters or uploading new files to get started.</div>
+        <div class="empty-title">${msg}</div>
+        <div class="empty-desc">Adjust your filters or upload new files to this location.</div>
         <div style="margin-top:12px;display:flex;gap:8px;">
-          <button class="btn btn-ghost btn-sm" id="clearFilters">Clear filters</button>
+          ${(state.search || state.filter !== 'all') ? `<button class="btn btn-ghost btn-sm" id="clearFilters">Clear filters</button>` : ''}
           <a class="btn btn-primary btn-sm" href="uploads.html">${icon('upload', 15)} Upload files</a>
         </div>
       </div>
@@ -468,45 +411,40 @@ const Files = (() => {
   }
 
   /* ══════════════════════════════════════════
-     BREADCRUMB
+     BREADCRUMB & OS PATHING
      ══════════════════════════════════════════ */
 
   function updateBreadcrumb() {
     const bc = $('#breadcrumb');
     if (!bc) return;
-    const active = findNode(folderTree, state.currentFolder);
-    if (!active) return;
 
-    // Simple path builder
-    const path = pathTo(folderTree, state.currentFolder) || [];
-    bc.innerHTML = path.map((n, i) => `
-      <span class="breadcrumb-sep">${icon('chevronRight', 14)}</span>
-      <span class="breadcrumb-item ${i === path.length - 1 ? 'is-current' : ''}" data-nav-id="${n.id}">${n.name}</span>
-    `).join('');
-    // Add home first
-    bc.insertAdjacentHTML('afterbegin', `<span class="breadcrumb-item" data-nav-id="root">Files</span>`);
-  }
+    // Split OS path: e.g. "/media/videos" -> ["media", "videos"]
+    const parts = state.currentPath.split('/').filter(Boolean);
 
-  function findNode(list, id) {
-    for (const n of list) {
-      if (n.id === id) return n;
-      if (n.children) {
-        const found = findNode(n.children, id);
-        if (found) return found;
-      }
-    }
-  }
+    let html = `<span class="breadcrumb-item ${parts.length === 0 ? 'is-current' : ''}" data-nav-path="/">Files</span>`;
 
-  function pathTo(list, id, trail = []) {
-    for (const n of list) {
-      const next = [...trail, n];
-      if (n.id === id) return next;
-      if (n.children) {
-        const p = pathTo(n.children, id, next);
-        if (p) return p;
-      }
-    }
-    return null;
+    let currentBuiltPath = '';
+    parts.forEach((part, i) => {
+      currentBuiltPath += `/${part}`;
+      html += `
+        <span class="breadcrumb-sep">${icon('chevronRight', 14)}</span>
+        <span class="breadcrumb-item ${i === parts.length - 1 ? 'is-current' : ''}" data-nav-path="${currentBuiltPath}">${part}</span>
+      `;
+    });
+
+    bc.innerHTML = html;
+
+    // Bind breadcrumb navigation
+    bc.querySelectorAll('[data-nav-path]').forEach(b => {
+      b.addEventListener('click', () => {
+        const targetPath = b.getAttribute('data-nav-path');
+        if (targetPath === state.currentPath) return;
+        state.currentPath = targetPath;
+        state.page = 1;
+        updateBreadcrumb();
+        loadFiles();
+      });
+    });
   }
 
   /* ══════════════════════════════════════════
@@ -532,7 +470,22 @@ const Files = (() => {
      ══════════════════════════════════════════ */
 
   function bindRowInteractions() {
-    // Checkbox individual
+    // Navigate into folders
+    $$('[data-navigate]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        // Prevent nav if clicking checkbox/menu
+        if (e.target.closest('input, .btn-icon, .checkbox, [data-act]')) return;
+        state.currentPath = el.getAttribute('data-navigate');
+        state.page = 1;
+        state.search = '';
+        const searchInput = $('#filesSearch');
+        if (searchInput) searchInput.value = '';
+        updateBreadcrumb();
+        loadFiles();
+      });
+    });
+
+    // Checkboxes
     $$('input[data-check]').forEach(cb => {
       cb.addEventListener('change', () => {
         const id = cb.getAttribute('data-check');
@@ -543,10 +496,8 @@ const Files = (() => {
 
     // Select all
     $('#selectAll')?.addEventListener('change', e => {
-      const start = (state.page - 1) * state.perPage;
-      const pageItems = state.filtered.slice(start, start + state.perPage);
-      if (e.target.checked) pageItems.forEach(f => state.selected.add(f.id));
-      else pageItems.forEach(f => state.selected.delete(f.id));
+      if (e.target.checked) state.files.forEach(f => state.selected.add(f.id));
+      else state.files.forEach(f => state.selected.delete(f.id));
       renderView();
     });
 
@@ -560,32 +511,35 @@ const Files = (() => {
           state.sort.key = key;
           state.sort.dir = 'asc';
         }
-        applyFilters();
-        renderView();
+        loadFiles();
       });
     });
 
-    // Row click → open drawer
+    // Row click → open drawer (only for files, folders navigate)
     $$('.files-table tbody tr, .file-card').forEach(row => {
       row.addEventListener('click', e => {
-        if (e.target.closest('input, .btn-icon, .checkbox, [data-act]')) return;
-        openDrawer(row.getAttribute('data-id'));
+        if (e.target.closest('input, .btn-icon, .checkbox, [data-act], [data-navigate]')) return;
+
+        const id = row.getAttribute('data-id');
+        const file = state.files.find(f => f.id === id);
+        // If it's a file, open drawer. (Folders navigate via data-navigate binding above).
+        if (file && !file.isFolder) {
+          openDrawer(id);
+        }
       });
 
-      // Right-click context menu
+      // Context menu
       row.addEventListener('contextmenu', e => {
         e.preventDefault();
         openContext(e.clientX, e.clientY, row.getAttribute('data-id'));
       });
     });
 
-    // Row action buttons
+    // Action buttons
     $$('[data-act]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
-        const id = btn.getAttribute('data-id');
-        const act = btn.getAttribute('data-act');
-        handleAction(act, id, e);
+        handleAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'), e);
       });
     });
 
@@ -593,145 +547,90 @@ const Files = (() => {
     $$('[data-page]').forEach(btn => {
       btn.addEventListener('click', () => {
         const p = btn.getAttribute('data-page');
-        const totalPages = Math.max(1, Math.ceil(state.filtered.length / state.perPage));
+        const totalPages = Math.max(1, Math.ceil(state.totalFiles / state.perPage));
         if (p === 'prev') state.page = Math.max(1, state.page - 1);
         else if (p === 'next') state.page = Math.min(totalPages, state.page + 1);
         else state.page = parseInt(p, 10);
-        renderView();
+
+        loadFiles();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
 
-    // Per page
     $('#perPageSelect')?.addEventListener('change', e => {
       state.perPage = parseInt(e.target.value, 10);
       state.page = 1;
-      renderView();
+      loadFiles();
     });
 
-    // Empty state clear
     $('#clearFilters')?.addEventListener('click', () => {
       state.filter = 'all';
       state.search = '';
       const searchInput = $('#filesSearch');
       if (searchInput) searchInput.value = '';
-      renderFilterChips();
-      applyFilters();
-      renderView();
-    });
-
-    // Breadcrumb clicks
-    $$('#breadcrumb [data-nav-id]').forEach(b => {
-      b.addEventListener('click', () => {
-        state.currentFolder = b.getAttribute('data-nav-id');
-        updateBreadcrumb();
-      });
+      state.page = 1;
+      loadFiles();
     });
   }
 
   /* ══════════════════════════════════════════
-     ACTIONS
+     ACTIONS (Stubs ready for Phase 5)
      ══════════════════════════════════════════ */
 
   async function handleAction(act, id, event) {
-    const file = state.all.find(f => f.id === id);
+    const file = state.files.find(f => f.id === id);
     if (!file) return;
 
     switch (act) {
       case 'download':
-        Toast.success('Download started', file.name);
+        // Needs API implementation
+        Toast.success('Download requested', file.name);
         break;
-
       case 'more': {
         const rect = event.target.getBoundingClientRect();
         openContext(rect.left, rect.bottom + 4, id);
         break;
       }
-
-      case 'share': {
-        const link = 'https://dl.dimension.io/f/' + Math.random().toString(36).slice(2, 10);
-        await copyToClipboard(link, 'Share link copied');
+      case 'delete':
+        Toast.info('Delete functionality will be connected in Phase 5');
         break;
-      }
-
-      case 'rename': {
-        const newName = await Modal.prompt({
-          title: 'Rename file',
-          label: 'New name',
-          value: file.name,
-          confirmText: 'Rename',
-        });
-        if (newName && newName !== file.name) {
-          file.name = newName;
-          Toast.success('Renamed', newName);
-          applyFilters();
-          renderView();
-        }
-        break;
-      }
-
-      case 'delete': {
-        const ok = await Modal.confirm({
-          title: `Delete "${file.name}"?`,
-          message: 'This will move the file to trash. You can restore it within 30 days.',
-          confirmText: 'Move to trash',
-          danger: true,
-        });
-        if (ok) {
-          state.all = state.all.filter(f => f.id !== id);
-          state.selected.delete(id);
-          Toast.success('Moved to trash', file.name);
-          renderFilterChips();
-          applyFilters();
-          renderView();
-        }
-        break;
-      }
-
-      case 'star':
-        file.starred = !file.starred;
-        Toast.info(file.starred ? 'Starred' : 'Unstarred', file.name);
-        renderView();
-        break;
-
-      case 'copyLink': {
-        const link = 'https://dl.dimension.io/f/' + file.id;
-        await copyToClipboard(link, 'Link copied');
-        break;
-      }
     }
   }
 
   function openContext(x, y, id) {
-    const file = state.all.find(f => f.id === id);
+    const file = state.files.find(f => f.id === id);
     if (!file) return;
 
-    ContextMenu.show(x, y, [
-      { label: 'Preview',      icon: 'eye',      action: () => openDrawer(id) },
-      { label: 'Download',     icon: 'download', shortcut: 'D', action: () => handleAction('download', id) },
-      { label: 'Copy link',    icon: 'link',     shortcut: '⌘C', action: () => handleAction('copyLink', id) },
-      { label: 'Share',        icon: 'share',    action: () => handleAction('share', id) },
+    const items = [
+      { label: file.isFolder ? 'Open' : 'Preview', icon: file.isFolder ? 'folderOpen' : 'eye', action: () => file.isFolder ? null : openDrawer(id) }
+    ];
+
+    if (!file.isFolder) {
+      items.push({ label: 'Download', icon: 'download', shortcut: 'D', action: () => handleAction('download', id) });
+    }
+
+    items.push(
+      { label: 'Copy path', icon: 'copy', shortcut: '⌘C', action: () => copyToClipboard(file.path, 'Path copied') },
       { divider: true },
-      { label: file.starred ? 'Unstar' : 'Star', icon: 'star', action: () => handleAction('star', id) },
-      { label: 'Rename',       icon: 'edit',     shortcut: 'F2', action: () => handleAction('rename', id) },
-      { label: 'Move to…',     icon: 'move',     action: () => Toast.info('Move dialog', 'Coming soon') },
-      { divider: true },
-      { label: 'Move to trash', icon: 'trash',   danger: true, action: () => handleAction('delete', id) },
-    ]);
+      { label: 'Rename', icon: 'edit', shortcut: 'F2', action: () => handleAction('rename', id) },
+      { label: 'Move to trash', icon: 'trash', danger: true, action: () => handleAction('delete', id) }
+    );
+
+    ContextMenu.show(x, y, items);
   }
 
   /* ══════════════════════════════════════════
-     DRAWER (file details)
+     DRAWER (File Details)
      ══════════════════════════════════════════ */
 
   function openDrawer(id) {
-    const file = state.all.find(f => f.id === id);
-    if (!file) return;
+    const file = state.files.find(f => f.id === id);
+    if (!file || file.isFolder) return; // Don't open drawer for folders usually
+
     const drawer = $('#fileDrawer');
     if (!drawer) return;
 
     const t = resolveType(file.name, file.isFolder);
-    const shareLink = `https://dl.dimension.io/f/${file.id}`;
 
     drawer.querySelector('.drawer-body').innerHTML = `
       <div class="drawer-preview">
@@ -741,33 +640,19 @@ const Files = (() => {
         <div class="drawer-filename">${file.name}</div>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
           <span class="badge">${t.label}</span>
-          ${file.isFolder ? '' : `<span class="badge badge-${statusColor(file.status)}">${file.status}</span>`}
-          ${file.starred ? '<span class="badge badge-warning">★ Starred</span>' : ''}
+          ${file.status ? `<span class="badge badge-${statusColor(file.status)}">${file.status}</span>` : ''}
         </div>
       </div>
-
       <div class="meta-list">
-        <div class="meta-row"><span class="meta-key">Size</span><span class="meta-val">${file.isFolder ? file.items + ' items' : Format.bytes(file.size)}</span></div>
+        <div class="meta-row"><span class="meta-key">Size</span><span class="meta-val">${Format.bytes(file.size)}</span></div>
         <div class="meta-row"><span class="meta-key">Type</span><span class="meta-val">${t.label}${t.ext ? ' · .' + t.ext : ''}</span></div>
         ${file.downloads != null ? `<div class="meta-row"><span class="meta-key">Downloads</span><span class="meta-val">${Format.number(file.downloads)}</span></div>` : ''}
         <div class="meta-row"><span class="meta-key">Modified</span><span class="meta-val">${Format.dateTime(file.modified)}</span></div>
-        <div class="meta-row"><span class="meta-key">Author</span><span class="meta-val">${file.author}</span></div>
-        <div class="meta-row"><span class="meta-key">Location</span><span class="meta-val">${file.path}</span></div>
-        <div class="meta-row"><span class="meta-key">ID</span><span class="meta-val" style="font-family:'SF Mono',monospace;font-size:11px">${file.id}</span></div>
-      </div>
-
-      <div>
-        <div class="field-label" style="margin-bottom:8px">Shareable link</div>
-        <div class="link-box">
-          <div class="link-text">${shareLink}</div>
-          <button class="btn-icon btn-icon-sm" data-copy="${shareLink}" data-tip="Copy">${icon('copy', 15)}</button>
-        </div>
+        <div class="meta-row"><span class="meta-key">Location</span><span class="meta-val" style="direction:ltr">${file.path}</span></div>
       </div>
     `;
 
-    drawer.querySelector('.drawer-title').textContent = 'File details';
     drawer.classList.add('is-open');
-    drawer.setAttribute('data-current-id', id);
   }
 
   function closeDrawer() {
@@ -775,8 +660,50 @@ const Files = (() => {
   }
 
   /* ══════════════════════════════════════════
-     DRAG & DROP
+     RENDER SWITCH & BINDINGS
      ══════════════════════════════════════════ */
+
+  function renderView() {
+    if (state.view === 'grid') renderGrid();
+    else renderList();
+  }
+
+  function bindToolbar() {
+    // View toggle
+    $$('[data-view]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.view = btn.getAttribute('data-view');
+        Store.set('files-view', state.view);
+        $$('[data-view]').forEach(b => b.classList.toggle('is-active', b === btn));
+        renderView();
+      });
+    });
+
+    // Server-side Search (Debounced)
+    const search = $('#filesSearch');
+    if (search) {
+      search.addEventListener('input', window.AFM.debounce(e => {
+        state.search = e.target.value;
+        state.page = 1;
+        loadFiles();
+      }, 350));
+    }
+
+    // Filter chips trigger API reload
+    document.addEventListener('click', e => {
+      const chip = e.target.closest('[data-filter]');
+      if (!chip) return;
+
+      state.filter = chip.getAttribute('data-filter');
+      state.page = 1;
+
+      $$('[data-filter]').forEach(c => c.classList.toggle('is-active', c === chip));
+      loadFiles();
+    });
+
+    $('#drawerClose')?.addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+  }
 
   function initDragDrop() {
     const overlay = $('#dropOverlay');
@@ -798,79 +725,9 @@ const Files = (() => {
       dragCount = 0;
       overlay.classList.remove('is-active');
       const count = e.dataTransfer?.files?.length || 0;
-      if (count) Toast.success(`${count} file${count > 1 ? 's' : ''} ready to upload`, 'Redirecting to uploads…');
-    });
-  }
-
-  /* ══════════════════════════════════════════
-     RENDER SWITCH
-     ══════════════════════════════════════════ */
-
-  function renderView() {
-    if (state.view === 'grid') renderGrid();
-    else renderList();
-  }
-
-  /* ══════════════════════════════════════════
-     BIND TOOLBAR
-     ══════════════════════════════════════════ */
-
-  function bindToolbar() {
-    // View toggle
-    $$('[data-view]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.view = btn.getAttribute('data-view');
-        Store.set('files-view', state.view);
-        $$('[data-view]').forEach(b => b.classList.toggle('is-active', b === btn));
-        renderView();
-      });
-    });
-
-    // Search
-    const search = $('#filesSearch');
-    if (search) {
-      search.addEventListener('input', window.AFM.debounce(e => {
-        state.search = e.target.value;
-        state.page = 1;
-        applyFilters();
-        renderView();
-      }, 180));
-    }
-
-    // Filter chips
-    document.addEventListener('click', e => {
-      const chip = e.target.closest('[data-filter]');
-      if (!chip) return;
-      state.filter = chip.getAttribute('data-filter');
-      state.page = 1;
-      $$('[data-filter]').forEach(c => c.classList.toggle('is-active', c === chip));
-      applyFilters();
-      renderView();
-    });
-
-    // Drawer close
-    $('#drawerClose')?.addEventListener('click', closeDrawer);
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
-
-    // Bulk bar actions
-    $('#bulkClear')?.addEventListener('click', clearSelection);
-    $('#bulkDownload')?.addEventListener('click', () => {
-      Toast.success(`Downloading ${state.selected.size} files`, 'Preparing zip archive…');
-    });
-    $('#bulkDelete')?.addEventListener('click', async () => {
-      const ok = await Modal.confirm({
-        title: `Delete ${state.selected.size} items?`,
-        message: 'These files will be moved to trash.',
-        confirmText: 'Move to trash',
-        danger: true,
-      });
-      if (ok) {
-        state.all = state.all.filter(f => !state.selected.has(f.id));
-        state.selected.clear();
-        Toast.success('Files deleted');
-        renderFilterChips();
-        applyFilters();
-        renderView();
+      if (count) {
+        // In Phase 5/6, we can capture these files and send them directly to Uploads
+        Toast.info('Drop functionality', 'Ready to connect to Upload engine');
       }
     });
   }
@@ -880,18 +737,15 @@ const Files = (() => {
      ══════════════════════════════════════════ */
 
   function init() {
-    state.all = makeFiles();
-
-    // Set initial view button state
     $$('[data-view]').forEach(b => b.classList.toggle('is-active', b.getAttribute('data-view') === state.view));
 
-    renderTree();
-    renderFilterChips();
-    applyFilters();
-    renderView();
-    updateBreadcrumb();
     bindToolbar();
     initDragDrop();
+    updateBreadcrumb();
+
+    // Fetch data from API
+    loadTree();
+    loadFiles();
   }
 
   return { init };
