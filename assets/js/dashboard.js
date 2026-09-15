@@ -1,5 +1,5 @@
 /* ============================================
-   DASHBOARD.JS — Dashboard Page Logic
+   DASHBOARD.JS — Enterprise Dashboard Logic
    Admin Files Manager — Dimension Style
    ============================================ */
 
@@ -7,88 +7,23 @@
 
 const Dashboard = (() => {
 
+  const { $, $$, icon, Format, Toast, Modal } = window.AFM;
+
   /* ══════════════════════════════════════════
-     MOCK DATA
+     STATE MANAGEMENT
      ══════════════════════════════════════════ */
 
-  const stats = [
-    {
-      key: 'files',
-      label: 'Total Files',
-      value: 24837,
-      unit: '',
-      trend: +12.4,
-      icon: 'file',
-      spark: [4, 7, 5, 9, 8, 12, 10, 14, 13, 16, 15, 18],
-    },
-    {
-      key: 'storage',
-      label: 'Storage Used',
-      value: 342,
-      unit: 'GB',
-      trend: +4.7,
-      icon: 'hardDrive',
-      spark: [8, 9, 11, 10, 12, 13, 12, 14, 15, 14, 16, 17],
-    },
-    {
-      key: 'downloads',
-      label: 'Downloads Today',
-      value: 8412,
-      unit: '',
-      trend: -2.3,
-      icon: 'download',
-      spark: [12, 11, 14, 10, 13, 15, 12, 9, 11, 10, 8, 9],
-    },
-    {
-      key: 'bandwidth',
-      label: 'Bandwidth (24h)',
-      value: 187,
-      unit: 'GB',
-      trend: +8.9,
-      icon: 'activity',
-      spark: [5, 7, 8, 6, 10, 12, 11, 14, 13, 15, 16, 18],
-    },
-  ];
-
-  // Bar chart data (14 days)
-  const chartData = {
-    labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun','Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
-    series: [
-      { name: 'Uploads',   values: [22,34,28,45,38,18,12,28,42,55,48,52,34,20], color: 'a' },
-      { name: 'Downloads', values: [40,52,48,60,55,32,26,44,58,72,66,70,52,38], color: 'b' },
-      { name: 'Shares',    values: [8, 12,10,14,12, 6, 4,10,15,18,16,17,11, 7], color: 'c' },
-    ],
+  let state = {
+    stats: [],
+    traffic: { labels: [], series: [] },
+    storageBreakdown: [],
+    activities: [],
+    topFiles: [],
+    health: [],
+    isLoaded: false
   };
 
-  // Storage donut
-  const storageBreakdown = [
-    { name: 'Videos',    value: 145, color: '#a78bfa' },
-    { name: 'Images',    value: 82,  color: '#f472b6' },
-    { name: 'Documents', value: 54,  color: '#60a5fa' },
-    { name: 'Archives',  value: 38,  color: '#fbbf24' },
-    { name: 'Audio',     value: 15,  color: '#34d399' },
-    { name: 'Other',     value: 8,   color: '#686868' },
-  ];
-
-  const activities = [
-    { type: 'upload',   user: 'Sarah Chen',     action: 'uploaded',   target: 'Q4-Report-Final.pdf',      folder: '/reports/2025',   time: Date.now() - 3 * 60 * 1000 },
-    { type: 'folder',   user: 'Marcus Weber',   action: 'created folder', target: 'Design Assets 2025',   folder: '/design',         time: Date.now() - 14 * 60 * 1000 },
-    { type: 'download', user: 'Priya Ramesh',   action: 'downloaded', target: 'brand-kit-v2.zip',         folder: '/design/brand',   time: Date.now() - 42 * 60 * 1000 },
-    { type: 'edit',     user: 'Alex Torres',    action: 'renamed',    target: 'launch-video-final.mp4',   folder: '/media/2025',     time: Date.now() - 1.5 * 3600 * 1000 },
-    { type: 'delete',   user: 'System',         action: 'auto-purged', target: '17 expired files',        folder: '/temp',           time: Date.now() - 3 * 3600 * 1000 },
-    { type: 'upload',   user: 'Yuki Tanaka',    action: 'uploaded',   target: 'user-research-notes.docx', folder: '/research',       time: Date.now() - 5 * 3600 * 1000 },
-    { type: 'download', user: 'Elena Petrov',   action: 'downloaded', target: 'annual-review.pdf',        folder: '/hr/reviews',     time: Date.now() - 8 * 3600 * 1000 },
-  ];
-
-  const topFiles = [
-    { name: 'installer-v4.2.dmg',        folder: '/releases/mac',  downloads: 3421, max: 3421 },
-    { name: 'brand-guidelines-2025.pdf', folder: '/design/brand',  downloads: 2814 },
-    { name: 'onboarding-video.mp4',      folder: '/media/hr',      downloads: 2103 },
-    { name: 'api-reference.zip',         folder: '/docs/api',      downloads: 1877 },
-    { name: 'launch-assets.zip',         folder: '/marketing',     downloads: 1544 },
-  ];
-  topFiles.forEach(f => { if (!f.max) f.max = topFiles[0].downloads; });
-
+  // Static UI configurations (not dependent on File System)
   const capabilities = [
     'Automated file lifecycle & retention',
     'Multi-tier storage optimization',
@@ -99,40 +34,89 @@ const Dashboard = (() => {
     'Version history with instant rollback',
   ];
 
-  const serverHealth = [
-    { name: 'CPU Load',      value: 42, unit: '%', icon: 'cpu',      status: 'ok' },
-    { name: 'Memory',        value: 68, unit: '%', icon: 'server',   status: 'ok' },
-    { name: 'Disk I/O',      value: 34, unit: '%', icon: 'hardDrive',status: 'ok' },
-    { name: 'Network In',    value: 1.2,unit: 'GB/s', icon: 'wifi',  status: 'ok' },
-    { name: 'Active Uploads',value: 47, unit: '',   icon: 'upload',  status: 'ok' },
+  const quickActions = [
+    { label: 'Upload Files', desc: 'Add new files to storage', icon: 'uploadCloud', href: 'uploads.html' },
+    { label: 'New Folder', desc: 'Organize with a new folder', icon: 'folderPlus', action: 'newFolder' },
+    { label: 'Share Link', desc: 'Generate a shareable URL', icon: 'link', action: 'newShare' },
+    { label: 'Bulk Import', desc: 'Import from cloud provider', icon: 'download', action: 'import' },
+    { label: 'Manage Access', desc: 'Users & permission settings', icon: 'users', href: 'settings.html' },
+    { label: 'Server Health', desc: 'View diagnostics & logs', icon: 'gauge', action: 'health' },
   ];
 
-  const quickActions = [
-    { label: 'Upload Files',      desc: 'Add new files to storage',       icon: 'uploadCloud', href: 'uploads.html' },
-    { label: 'New Folder',        desc: 'Organize with a new folder',     icon: 'folderPlus',  action: 'newFolder' },
-    { label: 'Share Link',        desc: 'Generate a shareable URL',       icon: 'link',        action: 'newShare' },
-    { label: 'Bulk Import',       desc: 'Import from cloud provider',     icon: 'download',    action: 'import' },
-    { label: 'Manage Access',     desc: 'Users & permission settings',    icon: 'users',       href: 'settings.html' },
-    { label: 'Server Health',     desc: 'View diagnostics & logs',        icon: 'gauge',       action: 'health' },
-  ];
+  let healthPollingTimer = null;
+
+  /* ══════════════════════════════════════════
+     DATA FETCHING (API INTEGRATION)
+     ══════════════════════════════════════════ */
+
+  async function fetchDashboardData() {
+    try {
+      const data = await window.API.get('/dashboard/summary');
+
+      // Update state
+      state.stats = data.stats || [];
+      state.traffic = data.traffic || { labels: [], series: [] };
+      state.storageBreakdown = data.storageBreakdown || [];
+      state.activities = data.activities || [];
+      state.topFiles = data.topFiles || [];
+      state.health = data.health || [];
+      state.isLoaded = true;
+
+      // Render updated UI
+      renderAll();
+    } catch (error) {
+      console.error('[Dashboard] Failed to fetch summary:', error);
+      // Fallback: If API is not ready, keep the skeleton/empty state
+      // Toast is automatically handled by api.js
+    }
+  }
+
+  async function fetchServerHealth() {
+    // Prevent fetching if tab is hidden to save server resources
+    if (document.visibilityState !== 'visible') return;
+
+    try {
+      const healthData = await window.API.get('/dashboard/health');
+      if (healthData && Array.isArray(healthData)) {
+        state.health = healthData;
+        renderHealth();
+      }
+    } catch (error) {
+      // Fail silently on polling to avoid spamming UI with errors
+      console.warn('[Dashboard] Health poll failed:', error.message);
+    }
+  }
 
   /* ══════════════════════════════════════════
      RENDERERS
      ══════════════════════════════════════════ */
 
-  const { $, $$, el, icon, Format, Toast, Modal, countUp } = window.AFM;
+  function renderAll() {
+    renderStats();
+    renderChart();
+    renderLegend();
+    renderDonut();
+    renderActivity();
+    renderTopFiles();
+    renderCapabilities();
+    renderHealth();
+    renderQuickActions();
+  }
 
   function renderStats() {
     const wrap = $('#statsGrid');
-    if (!wrap) return;
+    if (!wrap || !state.stats.length) return;
 
-    wrap.innerHTML = stats.map((s, i) => {
-      const trendUp   = s.trend > 0;
+    wrap.innerHTML = state.stats.map((s, i) => {
+      const trendUp = s.trend > 0;
       const trendFlat = s.trend === 0;
-      const trendCls  = trendFlat ? 'flat' : (trendUp ? 'up' : 'down');
-      const trendIco  = trendFlat ? 'minus' : (trendUp ? 'trending' : 'trendingDown');
-      const max       = Math.max(...s.spark);
-      const bars      = s.spark.map(v => `<div class="spark-bar" style="height:${(v/max)*100}%"></div>`).join('');
+      const trendCls = trendFlat ? 'flat' : (trendUp ? 'up' : 'down');
+      const trendIco = trendFlat ? 'minus' : (trendUp ? 'trending' : 'trendingDown');
+
+      // Handle missing sparkline gracefully
+      const spark = s.spark || [];
+      const max = spark.length ? Math.max(...spark) : 1;
+      const bars = spark.map(v => `<div class="spark-bar" style="height:${(v / max) * 100}%"></div>`).join('');
 
       return `
         <div class="stat-card" style="animation-delay:${i * 60}ms">
@@ -161,6 +145,7 @@ const Dashboard = (() => {
       const start = performance.now();
       const duration = 1100;
       const ease = t => 1 - Math.pow(1 - t, 3);
+
       function frame(now) {
         const p = Math.min((now - start) / duration, 1);
         const val = Math.round(target * ease(p));
@@ -173,24 +158,24 @@ const Dashboard = (() => {
 
   function renderChart() {
     const wrap = $('#trafficChart');
-    if (!wrap) return;
+    if (!wrap || !state.traffic.series.length) return;
 
     const maxVal = Math.max(
-      ...chartData.series.reduce((acc, s) => acc.concat(s.values), [])
-    );
+      ...state.traffic.series.reduce((acc, s) => acc.concat(s.values), [])
+    ) || 1; // prevent division by zero
 
-    // Build columns
-    const cols = chartData.labels.map((label, i) => {
-      const total = chartData.series.reduce((sum, s) => sum + s.values[i], 0);
-      const stack = chartData.series.slice().reverse().map(s => {
-        const h = (s.values[i] / maxVal) * 100;
+    const cols = state.traffic.labels.map((label, i) => {
+      const total = state.traffic.series.reduce((sum, s) => sum + (s.values[i] || 0), 0);
+      const stack = state.traffic.series.slice().reverse().map(s => {
+        const val = s.values[i] || 0;
+        const h = (val / maxVal) * 100;
         return `<div class="bar-seg ${s.color}" style="height:${h}%; animation-delay:${i * 40 + 100}ms"></div>`;
       }).join('');
 
-      const tipRows = chartData.series.map(s =>
+      const tipRows = state.traffic.series.map(s =>
         `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;">
            <span style="opacity:.7">${s.name}</span>
-           <span style="font-variant-numeric:tabular-nums;">${Format.number(s.values[i])}</span>
+           <span style="font-variant-numeric:tabular-nums;">${Format.number(s.values[i] || 0)}</span>
          </div>`
       ).join('');
 
@@ -206,7 +191,6 @@ const Dashboard = (() => {
       `;
     }).join('');
 
-    // Grid lines (4 horizontal)
     const gridLines = [0, 25, 50, 75].map(p =>
       `<div class="chart-grid-line" style="bottom:${p + 6}%"></div>`
     ).join('');
@@ -216,15 +200,17 @@ const Dashboard = (() => {
 
   function renderLegend() {
     const wrap = $('#chartLegend');
-    if (!wrap) return;
+    if (!wrap || !state.traffic.series.length) return;
+
     const colorMap = {
       a: 'var(--accent-primary)',
       b: 'rgba(107, 98, 242, 0.45)',
       c: 'rgba(107, 98, 242, 0.2)',
     };
-    wrap.innerHTML = chartData.series.map(s => `
+
+    wrap.innerHTML = state.traffic.series.map(s => `
       <div class="legend-item">
-        <span class="legend-swatch" style="background:${colorMap[s.color]}"></span>
+        <span class="legend-swatch" style="background:${colorMap[s.color] || '#888'}"></span>
         ${s.name}
       </div>
     `).join('');
@@ -232,15 +218,15 @@ const Dashboard = (() => {
 
   function renderDonut() {
     const wrap = $('#storageDonut');
-    if (!wrap) return;
+    if (!wrap || !state.storageBreakdown.length) return;
 
-    const total = storageBreakdown.reduce((s, x) => s + x.value, 0);
+    const total = state.storageBreakdown.reduce((s, x) => s + x.value, 0);
     const RADIUS = 60;
     const CIRC = 2 * Math.PI * RADIUS;
 
     let offset = 0;
-    const rings = storageBreakdown.map((s, i) => {
-      const frac = s.value / total;
+    const rings = state.storageBreakdown.map((s, i) => {
+      const frac = total > 0 ? (s.value / total) : 0;
       const dash = frac * CIRC;
       const el = `<circle
         cx="75" cy="75" r="${RADIUS}"
@@ -259,23 +245,23 @@ const Dashboard = (() => {
         <div class="donut">
           <svg viewBox="0 0 150 150">${rings}</svg>
           <div class="donut-center">
-            <div class="donut-value">${total}<span style="font-size:.7em;opacity:.6"> GB</span></div>
+            <div class="donut-value">${Format.compact(total)}<span style="font-size:.7em;opacity:.6"> GB</span></div>
             <div class="donut-label">Used</div>
           </div>
         </div>
         <div class="donut-legend">
-          ${storageBreakdown.map((s, i) => `
+          ${state.storageBreakdown.map((s, i) => `
             <div class="donut-legend-row" data-idx="${i}">
               <span class="legend-swatch" style="background:${s.color}"></span>
               <span class="name">${s.name}</span>
-              <span class="val">${s.value} GB</span>
+              <span class="val">${Format.compact(s.value)} GB</span>
             </div>
           `).join('')}
         </div>
       </div>
     `;
 
-    // Legend hover → highlight segment
+    // Legend hover logic
     wrap.querySelectorAll('.donut-legend-row').forEach(row => {
       row.addEventListener('mouseenter', () => {
         const idx = row.getAttribute('data-idx');
@@ -292,7 +278,17 @@ const Dashboard = (() => {
   function renderActivity() {
     const wrap = $('#activityFeed');
     if (!wrap) return;
-    wrap.innerHTML = activities.map(a => `
+
+    if (!state.activities.length) {
+      wrap.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--text-tertiary);">No recent activity found.</div>`;
+      return;
+    }
+
+    const iconForActivity = (type) => ({
+      upload: 'upload', download: 'download', delete: 'trash', edit: 'edit', folder: 'folderPlus',
+    }[type] || 'activity');
+
+    wrap.innerHTML = state.activities.map(a => `
       <div class="activity-item">
         <div class="activity-ico ${a.type}">${icon(iconForActivity(a.type), 14)}</div>
         <div class="activity-body">
@@ -309,20 +305,16 @@ const Dashboard = (() => {
     `).join('');
   }
 
-  function iconForActivity(type) {
-    return {
-      upload: 'upload',
-      download: 'download',
-      delete: 'trash',
-      edit: 'edit',
-      folder: 'folderPlus',
-    }[type] || 'activity';
-  }
-
   function renderTopFiles() {
     const wrap = $('#topFiles');
     if (!wrap) return;
-    wrap.innerHTML = topFiles.map((f, i) => `
+
+    if (!state.topFiles.length) {
+      wrap.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--text-tertiary);">No data available.</div>`;
+      return;
+    }
+
+    wrap.innerHTML = state.topFiles.map((f, i) => `
       <div class="rank-row">
         <div class="rank-num">${Format.pad(i + 1)}</div>
         <div class="rank-info">
@@ -331,7 +323,7 @@ const Dashboard = (() => {
         </div>
         <div class="rank-bar-wrap">
           <div class="progress progress-sm">
-            <div class="progress-bar" style="width:${(f.downloads / f.max) * 100}%"></div>
+            <div class="progress-bar" style="width:${f.max ? (f.downloads / f.max) * 100 : 0}%"></div>
           </div>
         </div>
         <div class="rank-count">${Format.compact(f.downloads)}</div>
@@ -352,9 +344,9 @@ const Dashboard = (() => {
 
   function renderHealth() {
     const wrap = $('#serverHealth');
-    if (!wrap) return;
+    if (!wrap || !state.health.length) return;
 
-    wrap.innerHTML = serverHealth.map(h => {
+    wrap.innerHTML = state.health.map(h => {
       const isPct = h.unit === '%';
       const barWidth = isPct ? h.value : Math.min((h.value / 2) * 100, 100);
       const barClass = h.value > 80 ? 'is-error' : h.value > 60 ? 'is-warning' : '';
@@ -369,7 +361,7 @@ const Dashboard = (() => {
           </div>
           ${isPct ? `
             <div class="progress progress-sm">
-              <div class="progress-bar ${barClass}" style="width:${barWidth}%"></div>
+              <div class="progress-bar ${barClass}" style="width:${barWidth}%" style="transition: width 0.5s ease-out;"></div>
             </div>
           ` : ''}
         </div>
@@ -396,7 +388,7 @@ const Dashboard = (() => {
      ══════════════════════════════════════════ */
 
   function bindActions() {
-    // Quick action tiles
+    // Quick action tiles (Delegated)
     document.addEventListener('click', async e => {
       const tile = e.target.closest('[data-quick]');
       if (!tile) return;
@@ -410,75 +402,79 @@ const Dashboard = (() => {
             placeholder: 'e.g. Marketing Assets',
             confirmText: 'Create',
           });
-          if (name) Toast.success('Folder created', `"${name}" is ready`);
+
+          if (name) {
+            try {
+              await window.API.post('/folders', { name });
+              Toast.success('Folder created', `"${name}" is ready`);
+              // Reload dashboard data if necessary, or let the user navigate
+            } catch (err) {
+              // Error handled by API layer automatically
+            }
+          }
           break;
         }
         case 'newShare': {
-          const link = 'https://dl.dimension.io/s/' + Math.random().toString(36).slice(2, 10);
-          await window.AFM.copyToClipboard(link, 'Share link copied');
+          Toast.info('Creating share link...');
+          try {
+            const res = await window.API.post('/shares', {});
+            await window.AFM.copyToClipboard(res.link || 'https://dl.dimension.io/s/demo', 'Share link copied');
+          } catch (e) {
+            // Fallback for demo
+            await window.AFM.copyToClipboard('https://dl.dimension.io/s/demo', 'Share link copied');
+          }
           break;
         }
         case 'import':
           Toast.info('Bulk import', 'Choose a cloud provider to continue', 3200);
           break;
         case 'health':
-          Toast.info('All systems operational', 'Uptime 99.98% · Response 42ms', 3200);
+          // Immediately trigger a health poll
+          fetchServerHealth().then(() => {
+            Toast.success('Health status refreshed');
+          });
           break;
       }
     });
 
-    // Refresh button
-    $('#refreshDashboard')?.addEventListener('click', () => {
+    // Refresh Dashboard Button
+    $('#refreshDashboard')?.addEventListener('click', async () => {
+      const btn = $('#refreshDashboard');
+      btn.style.pointerEvents = 'none';
+      btn.style.opacity = '0.5';
       Toast.info('Refreshing dashboard…');
-      setTimeout(() => {
-        renderStats();
-        renderChart();
-        Toast.success('Dashboard updated');
-      }, 500);
+
+      await fetchDashboardData();
+
+      btn.style.pointerEvents = '';
+      btn.style.opacity = '1';
+      Toast.success('Dashboard updated');
     });
   }
 
   /* ══════════════════════════════════════════
-     LIVE UPDATES — simulated realtime tick
+     LIFECYCLE CONTROL
      ══════════════════════════════════════════ */
 
   function startLiveUpdates() {
-    // Simulate activity every 12–20 seconds
-    setInterval(() => {
-      const active = document.visibilityState === 'visible';
-      if (!active) return;
-
-      // Nudge server health values slightly
-      serverHealth.forEach(h => {
-        if (h.unit === '%') {
-          const delta = (Math.random() - 0.5) * 6;
-          h.value = window.AFM.clamp(Math.round(h.value + delta), 15, 92);
-        } else if (h.unit === 'GB/s') {
-          h.value = +(0.8 + Math.random() * 1.4).toFixed(1);
-        } else {
-          h.value = window.AFM.clamp(h.value + Math.round((Math.random() - 0.5) * 5), 10, 120);
-        }
-      });
-      renderHealth();
-    }, 4200);
+    // Poll the lightweight health endpoint every 5 seconds
+    if (healthPollingTimer) clearInterval(healthPollingTimer);
+    healthPollingTimer = setInterval(fetchServerHealth, 5000);
   }
 
-  /* ══════════════════════════════════════════
-     INIT
-     ══════════════════════════════════════════ */
-
   function init() {
-    renderStats();
-    renderChart();
-    renderLegend();
-    renderDonut();
-    renderActivity();
-    renderTopFiles();
+    // Initial Render of static parts
     renderCapabilities();
-    renderHealth();
     renderQuickActions();
+
+    // Bind Event Listeners
     bindActions();
-    startLiveUpdates();
+
+    // Fetch dynamic data from Server
+    fetchDashboardData().then(() => {
+      // Start background polling only after initial load succeeds
+      startLiveUpdates();
+    });
   }
 
   return { init };

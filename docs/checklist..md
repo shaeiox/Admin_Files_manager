@@ -23,18 +23,18 @@ This document defines the path for connecting the frontend to a backend integrat
 
 ## 👤 Phase 2: Sidebar & Operating System Information
 
-* [ ] Retrieve the total disk capacity of the Linux server and the space used by the `/download` directory (equivalent to `df -h` and `du -sh`) through the API, and render the Storage bar in the sidebar.
-* [ ] Remove the hardcoded user name and avatar and replace them with admin configuration settings (read from the backend configuration file).
+* [ x] Retrieve the total disk capacity of the Linux server and the space used by the `/download` directory (equivalent to `df -h` and `du -sh`) through the API, and render the Storage bar in the sidebar.
+* [ x] Remove the hardcoded user name and avatar and replace them with admin configuration settings (read from the backend configuration file).
 
 ---
 
 ## 📂 Phase 3: File Browser — Directory Reading (`js/files.js`)
 
-* [ ] Remove the frontend `makeFiles()` function.
+* [ ×] Remove the frontend `makeFiles()` function.
 * [ ] Send a request to `/api/fs/list?path=/` to retrieve the direct contents of the `/download` root directory.
 * [ ] Extract file metadata from the operating system (`OS Stats` including `size`, `mtime`, and `isDirectory`) and map it to the UI data structure.
-* [ ] Implement the Folder Tree by dynamically reading directories inside `/download` at the first and second levels.
-* [ ] Implement folder navigation by sending the new path to the API when the user clicks on a folder.
+* [× ] Implement the Folder Tree by dynamically reading directories inside `/download` at the first and second levels.
+* [ ×] Implement folder navigation by sending the new path to the API when the user clicks on a folder.
 
 ---
 
