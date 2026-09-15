@@ -620,6 +620,157 @@ const Files = (() => {
   }
 
   /* ══════════════════════════════════════════
+     ACTIONS (Mutations connected to API)
+     ══════════════════════════════════════════ */
+
+  async function handleAction(act, id, event) {
+    const file = state.files.find(f => f.id === id);
+
+    if (!file && act !== 'newFolder' && act !== 'bulkDelete') return;
+
+    switch (act) {
+      case 'download':
+        window.open(`${window.API.BASE_URL}/fs/download?path=${encodeURIComponent(file.path)}`, '_blank');
+        Toast.success('Download started', file.name);
+        break;
+
+      case 'more': {
+        const rect = event.target.getBoundingClientRect();
+        openContext(rect.left, rect.bottom + 4, id);
+        break;
+      }
+
+      case 'newFolder': {
+        const name = await Modal.prompt({
+          title: 'Create new folder',
+          label: 'Folder name',
+          placeholder: 'e.g. New Project',
+          confirmText: 'Create',
+        });
+
+        if (name && name.trim()) {
+          const folderName = name.trim();
+          const newPath = state.currentPath === '/'
+            ? `/${folderName}`
+            : `${state.currentPath}/${folderName}`;
+
+          try {
+            await window.API.post('/fs/folder', { path: newPath });
+            Toast.success('Folder created', folderName);
+            loadFiles();
+            loadTree();
+          } catch (e) {
+          }
+        }
+        break;
+      }
+
+      case 'rename': {
+        const newName = await Modal.prompt({
+          title: 'Rename item',
+          label: 'New name',
+          value: file.name,
+          confirmText: 'Rename',
+        });
+
+        if (newName && newName.trim() && newName !== file.name) {
+          try {
+            await window.API.put('/fs/rename', {
+              oldPath: file.path,
+              newName: newName.trim()
+            });
+            Toast.success('Item renamed', newName);
+            loadFiles();
+            if (file.isFolder) loadTree();
+          } catch (e) { }
+        }
+        break;
+      }
+
+      case 'delete': {
+        const ok = await Modal.confirm({
+          title: `Delete "${file.name}"?`,
+          message: 'This item will be permanently removed from the server disk.',
+          confirmText: 'Delete permanently',
+          danger: true,
+        });
+
+        if (ok) {
+          try {
+            await window.API.del(`/fs/delete`, { paths: [file.path] });
+            Toast.success('Item deleted', file.name);
+            loadFiles();
+            if (file.isFolder) loadTree();
+          } catch (e) { }
+        }
+        break;
+      }
+
+      case 'bulkDelete': {
+        const count = state.selected.size;
+        if (count === 0) return;
+
+        const ok = await Modal.confirm({
+          title: `Delete ${count} items?`,
+          message: 'Selected items will be permanently removed from the server disk.',
+          confirmText: 'Delete all',
+          danger: true,
+        });
+
+        if (ok) {
+          const pathsToDelete = state.files
+            .filter(f => state.selected.has(f.id))
+            .map(f => f.path);
+
+          try {
+            await window.API.del(`/fs/delete`, { paths: pathsToDelete });
+            Toast.success(`${count} items deleted`);
+            state.selected.clear();
+            loadFiles();
+            loadTree();
+          } catch (e) { }
+        }
+        break;
+      }
+    }
+  }
+
+  function openContext(x, y, id) {
+    const file = state.files.find(f => f.id === id);
+    if (!file) return;
+
+    const items = [
+      {
+        label: file.isFolder ? 'Open folder' : 'View details',
+        icon: file.isFolder ? 'folderOpen' : 'eye',
+        action: () => {
+          if (file.isFolder) {
+            state.currentPath = file.path;
+            state.page = 1;
+            updateBreadcrumb();
+            loadFiles();
+          } else {
+            openDrawer(id);
+          }
+        }
+      }
+    ];
+
+    if (!file.isFolder) {
+      items.push({ label: 'Download', icon: 'download', shortcut: 'D', action: () => handleAction('download', id) });
+    }
+
+    items.push(
+      { label: 'Copy path', icon: 'copy', shortcut: '⌘C', action: () => copyToClipboard(file.path, 'OS path copied') },
+      { divider: true },
+      { label: 'Rename', icon: 'edit', shortcut: 'F2', action: () => handleAction('rename', id) },
+      { label: 'Delete', icon: 'trash', danger: true, action: () => handleAction('delete', id) }
+    );
+
+    ContextMenu.show(x, y, items);
+  }
+
+  /* ══════════════════════════════════════════
      DRAWER (File Details)
      ══════════════════════════════════════════ */
 
@@ -703,6 +854,22 @@ const Files = (() => {
 
     $('#drawerClose')?.addEventListener('click', closeDrawer);
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+    // Toolbar Actions
+    $('[data-quick="newFolder"]')?.addEventListener('click', () => {
+      handleAction('newFolder');
+    });
+
+    // Bulk Actions
+    $('#bulkClear')?.addEventListener('click', clearSelection);
+
+    $('#bulkDownload')?.addEventListener('click', () => {
+      Toast.info('Bulk download will be handled by ZIP streaming on backend');
+    });
+
+    $('#bulkDelete')?.addEventListener('click', () => {
+      handleAction('bulkDelete');
+    });
   }
 
   function initDragDrop() {
