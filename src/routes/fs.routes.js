@@ -13,6 +13,7 @@ router.get('/download', fsController.downloadFile);
 // Write / mutation operations
 router.post('/folder', fsController.createFolder);
 router.post('/upload', fsController.uploadFile);
+router.post('/download-zip', fsController.downloadZip);
 router.put('/rename', fsController.renameItem);
 router.delete('/delete', fsController.deleteItems);
 

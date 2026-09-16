@@ -1144,8 +1144,58 @@ const Files = (() => {
     // Bulk Actions
     $('#bulkClear')?.addEventListener('click', clearSelection);
 
-    $('#bulkDownload')?.addEventListener('click', () => {
-      Toast.info('Bulk download will be handled by ZIP streaming on backend');
+    // Bulk Download with Native Context Menu Options
+    $('#bulkDownload')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      const count = state.selected.size;
+      if (count === 0) return;
+
+      const buttonEl = e.currentTarget || e.target.closest('#bulkDownload');
+      const rect = buttonEl.getBoundingClientRect();
+
+      const selectedItems = state.files.filter(f => state.selected.has(f.id));
+      const paths = selectedItems.map(f => f.path);
+      const filesOnly = selectedItems.filter(f => !f.isFolder);
+
+      ContextMenu.show(rect.left, rect.bottom + 8, [
+        {
+          label: `Download ${count} item(s) as ZIP`,
+          icon: 'archive',
+          action: () => {
+            Toast.info('Preparing ZIP download...', 'Your browser will start the download shortly.');
+            // ✅ اتصال واقعی به تابع دانلود زیپ در api.js
+            window.API.downloadZip(paths);
+            clearSelection();
+          }
+        },
+        { divider: true },
+        {
+          label: 'Download as individual files',
+          icon: 'file',
+          action: () => {
+            if (filesOnly.length === 0) {
+              Toast.warning('Cannot download folders', 'Please choose "Download as ZIP" to download folders.');
+              return;
+            }
+
+            const filePaths = filesOnly.map(f => f.path);
+            const folderCount = count - filePaths.length;
+
+            Toast.success('Downloads queued', `Starting download for ${filePaths.length} file(s)...`);
+            window.API.downloadMultipleFiles(filePaths);
+
+            if (folderCount > 0) {
+              setTimeout(() => {
+                Toast.info('Folders skipped', `${folderCount} folder(s) skipped. Use ZIP to download folders.`);
+              }, 1200);
+            }
+
+            clearSelection();
+          }
+        }
+      ]);
     });
 
     $('#bulkDelete')?.addEventListener('click', () => {

@@ -8,6 +8,7 @@ const MetadataService = require('../services/MetadataService');
 const PathService = require('../services/PathService');
 const AppError = require('../utils/AppError');
 const { validateFileName, validateClientPath } = require('../utils/validators');
+const archiver = require('archiver');
 
 /**
  * GET /api/fs/tree
@@ -389,6 +390,89 @@ async function uploadFile(req, res, next) {
     });
 }
 
+/**
+ * POST /api/fs/download-zip
+ * Streams a ZIP archive directly to the client browser.
+ * Normalizes Windows backslashes to POSIX slashes for Archiver compatibility.
+ */
+async function downloadZip(req, res, next) {
+    try {
+        let rawPaths = req.body.paths;
+
+        if (typeof rawPaths === 'string') {
+            try {
+                rawPaths = JSON.parse(rawPaths);
+            } catch (e) {
+                rawPaths = [rawPaths];
+            }
+        }
+
+        if (!Array.isArray(rawPaths) || rawPaths.length === 0) {
+            throw new AppError('At least one valid path must be provided.', 400);
+        }
+
+        if (rawPaths.length > 500) {
+            throw new AppError('Too many items for a single ZIP request (max 500).', 400);
+        }
+
+        const entries = [];
+        for (const clientPath of rawPaths) {
+            validateClientPath(clientPath);
+            const stats = await FileSystemService.getStats(clientPath);
+            entries.push({
+                clientPath,
+                securePath: stats.securePath,
+                isDirectory: stats.isDirectory,
+                name: path.posix.basename(clientPath) || 'item',
+            });
+        }
+
+        const stamp = new Date().toISOString().slice(0, 10);
+        const zipName = `download-${stamp}.zip`;
+
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${zipName}"; filename*=UTF-8''${encodeURIComponent(zipName)}`);
+        res.setHeader('Cache-Control', 'no-cache');
+
+        const archive = archiver('zip', { zlib: { level: 5 } });
+
+        archive.on('error', (err) => {
+            console.error('[ZIP Stream Error]:', err.message);
+            if (!res.headersSent) {
+                return next(new AppError('Failed to generate ZIP archive.', 500));
+            }
+            res.destroy(err);
+        });
+
+        req.on('close', () => {
+            if (!res.writableEnded) {
+                archive.abort();
+            }
+        });
+
+        archive.pipe(res);
+
+        for (const entry of entries) {
+            // ✅ CROSS-PLATFORM FIX: Normalize Windows backslashes (\) to slashes (/) for Archiver library
+            const normalizedPath = entry.securePath.replace(/\\/g, '/');
+
+            if (entry.isDirectory) {
+                archive.directory(normalizedPath, entry.name);
+            } else {
+                archive.file(normalizedPath, { name: entry.name });
+            }
+
+            if (!entry.isDirectory) {
+                MetadataService.incrementDownload(entry.clientPath).catch(() => { });
+            }
+        }
+
+        await archive.finalize();
+    } catch (error) {
+        next(error);
+    }
+}
+
 // Single explicit export object — prevents module.exports vs exports override issues
 module.exports = {
     getTree,
@@ -398,4 +482,5 @@ module.exports = {
     deleteItems,
     downloadFile,
     uploadFile,
+    downloadZip
 };
