@@ -8,7 +8,17 @@ const MetadataService = require('../services/MetadataService');
 const PathService = require('../services/PathService');
 const AppError = require('../utils/AppError');
 const { validateFileName, validateClientPath } = require('../utils/validators');
-const archiver = require('archiver');
+
+// Safe CommonJS / ES Module interop resolution for archiver
+let archiver;
+try {
+    const importedModule = require('archiver');
+    archiver = typeof importedModule === 'function'
+        ? importedModule
+        : (importedModule.default || importedModule);
+} catch (err) {
+    console.warn('[FS Controller] Warning: "archiver" module could not be loaded:', err.message);
+}
 
 /**
  * GET /api/fs/tree
@@ -324,79 +334,17 @@ async function downloadFile(req, res, next) {
     }
 }
 
-// Add multer requirement at the top of fs.controller.js
-const multer = require('multer');
-
-// Configure Multer for streaming uploads directly to memory/disk
-const storage = multer.diskStorage({
-    destination: async (req, file, cb) => {
-        try {
-            const clientDest = req.body.destination || '/';
-            const secureDest = PathService.resolveSecurePath(clientDest);
-            // Ensure the destination exists
-            await fs.promises.access(secureDest);
-            cb(null, secureDest);
-        } catch (err) {
-            cb(new AppError('Invalid upload destination.', 400));
-        }
-    },
-    filename: (req, file, cb) => {
-        try {
-            const cleanName = validateFileName(file.originalname);
-            // Optional: Add logic here to check overwrite flag and append (1) if needed
-            cb(null, cleanName);
-        } catch (err) {
-            cb(err);
-        }
-    }
-});
-
-const uploadMiddleware = multer({ storage }).single('file');
-
-/**
- * POST /api/fs/upload
- * Handles multipart/form-data file uploads
- */
-async function uploadFile(req, res, next) {
-    uploadMiddleware(req, res, (err) => {
-        if (err) {
-            return next(new AppError(err.message, 400));
-        }
-
-        if (!req.file) {
-            return next(new AppError('No file provided.', 400));
-        }
-
-        const clientDest = req.body.destination || '/';
-        const clientPath = clientDest === '/' ? `/${req.file.filename}` : `${clientDest}/${req.file.filename}`;
-
-        // Log the activity
-        MetadataService.addActivity({
-            type: 'upload',
-            user: 'system',
-            action: 'uploaded',
-            target: req.file.filename,
-            folder: clientDest,
-        }).catch(() => { });
-
-        res.status(201).json({
-            success: true,
-            data: {
-                name: req.file.filename,
-                path: clientPath,
-                size: req.file.size
-            }
-        });
-    });
-}
-
 /**
  * POST /api/fs/download-zip
  * Streams a ZIP archive directly to the client browser.
- * Normalizes Windows backslashes to POSIX slashes for Archiver compatibility.
+ * Handles both JSON body and URL-encoded Form body.
  */
 async function downloadZip(req, res, next) {
     try {
+        if (typeof archiver !== 'function') {
+            throw new AppError('ZIP archiving module is not available on server.', 500);
+        }
+
         let rawPaths = req.body.paths;
 
         if (typeof rawPaths === 'string') {
@@ -453,7 +401,7 @@ async function downloadZip(req, res, next) {
         archive.pipe(res);
 
         for (const entry of entries) {
-            // ✅ CROSS-PLATFORM FIX: Normalize Windows backslashes (\) to slashes (/) for Archiver library
+            // Normalize Windows backslashes (\) to slashes (/) for Archiver
             const normalizedPath = entry.securePath.replace(/\\/g, '/');
 
             if (entry.isDirectory) {
@@ -473,7 +421,6 @@ async function downloadZip(req, res, next) {
     }
 }
 
-// Single explicit export object — prevents module.exports vs exports override issues
 module.exports = {
     getTree,
     getList,
@@ -481,6 +428,5 @@ module.exports = {
     renameItem,
     deleteItems,
     downloadFile,
-    uploadFile,
-    downloadZip
+    downloadZip,
 };
