@@ -35,6 +35,9 @@ const Files = (() => {
      DATA FETCHING (API INTEGRATION)
      ══════════════════════════════════════════ */
 
+  // Request ID to prevent race conditions (Stale Response Issue)
+  let currentRequestId = 0;
+
   async function loadTree() {
     try {
       const data = await window.API.get('/fs/tree');
@@ -42,15 +45,21 @@ const Files = (() => {
       renderTree();
     } catch (e) {
       console.warn('[Files] Failed to load tree, using fallback');
-      // Minimal fallback structure if API is unreachable
       state.tree = [{ id: '/', name: 'All Files', path: '/', icon: 'hardDrive', children: [] }];
       renderTree();
     }
   }
 
   async function loadFiles() {
+    // Generate a unique ID for this specific fetch request
+    const reqId = ++currentRequestId;
+
     state.isLoading = true;
-    renderView(); // Re-render to show loading state (can be enhanced with skeletons)
+
+    // Ensure page is always a valid number to prevent page=NaN errors
+    state.page = parseInt(state.page, 10) || 1;
+
+    renderView();
 
     try {
       const params = new URLSearchParams({
@@ -65,22 +74,28 @@ const Files = (() => {
 
       const res = await window.API.get(`/fs/list?${params.toString()}`);
 
+      // SECURITY/ARCHITECTURE CHECK: If a new request was made while this one was pending,
+      // discard this stale response to prevent UI bouncing.
+      if (reqId !== currentRequestId) return;
+
       state.files = res.items || [];
       state.totalFiles = res.total || 0;
       state.typeCounts = res.counts || {};
 
     } catch (e) {
+      if (reqId !== currentRequestId) return;
       console.warn('[Files] Failed to load files list');
       state.files = [];
       state.totalFiles = 0;
       state.typeCounts = {};
     } finally {
-      state.isLoading = false;
-      // Clear selection when folder changes or reloads
-      state.selected.clear();
-      updateBulkBar();
-      renderFilterChips();
-      renderView();
+      if (reqId === currentRequestId) {
+        state.isLoading = false;
+        state.selected.clear();
+        updateBulkBar();
+        renderFilterChips();
+        renderView();
+      }
     }
   }
 
@@ -125,13 +140,16 @@ const Files = (() => {
     });
 
     wrap.querySelectorAll('.tree-item').forEach(item => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
         const newPath = item.getAttribute('data-tree-path');
         if (newPath === state.currentPath) return; // Already there
 
         state.currentPath = newPath;
         state.page = 1;
+        state.filter = 'all'; // Reset filter when navigating
         state.search = '';
+
         const searchInput = $('#filesSearch');
         if (searchInput) searchInput.value = '';
 
@@ -164,7 +182,7 @@ const Files = (() => {
     ];
 
     wrap.innerHTML = chips.map(c => {
-      // Show count if provided by API, otherwise omit it to prevent "0" spam when offline
+      // Show count if provided by API, otherwise omit it
       const countStr = state.typeCounts[c.key] !== undefined
         ? `<span class="count">${Format.compact(state.typeCounts[c.key])}</span>`
         : '';
@@ -224,9 +242,7 @@ const Files = (() => {
             <div class="fname-cell">
               <div class="ftype-icon ${t.key}">${icon(t.icon, 16)}</div>
               <div class="fname-text">
-                <div class="fname" style="cursor:${f.isFolder ? 'pointer' : 'default'}" ${f.isFolder ? `data-navigate="${f.path}"` : ''}>
-                  ${f.name} ${f.starred ? '<span style="color:#fbbf24">★</span>' : ''}
-                </div>
+                <div class="fname">${f.name} ${f.starred ? '<span style="color:#fbbf24">★</span>' : ''}</div>
                 <div class="fpath">${f.path}</div>
               </div>
             </div>
@@ -312,7 +328,7 @@ const Files = (() => {
       const ext = t.ext ? t.ext.toUpperCase() : (f.isFolder ? 'FOLDER' : '');
 
       return `
-        <div class="file-card ${isSel ? 'is-selected' : ''}" data-id="${f.id}" style="animation-delay:${i * 20}ms" ${f.isFolder ? `data-navigate="${f.path}"` : ''}>
+        <div class="file-card ${isSel ? 'is-selected' : ''}" data-id="${f.id}" style="animation-delay:${i * 20}ms">
           <div class="file-card-check">
             <label class="checkbox">
               <input type="checkbox" data-check="${f.id}" ${isSel ? 'checked' : ''}>
@@ -439,8 +455,12 @@ const Files = (() => {
       b.addEventListener('click', () => {
         const targetPath = b.getAttribute('data-nav-path');
         if (targetPath === state.currentPath) return;
+
         state.currentPath = targetPath;
         state.page = 1;
+        state.filter = 'all'; // Reset filter when navigating
+        state.search = '';
+
         updateBreadcrumb();
         loadFiles();
       });
@@ -470,38 +490,56 @@ const Files = (() => {
      ══════════════════════════════════════════ */
 
   function bindRowInteractions() {
-    // Navigate into folders
-    $$('[data-navigate]').forEach(el => {
-      el.addEventListener('click', (e) => {
-        // Prevent nav if clicking checkbox/menu
-        if (e.target.closest('input, .btn-icon, .checkbox, [data-act]')) return;
-        state.currentPath = el.getAttribute('data-navigate');
-        state.page = 1;
-        state.search = '';
-        const searchInput = $('#filesSearch');
-        if (searchInput) searchInput.value = '';
-        updateBreadcrumb();
-        loadFiles();
-      });
-    });
 
-    // Checkboxes
+    // 1. Checkboxes (Individual Selection - No Re-render)
     $$('input[data-check]').forEach(cb => {
-      cb.addEventListener('change', () => {
+      cb.addEventListener('change', (e) => {
         const id = cb.getAttribute('data-check');
-        if (cb.checked) state.selected.add(id); else state.selected.delete(id);
-        renderView();
+        const row = e.target.closest('tr, .file-card');
+
+        if (cb.checked) {
+          state.selected.add(id);
+          row?.classList.add('is-selected');
+        } else {
+          state.selected.delete(id);
+          row?.classList.remove('is-selected');
+        }
+
+        updateBulkBar();
+
+        const selectAll = $('#selectAll');
+        if (selectAll) {
+          const allSelected = state.files.length > 0 && state.files.every(f => state.selected.has(f.id));
+          const anySelected = state.files.some(f => state.selected.has(f.id));
+          selectAll.checked = allSelected;
+          selectAll.indeterminate = anySelected && !allSelected;
+        }
       });
     });
 
-    // Select all
+    // 2. Select All Checkbox (No Re-render)
     $('#selectAll')?.addEventListener('change', e => {
-      if (e.target.checked) state.files.forEach(f => state.selected.add(f.id));
-      else state.files.forEach(f => state.selected.delete(f.id));
-      renderView();
+      const isChecked = e.target.checked;
+
+      $$('.files-table tbody tr, .file-card').forEach(row => {
+        const id = row.getAttribute('data-id');
+        const cb = row.querySelector('input[data-check]');
+
+        if (isChecked) {
+          state.selected.add(id);
+          row.classList.add('is-selected');
+          if (cb) cb.checked = true;
+        } else {
+          state.selected.delete(id);
+          row.classList.remove('is-selected');
+          if (cb) cb.checked = false;
+        }
+      });
+
+      updateBulkBar();
     });
 
-    // Sort headers
+    // 3. Sort headers
     $$('.files-table th.sortable').forEach(th => {
       th.addEventListener('click', () => {
         const key = th.getAttribute('data-sort');
@@ -515,15 +553,30 @@ const Files = (() => {
       });
     });
 
-    // Row click → open drawer (only for files, folders navigate)
+    // 4. Centralized Row / Card Click Logic (Navigate or Details)
     $$('.files-table tbody tr, .file-card').forEach(row => {
       row.addEventListener('click', e => {
-        if (e.target.closest('input, .btn-icon, .checkbox, [data-act], [data-navigate]')) return;
+        // Prevent action if user is interacting with controls
+        if (e.target.closest('label.checkbox, .btn-icon, [data-act]')) return;
 
         const id = row.getAttribute('data-id');
         const file = state.files.find(f => f.id === id);
-        // If it's a file, open drawer. (Folders navigate via data-navigate binding above).
-        if (file && !file.isFolder) {
+        if (!file) return;
+
+        if (file.isFolder) {
+          // Folder: Navigate into it
+          state.currentPath = file.path;
+          state.page = 1;
+          state.filter = 'all'; // Reset filter when navigating
+          state.search = '';
+
+          const searchInput = $('#filesSearch');
+          if (searchInput) searchInput.value = '';
+
+          updateBreadcrumb();
+          loadFiles();
+        } else {
+          // File: Open details drawer
           openDrawer(id);
         }
       });
@@ -535,7 +588,7 @@ const Files = (() => {
       });
     });
 
-    // Action buttons
+    // 5. Action buttons (Download, More, etc.)
     $$('[data-act]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
@@ -543,17 +596,29 @@ const Files = (() => {
       });
     });
 
-    // Pagination
-    $$('[data-page]').forEach(btn => {
-      btn.addEventListener('click', () => {
+    // 6. Pagination (Safely scoped to .pagination to avoid selecting <body>)
+    $$('.pagination [data-page]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const p = btn.getAttribute('data-page');
         const totalPages = Math.max(1, Math.ceil(state.totalFiles / state.perPage));
-        if (p === 'prev') state.page = Math.max(1, state.page - 1);
-        else if (p === 'next') state.page = Math.min(totalPages, state.page + 1);
-        else state.page = parseInt(p, 10);
 
-        loadFiles();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        let newPage = state.page;
+
+        if (p === 'prev') {
+          newPage = Math.max(1, state.page - 1);
+        } else if (p === 'next') {
+          newPage = Math.min(totalPages, state.page + 1);
+        } else {
+          const parsed = parseInt(p, 10);
+          if (!isNaN(parsed)) newPage = parsed;
+        }
+
+        if (!isNaN(newPage) && newPage !== state.page) {
+          state.page = newPage;
+          loadFiles();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
       });
     });
 
@@ -574,49 +639,88 @@ const Files = (() => {
   }
 
   /* ══════════════════════════════════════════
-     ACTIONS (Stubs ready for Phase 5)
+     CONTEXT MENU & DRAWER
      ══════════════════════════════════════════ */
-
-  async function handleAction(act, id, event) {
-    const file = state.files.find(f => f.id === id);
-    if (!file) return;
-
-    switch (act) {
-      case 'download':
-        // Needs API implementation
-        Toast.success('Download requested', file.name);
-        break;
-      case 'more': {
-        const rect = event.target.getBoundingClientRect();
-        openContext(rect.left, rect.bottom + 4, id);
-        break;
-      }
-      case 'delete':
-        Toast.info('Delete functionality will be connected in Phase 5');
-        break;
-    }
-  }
 
   function openContext(x, y, id) {
     const file = state.files.find(f => f.id === id);
     if (!file) return;
 
-    const items = [
-      { label: file.isFolder ? 'Open' : 'Preview', icon: file.isFolder ? 'folderOpen' : 'eye', action: () => file.isFolder ? null : openDrawer(id) }
-    ];
+    const items = [];
 
-    if (!file.isFolder) {
-      items.push({ label: 'Download', icon: 'download', shortcut: 'D', action: () => handleAction('download', id) });
+    if (file.isFolder) {
+      items.push(
+        {
+          label: 'Open folder',
+          icon: 'folderOpen',
+          action: () => {
+            state.currentPath = file.path;
+            state.page = 1;
+            state.filter = 'all';
+            updateBreadcrumb();
+            loadFiles();
+          }
+        },
+        {
+          label: 'Folder details',
+          icon: 'info',
+          action: () => openDrawer(id)
+        }
+      );
+    } else {
+      items.push(
+        { label: 'View details', icon: 'eye', action: () => openDrawer(id) },
+        { label: 'Download', icon: 'download', shortcut: 'D', action: () => handleAction('download', id) }
+      );
     }
 
     items.push(
-      { label: 'Copy path', icon: 'copy', shortcut: '⌘C', action: () => copyToClipboard(file.path, 'Path copied') },
+      { label: 'Copy path', icon: 'copy', shortcut: '⌘C', action: () => copyToClipboard(file.path, 'OS path copied') },
       { divider: true },
       { label: 'Rename', icon: 'edit', shortcut: 'F2', action: () => handleAction('rename', id) },
-      { label: 'Move to trash', icon: 'trash', danger: true, action: () => handleAction('delete', id) }
+      { label: 'Delete', icon: 'trash', danger: true, action: () => handleAction('delete', id) }
     );
 
     ContextMenu.show(x, y, items);
+  }
+
+  function openDrawer(id) {
+    const file = state.files.find(f => f.id === id);
+    if (!file) return;
+
+    const drawer = $('#fileDrawer');
+    if (!drawer) return;
+
+    const t = resolveType(file.name, file.isFolder);
+
+    drawer.querySelector('.drawer-body').innerHTML = `
+      <div class="drawer-preview">
+        <div class="ftype-icon ${t.key}">${icon(t.icon, 26)}</div>
+      </div>
+      <div>
+        <div class="drawer-filename">${file.name}</div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <span class="badge">${file.isFolder ? 'Folder' : t.label}</span>
+          ${file.status ? `<span class="badge badge-${statusColor(file.status)}">${file.status}</span>` : ''}
+        </div>
+      </div>
+      <div class="meta-list">
+        <div class="meta-row">
+          <span class="meta-key">${file.isFolder ? 'Contents' : 'Size'}</span>
+          <span class="meta-val">${file.isFolder ? (file.itemsCount !== undefined ? file.itemsCount + ' items' : 'Directory') : Format.bytes(file.size)}</span>
+        </div>
+        <div class="meta-row"><span class="meta-key">Type</span><span class="meta-val">${file.isFolder ? 'Directory' : t.label + (t.ext ? ' · .' + t.ext : '')}</span></div>
+        ${!file.isFolder && file.downloads != null ? `<div class="meta-row"><span class="meta-key">Downloads</span><span class="meta-val">${Format.number(file.downloads)}</span></div>` : ''}
+        <div class="meta-row"><span class="meta-key">Modified</span><span class="meta-val">${Format.dateTime(file.modified)}</span></div>
+        <div class="meta-row"><span class="meta-key">Location</span><span class="meta-val" style="direction:ltr;word-break:break-all;">${file.path}</span></div>
+      </div>
+    `;
+
+    drawer.classList.add('is-open');
+  }
+
+  function closeDrawer() {
+    $('#fileDrawer')?.classList.remove('is-open');
   }
 
   /* ══════════════════════════════════════════
@@ -735,81 +839,6 @@ const Files = (() => {
     }
   }
 
-  function openContext(x, y, id) {
-    const file = state.files.find(f => f.id === id);
-    if (!file) return;
-
-    const items = [
-      {
-        label: file.isFolder ? 'Open folder' : 'View details',
-        icon: file.isFolder ? 'folderOpen' : 'eye',
-        action: () => {
-          if (file.isFolder) {
-            state.currentPath = file.path;
-            state.page = 1;
-            updateBreadcrumb();
-            loadFiles();
-          } else {
-            openDrawer(id);
-          }
-        }
-      }
-    ];
-
-    if (!file.isFolder) {
-      items.push({ label: 'Download', icon: 'download', shortcut: 'D', action: () => handleAction('download', id) });
-    }
-
-    items.push(
-      { label: 'Copy path', icon: 'copy', shortcut: '⌘C', action: () => copyToClipboard(file.path, 'OS path copied') },
-      { divider: true },
-      { label: 'Rename', icon: 'edit', shortcut: 'F2', action: () => handleAction('rename', id) },
-      { label: 'Delete', icon: 'trash', danger: true, action: () => handleAction('delete', id) }
-    );
-
-    ContextMenu.show(x, y, items);
-  }
-
-  /* ══════════════════════════════════════════
-     DRAWER (File Details)
-     ══════════════════════════════════════════ */
-
-  function openDrawer(id) {
-    const file = state.files.find(f => f.id === id);
-    if (!file || file.isFolder) return; // Don't open drawer for folders usually
-
-    const drawer = $('#fileDrawer');
-    if (!drawer) return;
-
-    const t = resolveType(file.name, file.isFolder);
-
-    drawer.querySelector('.drawer-body').innerHTML = `
-      <div class="drawer-preview">
-        <div class="ftype-icon ${t.key}">${icon(t.icon, 26)}</div>
-      </div>
-      <div>
-        <div class="drawer-filename">${file.name}</div>
-        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-          <span class="badge">${t.label}</span>
-          ${file.status ? `<span class="badge badge-${statusColor(file.status)}">${file.status}</span>` : ''}
-        </div>
-      </div>
-      <div class="meta-list">
-        <div class="meta-row"><span class="meta-key">Size</span><span class="meta-val">${Format.bytes(file.size)}</span></div>
-        <div class="meta-row"><span class="meta-key">Type</span><span class="meta-val">${t.label}${t.ext ? ' · .' + t.ext : ''}</span></div>
-        ${file.downloads != null ? `<div class="meta-row"><span class="meta-key">Downloads</span><span class="meta-val">${Format.number(file.downloads)}</span></div>` : ''}
-        <div class="meta-row"><span class="meta-key">Modified</span><span class="meta-val">${Format.dateTime(file.modified)}</span></div>
-        <div class="meta-row"><span class="meta-key">Location</span><span class="meta-val" style="direction:ltr">${file.path}</span></div>
-      </div>
-    `;
-
-    drawer.classList.add('is-open');
-  }
-
-  function closeDrawer() {
-    $('#fileDrawer')?.classList.remove('is-open');
-  }
-
   /* ══════════════════════════════════════════
      RENDER SWITCH & BINDINGS
      ══════════════════════════════════════════ */
@@ -893,7 +922,6 @@ const Files = (() => {
       overlay.classList.remove('is-active');
       const count = e.dataTransfer?.files?.length || 0;
       if (count) {
-        // In Phase 5/6, we can capture these files and send them directly to Uploads
         Toast.info('Drop functionality', 'Ready to connect to Upload engine');
       }
     });
