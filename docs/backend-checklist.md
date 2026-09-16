@@ -15,14 +15,14 @@ This document outlines the atomic steps to build a secure, high-performance Node
 - [x] Implement a safe `exists` and `isDirectory` check mechanism.
 
 ## 💾 Phase 3: Metadata Service (JSON Database)
-- [ ] Create `MetadataService` to manage `metadata.json` (stored outside the public download folder).
-- [ ] Implement read/write locks or atomic writes to prevent data corruption during concurrent requests.
-- [ ] Create methods to get/set stats (downloads count, starred status, activity logs) mapped to file paths.
+- [x] Create `MetadataService` to manage `metadata.json` (stored outside the public download folder).
+- [x] Implement read/write locks or atomic writes to prevent data corruption during concurrent requests.
+- [x] Create methods to get/set stats (downloads count, starred status, activity logs) mapped to file paths.
 
 ## 📂 Phase 4: File Browser APIs (Read)
-- [ ] Implement `GET /api/fs/tree` (Scan directories up to depth 2 to build the sidebar tree).
-- [ ] Implement `GET /api/fs/list` (Read directory contents, merge with Metadata, handle sorting/filtering/pagination).
-- [ ] Mount these routes in `/src/routes/fs.routes.js`.
+- [x] Implement `GET /api/fs/tree` (Scan directories up to depth 2 to build the sidebar tree).
+- [x] Implement `GET /api/fs/list` (Read directory contents, merge with Metadata, handle sorting/filtering/pagination).
+- [x] Mount these routes in `/src/routes/fs.routes.js`.
 
 ## ✍️ Phase 5: File Mutations APIs (Write)
 - [ ] Implement `POST /api/fs/folder` (Create new directory).

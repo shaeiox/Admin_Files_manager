@@ -2,16 +2,18 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 const FileSystemService = require('../services/FileSystemService');
 const MetadataService = require('../services/MetadataService');
 const PathService = require('../services/PathService');
 const AppError = require('../utils/AppError');
+const { validateFileName, validateClientPath } = require('../utils/validators');
 
 /**
  * GET /api/fs/tree
  * Returns a 2-level deep folder hierarchy for the sidebar tree.
  */
-exports.getTree = async (req, res, next) => {
+async function getTree(req, res, next) {
     try {
         const rootPath = '/';
         const rootNode = {
@@ -22,16 +24,14 @@ exports.getTree = async (req, res, next) => {
             children: []
         };
 
-        // Helper to scan a directory and return sub-folders
         async function scanFolders(clientPath, depth = 1) {
-            if (depth > 2) return []; // Limit depth to avoid excessive scanning
+            if (depth > 2) return [];
 
             try {
                 const items = await FileSystemService.readDirectory(clientPath);
                 const folders = [];
 
                 for (const item of items) {
-                    // Skip hidden files/folders (starting with dot)
                     if (item.name.startsWith('.')) continue;
 
                     if (item.isDirectory()) {
@@ -45,7 +45,6 @@ exports.getTree = async (req, res, next) => {
                     }
                 }
 
-                // Sort folders alphabetically
                 return folders.sort((a, b) => a.name.localeCompare(b.name));
             } catch (error) {
                 console.warn(`[Tree] Could not read ${clientPath}:`, error.message);
@@ -54,18 +53,17 @@ exports.getTree = async (req, res, next) => {
         }
 
         rootNode.children = await scanFolders(rootPath, 1);
-
-        res.json([rootNode]); // Frontend expects an array of roots
+        res.json([rootNode]);
     } catch (error) {
         next(error);
     }
-};
+}
 
 /**
  * GET /api/fs/list
  * Returns directory contents, merged with metadata, supports filtering/sorting/pagination.
  */
-exports.getList = async (req, res, next) => {
+async function getList(req, res, next) {
     try {
         const targetPath = req.query.path || '/';
         const page = parseInt(req.query.page, 10) || 1;
@@ -75,29 +73,22 @@ exports.getList = async (req, res, next) => {
         const search = (req.query.search || '').toLowerCase();
         const typeFilter = req.query.type || 'all';
 
-        // 1. Read Raw OS Items
         const rawItems = await FileSystemService.readDirectory(targetPath);
         const enrichedItems = [];
 
-        // Counters for filter chips
         const counts = {
             all: 0, folder: 0, image: 0, video: 0, document: 0, audio: 0, archive: 0, code: 0
         };
 
-        // 2. Enrich with OS Stats and JSON Metadata
         for (const item of rawItems) {
-            if (item.name.startsWith('.')) continue; // Hide dot-files
+            if (item.name.startsWith('.')) continue;
 
             const itemClientPath = targetPath === '/' ? `/${item.name}` : `${targetPath}/${item.name}`;
             const isFolder = item.isDirectory();
 
-            // Get OS Stats (Size, Date)
             const stats = await FileSystemService.getStats(itemClientPath);
-
-            // Get JSON Metadata (Downloads, Starred)
             const meta = await MetadataService.getFileMeta(itemClientPath);
 
-            // Determine "type" for filtering (Very basic extension matcher, mirrors frontend)
             let extKey = 'other';
             if (isFolder) {
                 extKey = 'folder';
@@ -120,27 +111,23 @@ exports.getList = async (req, res, next) => {
                 modified: stats.modified,
                 downloads: isFolder ? null : meta.downloads,
                 starred: meta.starred,
-                status: 'internal', // Placeholder for now
-                _extKey: extKey // Internal use for filtering
+                status: 'internal',
+                _extKey: extKey
             };
 
-            // Apply Search Filter
             if (search && !fileObj.name.toLowerCase().includes(search)) continue;
 
             enrichedItems.push(fileObj);
 
-            // Update Counts (ignores type filter, but respects search)
             counts.all++;
             if (counts[extKey] !== undefined) counts[extKey]++;
         }
 
-        // 3. Apply Type Filter
         let filteredItems = enrichedItems;
         if (typeFilter !== 'all') {
             filteredItems = filteredItems.filter(f => f._extKey === typeFilter);
         }
 
-        // 4. Sort (Folders always first)
         filteredItems.sort((a, b) => {
             if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
 
@@ -154,12 +141,10 @@ exports.getList = async (req, res, next) => {
             return 0;
         });
 
-        // 5. Pagination
         const total = filteredItems.length;
         const startIndex = (page - 1) * limit;
         const paginatedItems = filteredItems.slice(startIndex, startIndex + limit);
 
-        // Clean up internal keys before sending to client
         paginatedItems.forEach(item => delete item._extKey);
 
         res.json({
@@ -167,8 +152,183 @@ exports.getList = async (req, res, next) => {
             total,
             counts
         });
-
     } catch (error) {
         next(error);
     }
+}
+
+/**
+ * POST /api/fs/folder
+ * Body: { path: "/media/new-folder" }
+ */
+async function createFolder(req, res, next) {
+    try {
+        const { path: clientPath } = req.body || {};
+        validateClientPath(clientPath);
+
+        const folderName = path.posix.basename(clientPath);
+        validateFileName(folderName);
+
+        await FileSystemService.createDirectory(clientPath);
+
+        MetadataService.addActivity({
+            type: 'folder',
+            user: 'system',
+            action: 'created folder',
+            target: folderName,
+            folder: path.posix.dirname(clientPath),
+        }).catch(() => { });
+
+        res.status(201).json({
+            success: true,
+            data: { path: clientPath },
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * PUT /api/fs/rename
+ * Body: { oldPath: "/media/old.txt", newName: "new.txt" }
+ */
+async function renameItem(req, res, next) {
+    try {
+        const { oldPath, newName } = req.body || {};
+        validateClientPath(oldPath);
+        const cleanNewName = validateFileName(newName);
+
+        const { oldPath: from, newPath: to } = await FileSystemService.rename(oldPath, cleanNewName);
+
+        try {
+            await MetadataService.renamePath(from, to);
+        } catch (metaErr) {
+            console.error('[Metadata] Failed to migrate on rename:', metaErr.message);
+        }
+
+        MetadataService.addActivity({
+            type: 'edit',
+            user: 'system',
+            action: 'renamed',
+            target: cleanNewName,
+            folder: path.posix.dirname(from),
+        }).catch(() => { });
+
+        res.json({
+            success: true,
+            data: { oldPath: from, newPath: to },
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * DELETE /api/fs/delete
+ * Body: { paths: ["/media/a.txt", "/media/folder-b"] }
+ */
+async function deleteItems(req, res, next) {
+    try {
+        const { paths } = req.body || {};
+
+        if (!Array.isArray(paths) || paths.length === 0) {
+            throw new AppError('At least one path must be provided.', 400);
+        }
+        if (paths.length > 500) {
+            throw new AppError('Too many items in a single request (max 500).', 400);
+        }
+
+        const results = { deleted: [], failed: [] };
+
+        for (const clientPath of paths) {
+            try {
+                validateClientPath(clientPath);
+                await FileSystemService.remove(clientPath);
+
+                MetadataService.deletePath(clientPath).catch(() => { });
+
+                MetadataService.addActivity({
+                    type: 'delete',
+                    user: 'system',
+                    action: 'deleted',
+                    target: path.posix.basename(clientPath),
+                    folder: path.posix.dirname(clientPath),
+                }).catch(() => { });
+
+                results.deleted.push(clientPath);
+            } catch (err) {
+                results.failed.push({
+                    path: clientPath,
+                    error: err.message,
+                    statusCode: err.statusCode || 500,
+                });
+            }
+        }
+
+        if (results.deleted.length === 0 && results.failed.length > 0) {
+            const firstErr = results.failed[0];
+            throw new AppError(firstErr.error, firstErr.statusCode);
+        }
+
+        res.json({
+            success: true,
+            data: results,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * GET /api/fs/download?path=/media/file.txt
+ */
+async function downloadFile(req, res, next) {
+    try {
+        const clientPath = req.query.path;
+        validateClientPath(clientPath);
+
+        const stats = await FileSystemService.getStats(clientPath);
+
+        if (stats.isDirectory) {
+            throw new AppError('Cannot download a directory.', 400);
+        }
+
+        const fileName = path.posix.basename(clientPath);
+        const encodedName = encodeURIComponent(fileName);
+
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="${fileName.replace(/"/g, '')}"; filename*=UTF-8''${encodedName}`
+        );
+        res.setHeader('Content-Length', stats.size);
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+
+        const stream = fs.createReadStream(stats.securePath);
+
+        stream.once('open', () => {
+            MetadataService.incrementDownload(clientPath).catch(() => { });
+        });
+
+        stream.on('error', (streamErr) => {
+            if (!res.headersSent) {
+                return next(new AppError('Failed to stream file.', 500));
+            }
+            res.destroy(streamErr);
+        });
+
+        stream.pipe(res);
+    } catch (error) {
+        next(error);
+    }
+}
+
+// Single explicit export object — prevents module.exports vs exports override issues
+module.exports = {
+    getTree,
+    getList,
+    createFolder,
+    renameItem,
+    deleteItems,
+    downloadFile,
 };
