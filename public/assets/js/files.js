@@ -50,16 +50,13 @@ const Files = (() => {
     }
   }
 
-  async function loadFiles() {
-    // Generate a unique ID for this specific fetch request
+  async function loadFiles(silent = false) {
     const reqId = ++currentRequestId;
 
-    state.isLoading = true;
-
-    // Ensure page is always a valid number to prevent page=NaN errors
-    state.page = parseInt(state.page, 10) || 1;
-
-    renderView();
+    if (!silent) {
+      state.isLoading = true;
+      renderView();
+    }
 
     try {
       const params = new URLSearchParams({
@@ -74,8 +71,6 @@ const Files = (() => {
 
       const res = await window.API.get(`/fs/list?${params.toString()}`);
 
-      // SECURITY/ARCHITECTURE CHECK: If a new request was made while this one was pending,
-      // discard this stale response to prevent UI bouncing.
       if (reqId !== currentRequestId) return;
 
       state.files = res.items || [];
@@ -97,6 +92,42 @@ const Files = (() => {
         renderView();
       }
     }
+  }
+
+  /* ══════════════════════════════════════════
+     DIRECT UPLOAD ENGINE
+     ══════════════════════════════════════════ */
+
+  async function handleDirectUpload(fileList) {
+    if (!fileList || fileList.length === 0) return;
+
+    const files = Array.from(fileList);
+    Toast.info('Upload started', `Uploading ${files.length} file(s) to ${state.currentPath}...`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('destination', state.currentPath);
+      formData.append('overwrite', 'false');
+
+      try {
+        const { promise } = window.API.upload('/fs/upload', formData);
+        await promise;
+        successCount++;
+      } catch (err) {
+        failCount++;
+        console.error('[Upload] Failed for', file.name, err);
+      }
+    }
+
+    if (successCount > 0) Toast.success('Upload complete', `${successCount} file(s) uploaded successfully.`);
+    if (failCount > 0) Toast.error('Upload warnings', `${failCount} file(s) failed to upload.`);
+
+    // Refresh the files list to show newly uploaded items
+    loadFiles(true);
   }
 
   /* ══════════════════════════════════════════
@@ -143,11 +174,11 @@ const Files = (() => {
       item.addEventListener('click', (e) => {
         e.stopPropagation();
         const newPath = item.getAttribute('data-tree-path');
-        if (newPath === state.currentPath) return; // Already there
+        if (newPath === state.currentPath) return;
 
         state.currentPath = newPath;
         state.page = 1;
-        state.filter = 'all'; // Reset filter when navigating
+        state.filter = 'all';
         state.search = '';
 
         const searchInput = $('#filesSearch');
@@ -159,7 +190,133 @@ const Files = (() => {
         updateBreadcrumb();
         loadFiles();
       });
+
+      // Tree Context Menu (Right Click)
+      item.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const targetPath = item.getAttribute('data-tree-path');
+
+        const menuItems = [
+          { label: 'New subfolder', icon: 'folderPlus', action: () => handleAction('newFolder', targetPath) }
+        ];
+
+        // Do not allow renaming or deleting the root folder
+        if (targetPath !== '/') {
+          menuItems.push(
+            { divider: true },
+            { label: 'Rename folder', icon: 'edit', action: () => handleAction('renameTree', targetPath) },
+            { label: 'Delete folder', icon: 'trash', danger: true, action: () => handleAction('deleteTree', targetPath) }
+          );
+        }
+
+        ContextMenu.show(e.clientX, e.clientY, menuItems);
+      });
     });
+  }
+
+  /* ══════════════════════════════════════════
+   PATH NAVIGATION SYNC HELPERS
+   ══════════════════════════════════════════ */
+
+  function getParentPath(p) {
+    if (p === '/') return '/';
+    const parts = p.split('/').filter(Boolean);
+    parts.pop();
+    return parts.length ? '/' + parts.join('/') : '/';
+  }
+
+  function syncCurrentPathAfterMutation(action, oldPath, newPath = null) {
+    let changed = false;
+    const current = state.currentPath;
+
+    // Check if the user is currently inside the mutated folder or its subfolders
+    // Use trailing slash to prevent false matches (e.g., /folder1 matching /folder123)
+    const isTargetOrChild = current === oldPath || current.startsWith(oldPath + '/');
+
+    if (!isTargetOrChild) return false; // No navigation needed
+
+    if (action === 'rename' && newPath) {
+      // Replace the oldPath prefix with the newPath safely
+      state.currentPath = newPath + current.slice(oldPath.length);
+      changed = true;
+    } else if (action === 'delete') {
+      // Fallback to the immediate parent of the deleted folder
+      state.currentPath = getParentPath(oldPath);
+      changed = true;
+    }
+
+    if (changed) {
+      updateBreadcrumb();
+    }
+    return changed;
+  }
+
+  // Handle mutations specifically from the sidebar tree
+  async function handleTreeMutation(act, targetPath) {
+    switch (act) {
+      case 'newFolder':
+        const name = await Modal.prompt({
+          title: 'Create subfolder',
+          label: 'Folder name',
+          placeholder: 'e.g. New Project',
+          confirmText: 'Create',
+        });
+        if (name && name.trim()) {
+          const newPath = targetPath === '/' ? `/${name.trim()}` : `${targetPath}/${name.trim()}`;
+          try {
+            await window.API.post('/fs/folder', { path: newPath });
+            Toast.success('Folder created', name.trim());
+            loadTree();
+            // Silent reload if we are in the target path
+            if (state.currentPath === targetPath) loadFiles(true);
+          } catch (e) { }
+        }
+        break;
+
+      case 'rename':
+        const currentName = targetPath.split('/').pop();
+        const newName = await Modal.prompt({
+          title: 'Rename folder',
+          label: 'New name',
+          value: currentName,
+          confirmText: 'Rename',
+        });
+        if (newName && newName.trim() && newName !== currentName) {
+          try {
+            const res = await window.API.put('/fs/rename', { oldPath: targetPath, newName: newName.trim() });
+            Toast.success('Folder renamed');
+
+            // Sync navigation if needed
+            syncCurrentPathAfterMutation('rename', targetPath, res.data.newPath);
+
+            loadTree();
+            loadFiles(true);
+          } catch (e) { }
+        }
+        break;
+
+      case 'delete':
+        const ok = await Modal.confirm({
+          title: `Delete folder?`,
+          message: 'This folder and all its contents will be permanently deleted.',
+          confirmText: 'Delete permanently',
+          danger: true,
+        });
+        if (ok) {
+          try {
+            await window.API.del(`/fs/delete`, { paths: [targetPath] });
+            Toast.success('Folder deleted');
+
+            // Sync navigation if needed
+            syncCurrentPathAfterMutation('delete', targetPath);
+
+            loadTree();
+            loadFiles(true);
+          } catch (e) { }
+        }
+        break;
+    }
   }
 
   /* ══════════════════════════════════════════
@@ -549,7 +706,7 @@ const Files = (() => {
           state.sort.key = key;
           state.sort.dir = 'asc';
         }
-        loadFiles();
+        loadFiles(true);
       });
     });
 
@@ -730,7 +887,8 @@ const Files = (() => {
   async function handleAction(act, id, event) {
     const file = state.files.find(f => f.id === id);
 
-    if (!file && act !== 'newFolder' && act !== 'bulkDelete') return;
+    const isGlobalOrTreeAction = ['newFolder', 'bulkDelete', 'renameTree', 'deleteTree'].includes(act);
+    if (!file && !isGlobalOrTreeAction) return;
 
     switch (act) {
       case 'download':
@@ -761,10 +919,9 @@ const Files = (() => {
           try {
             await window.API.post('/fs/folder', { path: newPath });
             Toast.success('Folder created', folderName);
-            loadFiles();
+            loadFiles(true);
             loadTree();
-          } catch (e) {
-          }
+          } catch (e) { }
         }
         break;
       }
@@ -779,13 +936,55 @@ const Files = (() => {
 
         if (newName && newName.trim() && newName !== file.name) {
           try {
-            await window.API.put('/fs/rename', {
+            const res = await window.API.put('/fs/rename', {
               oldPath: file.path,
               newName: newName.trim()
             });
-            Toast.success('Item renamed', newName);
-            loadFiles();
-            if (file.isFolder) loadTree();
+            Toast.success('Item renamed', newName.trim());
+
+            const oldPath = file.path;
+            const newPath = res.data.newPath;
+
+            // Update all properties of the file object in memory
+            file.name = newName.trim();
+            file.path = newPath;
+            file.id = newPath;
+
+            if (file.isFolder) {
+              syncCurrentPathAfterMutation('rename', oldPath, newPath);
+              loadTree();
+            }
+
+            loadFiles(true);
+          } catch (e) { }
+        }
+        break;
+      }
+
+      //  Dedicated handler for renaming directly from Sidebar Tree
+      case 'renameTree': {
+        const targetPath = id; // id parameter carries the targetPath string
+        const currentName = targetPath.split('/').filter(Boolean).pop() || '';
+
+        const newName = await Modal.prompt({
+          title: 'Rename folder',
+          label: 'New name',
+          value: currentName,
+          confirmText: 'Rename',
+        });
+
+        if (newName && newName.trim() && newName !== currentName) {
+          try {
+            const res = await window.API.put('/fs/rename', {
+              oldPath: targetPath,
+              newName: newName.trim()
+            });
+            Toast.success('Folder renamed', newName.trim());
+
+            syncCurrentPathAfterMutation('rename', targetPath, res.data.newPath);
+
+            loadTree();
+            loadFiles(true);
           } catch (e) { }
         }
         break;
@@ -803,8 +1002,48 @@ const Files = (() => {
           try {
             await window.API.del(`/fs/delete`, { paths: [file.path] });
             Toast.success('Item deleted', file.name);
-            loadFiles();
-            if (file.isFolder) loadTree();
+
+            const deletedPath = file.path;
+            const isFolder = file.isFolder;
+
+            // Optimistic removal from current list
+            state.files = state.files.filter(f => f.id !== id);
+            state.selected.delete(id);
+            state.totalFiles = Math.max(0, state.totalFiles - 1);
+            renderView();
+
+            if (isFolder) {
+              syncCurrentPathAfterMutation('delete', deletedPath);
+              loadTree();
+            }
+
+            loadFiles(true);
+          } catch (e) { }
+        }
+        break;
+      }
+
+      // Dedicated handler for deleting directly from Sidebar Tree
+      case 'deleteTree': {
+        const targetPath = id; // id parameter carries the targetPath string
+        const folderName = targetPath.split('/').filter(Boolean).pop() || 'folder';
+
+        const ok = await Modal.confirm({
+          title: `Delete folder "${folderName}"?`,
+          message: 'This folder and all its contents will be permanently removed from the server disk.',
+          confirmText: 'Delete permanently',
+          danger: true,
+        });
+
+        if (ok) {
+          try {
+            await window.API.del('/fs/delete', { paths: [targetPath] });
+            Toast.success('Folder deleted', folderName);
+
+            syncCurrentPathAfterMutation('delete', targetPath);
+
+            loadTree();
+            loadFiles(true);
           } catch (e) { }
         }
         break;
@@ -829,9 +1068,22 @@ const Files = (() => {
           try {
             await window.API.del(`/fs/delete`, { paths: pathsToDelete });
             Toast.success(`${count} items deleted`);
+
+            // Sync path if the current folder (or its parent) was in the bulk delete
+            for (const p of pathsToDelete) {
+              if (syncCurrentPathAfterMutation('delete', p)) {
+                break; // Stop checking once we've successfully navigated up
+              }
+            }
+
+            // Optimistic update
+            state.files = state.files.filter(f => !state.selected.has(f.id));
+            state.totalFiles = Math.max(0, state.totalFiles - count);
             state.selected.clear();
-            loadFiles();
+            renderView();
+
             loadTree();
+            loadFiles(true);
           } catch (e) { }
         }
         break;
@@ -899,6 +1151,99 @@ const Files = (() => {
     $('#bulkDelete')?.addEventListener('click', () => {
       handleAction('bulkDelete');
     });
+    // Sort Dropdown Actions
+    $$('[data-sort-act]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.getAttribute('data-sort-act');
+        if (state.sort.key === key) {
+          state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sort.key = key;
+          state.sort.dir = 'asc';
+        }
+        loadFiles();
+        window.AFM.Dropdown.closeAll();
+      });
+    });
+
+    // Top Actions & Direct Upload Binding
+    const fileInput = $('#hiddenFileInput');
+    $('#btnTopbarUpload')?.addEventListener('click', () => fileInput?.click());
+    $('#btnPageUpload')?.addEventListener('click', () => fileInput?.click());
+
+    fileInput?.addEventListener('change', (e) => {
+      handleDirectUpload(e.target.files);
+      e.target.value = ''; // Reset input after selection
+    });
+
+    // Bulk Download with Context Menu for options
+    $('#bulkDownload')?.addEventListener('click', (e) => {
+      const rect = e.target.getBoundingClientRect();
+      const count = state.selected.size;
+
+      ContextMenu.show(rect.left, rect.bottom + 4, [
+        {
+          label: `Download ${count} files as ZIP`,
+          icon: 'archive',
+          action: () => {
+            Toast.info('ZIP Archive', 'Backend ZIP streaming will be implemented in Phase 6/7.');
+          }
+        },
+        {
+          label: 'Download as individual files',
+          icon: 'file',
+          action: () => {
+            // Loop through selected and trigger individual downloads
+            let delay = 0;
+            state.files.filter(f => state.selected.has(f.id)).forEach(f => {
+              if (!f.isFolder) {
+                setTimeout(() => {
+                  window.open(`${window.API.BASE_URL}/fs/download?path=${encodeURIComponent(f.path)}`, '_blank');
+                }, delay);
+                delay += 500; // Stagger to prevent browser popup blockers
+              }
+            });
+            Toast.success('Downloads started', `${count} files queued for download.`);
+            clearSelection();
+          }
+        }
+      ]);
+    });
+
+    $('#bulkMove')?.addEventListener('click', async () => {
+      const dest = await Modal.prompt({
+        title: 'Move items',
+        label: 'Destination path',
+        placeholder: '/media/archive',
+        confirmText: 'Move'
+      });
+      if (dest) Toast.info('Move function will connect to API in next phase');
+    });
+
+    $('#bulkShare')?.addEventListener('click', () => {
+      copyToClipboard('https://dl.dimension.io/s/batch-xyz', 'Batch share link copied');
+    });
+
+    $('#bulkStar')?.addEventListener('click', () => {
+      Toast.success('Items starred');
+    });
+
+    $('#bulkRename')?.addEventListener('click', async () => {
+      const count = state.selected.size;
+      if (count === 1) {
+        // Fallback to standard rename if only 1 item selected
+        const id = Array.from(state.selected)[0];
+        handleAction('rename', id);
+      } else {
+        const baseName = await Modal.prompt({
+          title: `Batch rename ${count} items`,
+          label: 'Base name (will append -1, -2...)',
+          placeholder: 'e.g., Summer-Photos',
+          confirmText: 'Batch Rename'
+        });
+        if (baseName) Toast.info('Batch rename requires backend bulk support');
+      }
+    });
   }
 
   function initDragDrop() {
@@ -922,7 +1267,7 @@ const Files = (() => {
       overlay.classList.remove('is-active');
       const count = e.dataTransfer?.files?.length || 0;
       if (count) {
-        Toast.info('Drop functionality', 'Ready to connect to Upload engine');
+        handleDirectUpload(e.dataTransfer.files);
       }
     });
   }

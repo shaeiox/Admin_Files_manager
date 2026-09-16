@@ -21,7 +21,7 @@ const API = (() => {
             const response = await fetch(url, { ...options, headers });
 
             let data;
-    
+
             try { data = await response.json(); } catch (e) { data = null; }
 
             if (!response.ok) {
@@ -35,7 +35,7 @@ const API = (() => {
             if (window.AFM && window.AFM.Toast) {
                 window.AFM.Toast.error('Network Error', error.message || 'Failed to communicate with server');
             }
-            throw error; 
+            throw error;
         }
     }
 
@@ -52,7 +52,10 @@ const API = (() => {
         body: body instanceof FormData ? body : JSON.stringify(body)
     });
 
-    const del = (endpoint) => request(endpoint, { method: 'DELETE' });
+    const del = (endpoint, body) => request(endpoint, {
+        method: 'DELETE',
+        body: body ? JSON.stringify(body) : undefined
+    });
 
     const upload = (endpoint, formData, onProgress) => {
         const xhr = new XMLHttpRequest();

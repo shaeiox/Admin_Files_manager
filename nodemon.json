@@ -1,0 +1,6 @@
+{
+    "ignore": [
+        "data/*",
+        "public/*"
+    ]
+}

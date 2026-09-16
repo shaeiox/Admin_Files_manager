@@ -169,10 +169,10 @@
             <i data-icon="bell" data-icon-size="16"></i>
             <span class="notif-dot"></span>
           </button>
-          <a class="btn btn-primary btn-sm" href="uploads.html">
+          <button class="btn btn-primary btn-sm" id="btnTopbarUpload">
             <i data-icon="plus" data-icon-size="15"></i>
             <span>Upload</span>
-          </a>
+          </button>
         </div>
       </header>
 
@@ -196,10 +196,12 @@
               <i data-icon="folderPlus" data-icon-size="15"></i>
               <span>New folder</span>
             </button>
-            <a class="btn btn-primary btn-sm" href="uploads.html">
+            <button class="btn btn-primary btn-sm" id="btnPageUpload">
               <i data-icon="upload" data-icon-size="15"></i>
               <span>Upload files</span>
-            </a>
+            </button>
+            <!-- Hidden input for direct uploading -->
+            <input type="file" id="hiddenFileInput" multiple style="display: none;">
           </div>
         </div>
 
@@ -230,10 +232,14 @@
               </button>
               <div class="dropdown-menu" id="sortDropdown">
                 <div class="dropdown-label">Sort by</div>
-                <button class="dropdown-item"><i data-icon="fileText" data-icon-size="15"></i> Name</button>
-                <button class="dropdown-item"><i data-icon="hardDrive" data-icon-size="15"></i> Size</button>
-                <button class="dropdown-item"><i data-icon="calendar" data-icon-size="15"></i> Date modified</button>
-                <button class="dropdown-item"><i data-icon="download" data-icon-size="15"></i> Downloads</button>
+                <button class="dropdown-item" data-sort-act="name"><i data-icon="fileText" data-icon-size="15"></i>
+                  Name</button>
+                <button class="dropdown-item" data-sort-act="size"><i data-icon="hardDrive" data-icon-size="15"></i>
+                  Size</button>
+                <button class="dropdown-item" data-sort-act="modified"><i data-icon="calendar" data-icon-size="15"></i>
+                  Date modified</button>
+                <button class="dropdown-item" data-sort-act="downloads"><i data-icon="download" data-icon-size="15"></i>
+                  Downloads</button>
               </div>
             </div>
 
@@ -301,14 +307,17 @@
       <button class="btn-icon" id="bulkDownload" data-tip="Download selected">
         <i data-icon="download" data-icon-size="16"></i>
       </button>
-      <button class="btn-icon" data-tip="Move to folder">
+      <button class="btn-icon" id="bulkMove" data-tip="Move to folder">
         <i data-icon="move" data-icon-size="16"></i>
       </button>
-      <button class="btn-icon" data-tip="Share">
+      <button class="btn-icon" id="bulkShare" data-tip="Share">
         <i data-icon="share" data-icon-size="16"></i>
       </button>
-      <button class="btn-icon" data-tip="Star">
+      <button class="btn-icon" id="bulkStar" data-tip="Star">
         <i data-icon="star" data-icon-size="16"></i>
+      </button>
+      <button class="btn-icon" id="bulkRename" data-tip="Rename">
+        <i data-icon="edit" data-icon-size="16"></i>
       </button>
       <button class="btn-icon" id="bulkDelete" data-tip="Delete">
         <i data-icon="trash" data-icon-size="16"></i>

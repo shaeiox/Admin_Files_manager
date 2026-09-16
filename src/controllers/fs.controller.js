@@ -323,6 +323,72 @@ async function downloadFile(req, res, next) {
     }
 }
 
+// Add multer requirement at the top of fs.controller.js
+const multer = require('multer');
+
+// Configure Multer for streaming uploads directly to memory/disk
+const storage = multer.diskStorage({
+    destination: async (req, file, cb) => {
+        try {
+            const clientDest = req.body.destination || '/';
+            const secureDest = PathService.resolveSecurePath(clientDest);
+            // Ensure the destination exists
+            await fs.promises.access(secureDest);
+            cb(null, secureDest);
+        } catch (err) {
+            cb(new AppError('Invalid upload destination.', 400));
+        }
+    },
+    filename: (req, file, cb) => {
+        try {
+            const cleanName = validateFileName(file.originalname);
+            // Optional: Add logic here to check overwrite flag and append (1) if needed
+            cb(null, cleanName);
+        } catch (err) {
+            cb(err);
+        }
+    }
+});
+
+const uploadMiddleware = multer({ storage }).single('file');
+
+/**
+ * POST /api/fs/upload
+ * Handles multipart/form-data file uploads
+ */
+async function uploadFile(req, res, next) {
+    uploadMiddleware(req, res, (err) => {
+        if (err) {
+            return next(new AppError(err.message, 400));
+        }
+
+        if (!req.file) {
+            return next(new AppError('No file provided.', 400));
+        }
+
+        const clientDest = req.body.destination || '/';
+        const clientPath = clientDest === '/' ? `/${req.file.filename}` : `${clientDest}/${req.file.filename}`;
+
+        // Log the activity
+        MetadataService.addActivity({
+            type: 'upload',
+            user: 'system',
+            action: 'uploaded',
+            target: req.file.filename,
+            folder: clientDest,
+        }).catch(() => { });
+
+        res.status(201).json({
+            success: true,
+            data: {
+                name: req.file.filename,
+                path: clientPath,
+                size: req.file.size
+            }
+        });
+    });
+}
+
 // Single explicit export object — prevents module.exports vs exports override issues
 module.exports = {
     getTree,
@@ -331,4 +397,5 @@ module.exports = {
     renameItem,
     deleteItems,
     downloadFile,
+    uploadFile,
 };
