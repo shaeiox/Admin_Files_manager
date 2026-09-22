@@ -1,54 +1,42 @@
 /* ============================================
    FILES.JS — Enterprise File Browser Logic
    Admin Files Manager — Dimension Style
-
-   Responsibilities:
-   - Directory browsing (tree + list/grid)
-   - Server-side pagination, sorting, filtering, search
-   - CRUD mutations via /api/fs/* endpoints
-   - Direct upload (button + drag & drop)
-   - Bulk actions (download ZIP / individual, delete, star, share, rename, move)
-   - Path continuity after rename/delete (Enterprise UX)
    ============================================ */
 
 'use strict';
 
 const Files = (() => {
 
-  const {
-    $, $$, icon, Format,
-    Toast, Modal, ContextMenu,
-    copyToClipboard, resolveType, Store,
-  } = window.AFM;
+  const { $, $$, icon, Format, Toast, Modal, ContextMenu, copyToClipboard, resolveType, Store } = window.AFM;
 
   /* ══════════════════════════════════════════
      STATE
      ══════════════════════════════════════════ */
 
   const state = {
-    tree: [],                                    // Sidebar folder tree from /fs/tree
-    files: [],                                   // Current page items from /fs/list
-    totalFiles: 0,                               // Total items in current view
-    typeCounts: {},                              // Counts per type (folder / image / ...)
+    tree: [],               // Folder hierarchy from API
+    files: [],              // Current page items from API
+    totalFiles: 0,          // Total items in current folder matching filters
+    typeCounts: {},         // Counts for filter chips
 
-    view: Store.get('files-view', 'list'),       // 'list' | 'grid'
+    view: Store.get('files-view', 'list'), // 'list' | 'grid'
     sort: { key: 'modified', dir: 'desc' },
-    filter: 'all',                               // all|folder|image|video|audio|document|archive|code
+    filter: 'all',          // 'all'|'folder'|'image'|'video'|'audio'|'document'|'archive'|'code'
     search: '',
     selected: new Set(),
     page: 1,
     perPage: 20,
-    currentPath: '/',                            // Client-side representation, root = '/'
+    currentPath: '/',       // Root is represented as '/'
 
-    isLoading: false,
+    isLoading: false
   };
 
-  // Monotonic request ID — protects UI from stale API responses (race conditions)
-  let currentRequestId = 0;
-
   /* ══════════════════════════════════════════
-     API-BACKED DATA FETCHING
+     DATA FETCHING (API INTEGRATION)
      ══════════════════════════════════════════ */
+
+  // Request ID to prevent race conditions (Stale Response Issue)
+  let currentRequestId = 0;
 
   async function loadTree() {
     try {
@@ -56,17 +44,12 @@ const Files = (() => {
       state.tree = Array.isArray(data) ? data : [data];
       renderTree();
     } catch (e) {
-      // Fallback keeps the sidebar operable even if tree API is down
       console.warn('[Files] Failed to load tree, using fallback');
       state.tree = [{ id: '/', name: 'All Files', path: '/', icon: 'hardDrive', children: [] }];
       renderTree();
     }
   }
 
-  /**
-   * Load current directory listing.
-   * @param {boolean} silent - When true, do not blank out the current UI (used after mutations/sort)
-   */
   async function loadFiles(silent = false) {
     const reqId = ++currentRequestId;
 
@@ -83,20 +66,20 @@ const Files = (() => {
         sort: state.sort.key,
         dir: state.sort.dir,
         search: state.search,
-        type: state.filter,
+        type: state.filter
       });
 
       const res = await window.API.get(`/fs/list?${params.toString()}`);
 
-      // Discard stale response if a newer request has been issued
       if (reqId !== currentRequestId) return;
 
       state.files = res.items || [];
       state.totalFiles = res.total || 0;
       state.typeCounts = res.counts || {};
+
     } catch (e) {
       if (reqId !== currentRequestId) return;
-      console.warn('[Files] Failed to load files list:', e.message);
+      console.warn('[Files] Failed to load files list');
       state.files = [];
       state.totalFiles = 0;
       state.typeCounts = {};
@@ -113,7 +96,6 @@ const Files = (() => {
 
   /* ══════════════════════════════════════════
      DIRECT UPLOAD ENGINE
-     Uses window.API.upload (XHR) — supports progress/abort in the future
      ══════════════════════════════════════════ */
 
   async function handleDirectUpload(fileList) {
@@ -144,49 +126,12 @@ const Files = (() => {
     if (successCount > 0) Toast.success('Upload complete', `${successCount} file(s) uploaded successfully.`);
     if (failCount > 0) Toast.error('Upload warnings', `${failCount} file(s) failed to upload.`);
 
-    // Silent refresh — avoids the "No files found" flash while listing reloads
+    // Refresh the files list to show newly uploaded items
     loadFiles(true);
   }
 
   /* ══════════════════════════════════════════
-     PATH CONTINUITY HELPERS
-     Keep currentPath valid after folder rename/delete anywhere in the tree
-     ══════════════════════════════════════════ */
-
-  function getParentPath(p) {
-    if (p === '/') return '/';
-    const parts = p.split('/').filter(Boolean);
-    parts.pop();
-    return parts.length ? '/' + parts.join('/') : '/';
-  }
-
-  /**
-   * Rewrites state.currentPath after a folder mutation (rename/delete).
-   * - rename: if user is inside oldPath (or a descendant), remap the prefix to newPath
-   * - delete: if user is inside oldPath (or a descendant), jump to its parent
-   * @returns {boolean} true when a navigation change was applied
-   */
-  function syncCurrentPathAfterMutation(action, oldPath, newPath = null) {
-    const current = state.currentPath;
-
-    // Trailing slash guard prevents /folder1 matching /folder123
-    const isTargetOrChild = current === oldPath || current.startsWith(oldPath + '/');
-    if (!isTargetOrChild) return false;
-
-    if (action === 'rename' && newPath) {
-      state.currentPath = newPath + current.slice(oldPath.length);
-    } else if (action === 'delete') {
-      state.currentPath = getParentPath(oldPath);
-    } else {
-      return false;
-    }
-
-    updateBreadcrumb();
-    return true;
-  }
-
-  /* ══════════════════════════════════════════
-     RENDER — FOLDER TREE (sidebar)
+     RENDER — FOLDER TREE
      ══════════════════════════════════════════ */
 
   function renderTree() {
@@ -197,7 +142,7 @@ const Files = (() => {
       if (!nodes) return '';
       return nodes.map(n => {
         const hasChildren = Array.isArray(n.children) && n.children.length > 0;
-        const isOpen = depth === 0;
+        const isOpen = depth === 0; // Keep root open by default
         const isActive = n.path === state.currentPath;
 
         return `
@@ -217,7 +162,7 @@ const Files = (() => {
 
     wrap.innerHTML = walk(state.tree);
 
-    // Caret expand/collapse
+    // Bind tree clicks
     wrap.querySelectorAll('.tree-caret').forEach(c => {
       c.addEventListener('click', e => {
         e.stopPropagation();
@@ -226,7 +171,6 @@ const Files = (() => {
     });
 
     wrap.querySelectorAll('.tree-item').forEach(item => {
-      // Navigate into folder
       item.addEventListener('click', (e) => {
         e.stopPropagation();
         const newPath = item.getAttribute('data-tree-path');
@@ -247,28 +191,132 @@ const Files = (() => {
         loadFiles();
       });
 
-      // Right-click context menu on sidebar tree entries
+      // Tree Context Menu (Right Click)
       item.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         e.stopPropagation();
         const targetPath = item.getAttribute('data-tree-path');
 
         const menuItems = [
-          { label: 'New subfolder', icon: 'folderPlus', action: () => handleAction('newFolder', targetPath) },
+          { label: 'New subfolder', icon: 'folderPlus', action: () => handleAction('newFolder', targetPath) }
         ];
 
-        // Root cannot be renamed or deleted
+        // Do not allow renaming or deleting the root folder
         if (targetPath !== '/') {
           menuItems.push(
             { divider: true },
             { label: 'Rename folder', icon: 'edit', action: () => handleAction('renameTree', targetPath) },
-            { label: 'Delete folder', icon: 'trash', danger: true, action: () => handleAction('deleteTree', targetPath) },
+            { label: 'Delete folder', icon: 'trash', danger: true, action: () => handleAction('deleteTree', targetPath) }
           );
         }
 
         ContextMenu.show(e.clientX, e.clientY, menuItems);
       });
     });
+  }
+
+  /* ══════════════════════════════════════════
+   PATH NAVIGATION SYNC HELPERS
+   ══════════════════════════════════════════ */
+
+  function getParentPath(p) {
+    if (p === '/') return '/';
+    const parts = p.split('/').filter(Boolean);
+    parts.pop();
+    return parts.length ? '/' + parts.join('/') : '/';
+  }
+
+  function syncCurrentPathAfterMutation(action, oldPath, newPath = null) {
+    let changed = false;
+    const current = state.currentPath;
+
+    // Check if the user is currently inside the mutated folder or its subfolders
+    // Use trailing slash to prevent false matches (e.g., /folder1 matching /folder123)
+    const isTargetOrChild = current === oldPath || current.startsWith(oldPath + '/');
+
+    if (!isTargetOrChild) return false; // No navigation needed
+
+    if (action === 'rename' && newPath) {
+      // Replace the oldPath prefix with the newPath safely
+      state.currentPath = newPath + current.slice(oldPath.length);
+      changed = true;
+    } else if (action === 'delete') {
+      // Fallback to the immediate parent of the deleted folder
+      state.currentPath = getParentPath(oldPath);
+      changed = true;
+    }
+
+    if (changed) {
+      updateBreadcrumb();
+    }
+    return changed;
+  }
+
+  // Handle mutations specifically from the sidebar tree
+  async function handleTreeMutation(act, targetPath) {
+    switch (act) {
+      case 'newFolder':
+        const name = await Modal.prompt({
+          title: 'Create subfolder',
+          label: 'Folder name',
+          placeholder: 'e.g. New Project',
+          confirmText: 'Create',
+        });
+        if (name && name.trim()) {
+          const newPath = targetPath === '/' ? `/${name.trim()}` : `${targetPath}/${name.trim()}`;
+          try {
+            await window.API.post('/fs/folder', { path: newPath });
+            Toast.success('Folder created', name.trim());
+            loadTree();
+            // Silent reload if we are in the target path
+            if (state.currentPath === targetPath) loadFiles(true);
+          } catch (e) { }
+        }
+        break;
+
+      case 'rename':
+        const currentName = targetPath.split('/').pop();
+        const newName = await Modal.prompt({
+          title: 'Rename folder',
+          label: 'New name',
+          value: currentName,
+          confirmText: 'Rename',
+        });
+        if (newName && newName.trim() && newName !== currentName) {
+          try {
+            const res = await window.API.put('/fs/rename', { oldPath: targetPath, newName: newName.trim() });
+            Toast.success('Folder renamed');
+
+            // Sync navigation if needed
+            syncCurrentPathAfterMutation('rename', targetPath, res.data.newPath);
+
+            loadTree();
+            loadFiles(true);
+          } catch (e) { }
+        }
+        break;
+
+      case 'delete':
+        const ok = await Modal.confirm({
+          title: `Delete folder?`,
+          message: 'This folder and all its contents will be permanently deleted.',
+          confirmText: 'Delete permanently',
+          danger: true,
+        });
+        if (ok) {
+          try {
+            await window.API.del(`/fs/delete`, { paths: [targetPath] });
+            Toast.success('Folder deleted');
+
+            // Sync navigation if needed
+            syncCurrentPathAfterMutation('delete', targetPath);
+
+            loadTree();
+            loadFiles(true);
+          } catch (e) { }
+        }
+        break;
+    }
   }
 
   /* ══════════════════════════════════════════
@@ -291,9 +339,11 @@ const Files = (() => {
     ];
 
     wrap.innerHTML = chips.map(c => {
+      // Show count if provided by API, otherwise omit it
       const countStr = state.typeCounts[c.key] !== undefined
         ? `<span class="count">${Format.compact(state.typeCounts[c.key])}</span>`
         : '';
+
       return `
         <button class="filter-chip ${state.filter === c.key ? 'is-active' : ''}" data-filter="${c.key}">
           ${icon(c.icon, 13)}
@@ -467,7 +517,7 @@ const Files = (() => {
   }
 
   /* ══════════════════════════════════════════
-     FOOTER — PAGINATION
+     FOOTER — Pagination
      ══════════════════════════════════════════ */
 
   function renderFooter() {
@@ -523,7 +573,7 @@ const Files = (() => {
         <div class="empty-desc">Adjust your filters or upload new files to this location.</div>
         <div style="margin-top:12px;display:flex;gap:8px;">
           ${(state.search || state.filter !== 'all') ? `<button class="btn btn-ghost btn-sm" id="clearFilters">Clear filters</button>` : ''}
-          <button class="btn btn-primary btn-sm" id="emptyUpload">${icon('upload', 15)} Upload files</button>
+          <a class="btn btn-primary btn-sm" href="uploads.html">${icon('upload', 15)} Upload files</a>
         </div>
       </div>
     `;
@@ -534,14 +584,16 @@ const Files = (() => {
   }
 
   /* ══════════════════════════════════════════
-     BREADCRUMB
+     BREADCRUMB & OS PATHING
      ══════════════════════════════════════════ */
 
   function updateBreadcrumb() {
     const bc = $('#breadcrumb');
     if (!bc) return;
 
+    // Split OS path: e.g. "/media/videos" -> ["media", "videos"]
     const parts = state.currentPath.split('/').filter(Boolean);
+
     let html = `<span class="breadcrumb-item ${parts.length === 0 ? 'is-current' : ''}" data-nav-path="/">Files</span>`;
 
     let currentBuiltPath = '';
@@ -555,6 +607,7 @@ const Files = (() => {
 
     bc.innerHTML = html;
 
+    // Bind breadcrumb navigation
     bc.querySelectorAll('[data-nav-path]').forEach(b => {
       b.addEventListener('click', () => {
         const targetPath = b.getAttribute('data-nav-path');
@@ -562,7 +615,7 @@ const Files = (() => {
 
         state.currentPath = targetPath;
         state.page = 1;
-        state.filter = 'all';
+        state.filter = 'all'; // Reset filter when navigating
         state.search = '';
 
         updateBreadcrumb();
@@ -572,7 +625,7 @@ const Files = (() => {
   }
 
   /* ══════════════════════════════════════════
-     BULK BAR (selection counter)
+     BULK BAR
      ══════════════════════════════════════════ */
 
   function updateBulkBar() {
@@ -595,7 +648,7 @@ const Files = (() => {
 
   function bindRowInteractions() {
 
-    // Individual checkbox (DOM-only, no re-render)
+    // 1. Checkboxes (Individual Selection - No Re-render)
     $$('input[data-check]').forEach(cb => {
       cb.addEventListener('change', (e) => {
         const id = cb.getAttribute('data-check');
@@ -621,7 +674,7 @@ const Files = (() => {
       });
     });
 
-    // Master checkbox
+    // 2. Select All Checkbox (No Re-render)
     $('#selectAll')?.addEventListener('change', e => {
       const isChecked = e.target.checked;
 
@@ -643,7 +696,7 @@ const Files = (() => {
       updateBulkBar();
     });
 
-    // Column sorting
+    // 3. Sort headers
     $$('.files-table th.sortable').forEach(th => {
       th.addEventListener('click', () => {
         const key = th.getAttribute('data-sort');
@@ -657,9 +710,10 @@ const Files = (() => {
       });
     });
 
-    // Row / card click → navigate (folder) or open details drawer (file)
+    // 4. Centralized Row / Card Click Logic (Navigate or Details)
     $$('.files-table tbody tr, .file-card').forEach(row => {
       row.addEventListener('click', e => {
+        // Prevent action if user is interacting with controls
         if (e.target.closest('label.checkbox, .btn-icon, [data-act]')) return;
 
         const id = row.getAttribute('data-id');
@@ -667,9 +721,10 @@ const Files = (() => {
         if (!file) return;
 
         if (file.isFolder) {
+          // Folder: Navigate into it
           state.currentPath = file.path;
           state.page = 1;
-          state.filter = 'all';
+          state.filter = 'all'; // Reset filter when navigating
           state.search = '';
 
           const searchInput = $('#filesSearch');
@@ -678,18 +733,19 @@ const Files = (() => {
           updateBreadcrumb();
           loadFiles();
         } else {
+          // File: Open details drawer
           openDrawer(id);
         }
       });
 
-      // Right-click context menu on rows/cards
+      // Context menu
       row.addEventListener('contextmenu', e => {
         e.preventDefault();
         openContext(e.clientX, e.clientY, row.getAttribute('data-id'));
       });
     });
 
-    // Inline action buttons (Download / More)
+    // 5. Action buttons (Download, More, etc.)
     $$('[data-act]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
@@ -697,7 +753,7 @@ const Files = (() => {
       });
     });
 
-    // Pagination — strictly scoped to avoid selecting <body data-page="...">
+    // 6. Pagination (Safely scoped to .pagination to avoid selecting <body>)
     $$('.pagination [data-page]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -705,6 +761,7 @@ const Files = (() => {
         const totalPages = Math.max(1, Math.ceil(state.totalFiles / state.perPage));
 
         let newPage = state.page;
+
         if (p === 'prev') {
           newPage = Math.max(1, state.page - 1);
         } else if (p === 'next') {
@@ -736,16 +793,10 @@ const Files = (() => {
       state.page = 1;
       loadFiles();
     });
-
-    // Empty-state "Upload files" button triggers the hidden file input
-    $('#emptyUpload')?.addEventListener('click', () => {
-      const fileInput = $('#hiddenFileInput');
-      fileInput?.click();
-    });
   }
 
   /* ══════════════════════════════════════════
-     CONTEXT MENU (row/card right-click)
+     CONTEXT MENU & DRAWER
      ══════════════════════════════════════════ */
 
   function openContext(x, y, id) {
@@ -765,14 +816,18 @@ const Files = (() => {
             state.filter = 'all';
             updateBreadcrumb();
             loadFiles();
-          },
+          }
         },
-        { label: 'Folder details', icon: 'info', action: () => openDrawer(id) },
+        {
+          label: 'Folder details',
+          icon: 'info',
+          action: () => openDrawer(id)
+        }
       );
     } else {
       items.push(
         { label: 'View details', icon: 'eye', action: () => openDrawer(id) },
-        { label: 'Download', icon: 'download', shortcut: 'D', action: () => handleAction('download', id) },
+        { label: 'Download', icon: 'download', shortcut: 'D', action: () => handleAction('download', id) }
       );
     }
 
@@ -780,15 +835,11 @@ const Files = (() => {
       { label: 'Copy path', icon: 'copy', shortcut: '⌘C', action: () => copyToClipboard(file.path, 'OS path copied') },
       { divider: true },
       { label: 'Rename', icon: 'edit', shortcut: 'F2', action: () => handleAction('rename', id) },
-      { label: 'Delete', icon: 'trash', danger: true, action: () => handleAction('delete', id) },
+      { label: 'Delete', icon: 'trash', danger: true, action: () => handleAction('delete', id) }
     );
 
     ContextMenu.show(x, y, items);
   }
-
-  /* ══════════════════════════════════════════
-     DETAILS DRAWER
-     ══════════════════════════════════════════ */
 
   function openDrawer(id) {
     const file = state.files.find(f => f.id === id);
@@ -830,36 +881,28 @@ const Files = (() => {
   }
 
   /* ══════════════════════════════════════════
-     ACTION DISPATCHER
-     Handles: download / more / newFolder / rename(Tree) / delete(Tree) / bulkDelete
+     ACTIONS (Mutations connected to API)
      ══════════════════════════════════════════ */
 
   async function handleAction(act, id, event) {
     const file = state.files.find(f => f.id === id);
 
-    // Some actions do not depend on an item present in the current file list
     const isGlobalOrTreeAction = ['newFolder', 'bulkDelete', 'renameTree', 'deleteTree'].includes(act);
     if (!file && !isGlobalOrTreeAction) return;
 
     switch (act) {
-
-      // -------- Single-file download (native attachment via iframe) --------
       case 'download':
-        window.API.downloadFile(file.path);
+        window.open(`${window.API.BASE_URL}/fs/download?path=${encodeURIComponent(file.path)}`, '_blank');
         Toast.success('Download started', file.name);
         break;
 
-      // -------- Show inline context menu (from "..." button) --------
       case 'more': {
         const rect = event.target.getBoundingClientRect();
         openContext(rect.left, rect.bottom + 4, id);
         break;
       }
 
-      // -------- Create folder (id may be a parentPath when triggered from tree) --------
       case 'newFolder': {
-        const parentPath = (typeof id === 'string' && id) ? id : state.currentPath;
-
         const name = await Modal.prompt({
           title: 'Create new folder',
           label: 'Folder name',
@@ -869,21 +912,20 @@ const Files = (() => {
 
         if (name && name.trim()) {
           const folderName = name.trim();
-          const newPath = parentPath === '/'
+          const newPath = state.currentPath === '/'
             ? `/${folderName}`
-            : `${parentPath}/${folderName}`;
+            : `${state.currentPath}/${folderName}`;
 
           try {
             await window.API.post('/fs/folder', { path: newPath });
             Toast.success('Folder created', folderName);
             loadFiles(true);
             loadTree();
-          } catch (e) { /* toast handled by API layer */ }
+          } catch (e) { }
         }
         break;
       }
 
-      // -------- Rename item in current listing --------
       case 'rename': {
         const newName = await Modal.prompt({
           title: 'Rename item',
@@ -896,14 +938,14 @@ const Files = (() => {
           try {
             const res = await window.API.put('/fs/rename', {
               oldPath: file.path,
-              newName: newName.trim(),
+              newName: newName.trim()
             });
             Toast.success('Item renamed', newName.trim());
 
             const oldPath = file.path;
             const newPath = res.data.newPath;
 
-            // Optimistic in-memory update so the visible row stays consistent
+            // Update all properties of the file object in memory
             file.name = newName.trim();
             file.path = newPath;
             file.id = newPath;
@@ -914,14 +956,14 @@ const Files = (() => {
             }
 
             loadFiles(true);
-          } catch (e) { /* toast handled by API layer */ }
+          } catch (e) { }
         }
         break;
       }
 
-      // -------- Rename folder from sidebar tree (id === targetPath) --------
+      //  Dedicated handler for renaming directly from Sidebar Tree
       case 'renameTree': {
-        const targetPath = id;
+        const targetPath = id; // id parameter carries the targetPath string
         const currentName = targetPath.split('/').filter(Boolean).pop() || '';
 
         const newName = await Modal.prompt({
@@ -935,7 +977,7 @@ const Files = (() => {
           try {
             const res = await window.API.put('/fs/rename', {
               oldPath: targetPath,
-              newName: newName.trim(),
+              newName: newName.trim()
             });
             Toast.success('Folder renamed', newName.trim());
 
@@ -943,12 +985,11 @@ const Files = (() => {
 
             loadTree();
             loadFiles(true);
-          } catch (e) { /* toast handled by API layer */ }
+          } catch (e) { }
         }
         break;
       }
 
-      // -------- Delete item in current listing --------
       case 'delete': {
         const ok = await Modal.confirm({
           title: `Delete "${file.name}"?`,
@@ -965,7 +1006,7 @@ const Files = (() => {
             const deletedPath = file.path;
             const isFolder = file.isFolder;
 
-            // Optimistic UI: remove locally without waiting for reload
+            // Optimistic removal from current list
             state.files = state.files.filter(f => f.id !== id);
             state.selected.delete(id);
             state.totalFiles = Math.max(0, state.totalFiles - 1);
@@ -977,14 +1018,14 @@ const Files = (() => {
             }
 
             loadFiles(true);
-          } catch (e) { /* toast handled by API layer */ }
+          } catch (e) { }
         }
         break;
       }
 
-      // -------- Delete folder from sidebar tree (id === targetPath) --------
+      // Dedicated handler for deleting directly from Sidebar Tree
       case 'deleteTree': {
-        const targetPath = id;
+        const targetPath = id; // id parameter carries the targetPath string
         const folderName = targetPath.split('/').filter(Boolean).pop() || 'folder';
 
         const ok = await Modal.confirm({
@@ -1003,12 +1044,11 @@ const Files = (() => {
 
             loadTree();
             loadFiles(true);
-          } catch (e) { /* toast handled by API layer */ }
+          } catch (e) { }
         }
         break;
       }
 
-      // -------- Bulk delete via BulkBar --------
       case 'bulkDelete': {
         const count = state.selected.size;
         if (count === 0) return;
@@ -1029,12 +1069,14 @@ const Files = (() => {
             await window.API.del(`/fs/delete`, { paths: pathsToDelete });
             Toast.success(`${count} items deleted`);
 
-            // If the current directory (or an ancestor) was in the delete set,
-            // navigate up to the nearest existing parent.
+            // Sync path if the current folder (or its parent) was in the bulk delete
             for (const p of pathsToDelete) {
-              if (syncCurrentPathAfterMutation('delete', p)) break;
+              if (syncCurrentPathAfterMutation('delete', p)) {
+                break; // Stop checking once we've successfully navigated up
+              }
             }
 
+            // Optimistic update
             state.files = state.files.filter(f => !state.selected.has(f.id));
             state.totalFiles = Math.max(0, state.totalFiles - count);
             state.selected.clear();
@@ -1042,7 +1084,7 @@ const Files = (() => {
 
             loadTree();
             loadFiles(true);
-          } catch (e) { /* toast handled by API layer */ }
+          } catch (e) { }
         }
         break;
       }
@@ -1050,7 +1092,7 @@ const Files = (() => {
   }
 
   /* ══════════════════════════════════════════
-     RENDER SWITCH
+     RENDER SWITCH & BINDINGS
      ══════════════════════════════════════════ */
 
   function renderView() {
@@ -1058,14 +1100,8 @@ const Files = (() => {
     else renderList();
   }
 
-  /* ══════════════════════════════════════════
-     TOOLBAR + BULK BAR BINDINGS
-     (Single site — never register #bulkDownload / upload buttons twice)
-     ══════════════════════════════════════════ */
-
   function bindToolbar() {
-
-    // ---------- View toggle (list/grid) ----------
+    // View toggle
     $$('[data-view]').forEach(btn => {
       btn.addEventListener('click', () => {
         state.view = btn.getAttribute('data-view');
@@ -1075,7 +1111,7 @@ const Files = (() => {
       });
     });
 
-    // ---------- Server-side search (debounced) ----------
+    // Server-side Search (Debounced)
     const search = $('#filesSearch');
     if (search) {
       search.addEventListener('input', window.AFM.debounce(e => {
@@ -1085,7 +1121,7 @@ const Files = (() => {
       }, 350));
     }
 
-    // ---------- Filter chips (delegated) ----------
+    // Filter chips trigger API reload
     document.addEventListener('click', e => {
       const chip = e.target.closest('[data-filter]');
       if (!chip) return;
@@ -1097,43 +1133,19 @@ const Files = (() => {
       loadFiles();
     });
 
-    // ---------- Drawer close hooks ----------
     $('#drawerClose')?.addEventListener('click', closeDrawer);
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
 
-    // ---------- New folder (page header quick action) ----------
-    $('[data-quick="newFolder"]')?.addEventListener('click', () => handleAction('newFolder'));
-
-    // ---------- Sort dropdown (silent reload for smoother UX) ----------
-    $$('[data-sort-act]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const key = btn.getAttribute('data-sort-act');
-        if (state.sort.key === key) {
-          state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
-        } else {
-          state.sort.key = key;
-          state.sort.dir = 'asc';
-        }
-        loadFiles(true);
-        window.AFM.Dropdown.closeAll();
-      });
+    // Toolbar Actions
+    $('[data-quick="newFolder"]')?.addEventListener('click', () => {
+      handleAction('newFolder');
     });
 
-    // ---------- Direct upload (topbar + page header + hidden input) ----------
-    const fileInput = $('#hiddenFileInput');
-    $('#btnTopbarUpload')?.addEventListener('click', () => fileInput?.click());
-    $('#btnPageUpload')?.addEventListener('click', () => fileInput?.click());
-    fileInput?.addEventListener('change', (e) => {
-      handleDirectUpload(e.target.files);
-      e.target.value = ''; // allow selecting the same file again next time
-    });
-
-    // ---------- Bulk: clear selection ----------
+    // Bulk Actions
     $('#bulkClear')?.addEventListener('click', clearSelection);
 
-    // ---------- Bulk: download (ZIP or individual, via native stream) ----------
+    // Bulk Download with Native Context Menu Options
     $('#bulkDownload')?.addEventListener('click', (e) => {
-      // Prevent document-level click listeners from immediately closing the ContextMenu
       e.stopPropagation();
       e.preventDefault();
 
@@ -1152,10 +1164,11 @@ const Files = (() => {
           label: `Download ${count} item(s) as ZIP`,
           icon: 'archive',
           action: () => {
-            Toast.info('Preparing ZIP…', 'Your browser will start the download shortly.');
+            Toast.info('Preparing ZIP download...', 'Your browser will start the download shortly.');
+            // ✅ اتصال واقعی به تابع دانلود زیپ در api.js
             window.API.downloadZip(paths);
             clearSelection();
-          },
+          }
         },
         { divider: true },
         {
@@ -1163,81 +1176,129 @@ const Files = (() => {
           icon: 'file',
           action: () => {
             if (filesOnly.length === 0) {
-              Toast.warning('Cannot download folders alone', 'Use "Download as ZIP" to include folders.');
+              Toast.warning('Cannot download folders', 'Please choose "Download as ZIP" to download folders.');
               return;
             }
 
             const filePaths = filesOnly.map(f => f.path);
             const folderCount = count - filePaths.length;
 
-            Toast.success('Downloads queued', `Starting download for ${filePaths.length} file(s)…`);
+            Toast.success('Downloads queued', `Starting download for ${filePaths.length} file(s)...`);
             window.API.downloadMultipleFiles(filePaths);
 
             if (folderCount > 0) {
               setTimeout(() => {
-                Toast.info('Folders skipped', `${folderCount} folder(s) skipped — use ZIP for folders.`);
+                Toast.info('Folders skipped', `${folderCount} folder(s) skipped. Use ZIP to download folders.`);
               }, 1200);
             }
 
             clearSelection();
-          },
-        },
+          }
+        }
       ]);
     });
 
-    // ---------- Bulk: move (UI ready; wire to backend when move API exists) ----------
+    $('#bulkDelete')?.addEventListener('click', () => {
+      handleAction('bulkDelete');
+    });
+    // Sort Dropdown Actions
+    $$('[data-sort-act]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.getAttribute('data-sort-act');
+        if (state.sort.key === key) {
+          state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sort.key = key;
+          state.sort.dir = 'asc';
+        }
+        loadFiles();
+        window.AFM.Dropdown.closeAll();
+      });
+    });
+
+    // Top Actions & Direct Upload Binding
+    const fileInput = $('#hiddenFileInput');
+    $('#btnTopbarUpload')?.addEventListener('click', () => fileInput?.click());
+    $('#btnPageUpload')?.addEventListener('click', () => fileInput?.click());
+
+    fileInput?.addEventListener('change', (e) => {
+      handleDirectUpload(e.target.files);
+      e.target.value = ''; // Reset input after selection
+    });
+
+    // Bulk Download with Context Menu for options
+    $('#bulkDownload')?.addEventListener('click', (e) => {
+      const rect = e.target.getBoundingClientRect();
+      const count = state.selected.size;
+
+      ContextMenu.show(rect.left, rect.bottom + 4, [
+        {
+          label: `Download ${count} files as ZIP`,
+          icon: 'archive',
+          action: () => {
+            Toast.info('ZIP Archive', 'Backend ZIP streaming will be implemented in Phase 6/7.');
+          }
+        },
+        {
+          label: 'Download as individual files',
+          icon: 'file',
+          action: () => {
+            // Loop through selected and trigger individual downloads
+            let delay = 0;
+            state.files.filter(f => state.selected.has(f.id)).forEach(f => {
+              if (!f.isFolder) {
+                setTimeout(() => {
+                  window.open(`${window.API.BASE_URL}/fs/download?path=${encodeURIComponent(f.path)}`, '_blank');
+                }, delay);
+                delay += 500; // Stagger to prevent browser popup blockers
+              }
+            });
+            Toast.success('Downloads started', `${count} files queued for download.`);
+            clearSelection();
+          }
+        }
+      ]);
+    });
+
     $('#bulkMove')?.addEventListener('click', async () => {
       const dest = await Modal.prompt({
         title: 'Move items',
         label: 'Destination path',
         placeholder: '/media/archive',
-        confirmText: 'Move',
+        confirmText: 'Move'
       });
-      if (dest) Toast.info('Move', 'Move API will be connected in a later backend phase.');
+      if (dest) Toast.info('Move function will connect to API in next phase');
     });
 
-    // ---------- Bulk: share (placeholder link, replace when share API exists) ----------
     $('#bulkShare')?.addEventListener('click', () => {
       copyToClipboard('https://dl.dimension.io/s/batch-xyz', 'Batch share link copied');
     });
 
-    // ---------- Bulk: star (placeholder until metadata star API is wired) ----------
     $('#bulkStar')?.addEventListener('click', () => {
-      Toast.success('Starred', 'Selection marked as starred (UI feedback).');
+      Toast.success('Items starred');
     });
 
-    // ---------- Bulk: rename (single → normal rename; multi → batch prompt) ----------
     $('#bulkRename')?.addEventListener('click', async () => {
       const count = state.selected.size;
-      if (count === 0) return;
-
       if (count === 1) {
+        // Fallback to standard rename if only 1 item selected
         const id = Array.from(state.selected)[0];
         handleAction('rename', id);
-        return;
+      } else {
+        const baseName = await Modal.prompt({
+          title: `Batch rename ${count} items`,
+          label: 'Base name (will append -1, -2...)',
+          placeholder: 'e.g., Summer-Photos',
+          confirmText: 'Batch Rename'
+        });
+        if (baseName) Toast.info('Batch rename requires backend bulk support');
       }
-
-      const baseName = await Modal.prompt({
-        title: `Batch rename ${count} items`,
-        label: 'Base name (server will append -1, -2, …)',
-        placeholder: 'e.g. Summer-Photos',
-        confirmText: 'Batch Rename',
-      });
-      if (baseName) Toast.info('Batch rename', 'Requires bulk rename API on the backend.');
     });
-
-    // ---------- Bulk: delete ----------
-    $('#bulkDelete')?.addEventListener('click', () => handleAction('bulkDelete'));
   }
-
-  /* ══════════════════════════════════════════
-     GLOBAL DRAG & DROP (uploads anywhere on the page)
-     ══════════════════════════════════════════ */
 
   function initDragDrop() {
     const overlay = $('#dropOverlay');
     if (!overlay) return;
-
     let dragCount = 0;
 
     window.addEventListener('dragenter', e => {
@@ -1245,22 +1306,17 @@ const Files = (() => {
       dragCount++;
       overlay.classList.add('is-active');
     });
-
     window.addEventListener('dragleave', () => {
       dragCount--;
-      if (dragCount <= 0) {
-        dragCount = 0;
-        overlay.classList.remove('is-active');
-      }
+      if (dragCount <= 0) { dragCount = 0; overlay.classList.remove('is-active'); }
     });
-
     window.addEventListener('dragover', e => e.preventDefault());
-
     window.addEventListener('drop', e => {
       e.preventDefault();
       dragCount = 0;
       overlay.classList.remove('is-active');
-      if (e.dataTransfer?.files?.length) {
+      const count = e.dataTransfer?.files?.length || 0;
+      if (count) {
         handleDirectUpload(e.dataTransfer.files);
       }
     });
@@ -1271,15 +1327,13 @@ const Files = (() => {
      ══════════════════════════════════════════ */
 
   function init() {
-    // Reflect persisted view choice on the toggle buttons
-    $$('[data-view]').forEach(b =>
-      b.classList.toggle('is-active', b.getAttribute('data-view') === state.view)
-    );
+    $$('[data-view]').forEach(b => b.classList.toggle('is-active', b.getAttribute('data-view') === state.view));
 
     bindToolbar();
     initDragDrop();
     updateBreadcrumb();
 
+    // Fetch data from API
     loadTree();
     loadFiles();
   }
