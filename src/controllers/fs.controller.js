@@ -5,10 +5,14 @@ const path = require('path');
 const fs = require('fs');
 const FileSystemService = require('../services/FileSystemService');
 const MetadataService = require('../services/MetadataService');
-const PathService = require('../services/PathService');
+const UploadService = require('../services/UploadService');
 const AppError = require('../utils/AppError');
 const { validateFileName, validateClientPath } = require('../utils/validators');
-const archiver = require('archiver');
+const { classifyFile, emptyBreakdown } = require('../utils/fileTypes');
+const { mapWithConcurrency } = require('../utils/concurrency');
+// Archiver 8 is ESM with named exports only. The v5-era callable
+// factory no longer exists and calling it throws "archiver is not a function".
+const { ZipArchive } = require('archiver');
 
 /**
  * GET /api/fs/tree
@@ -60,93 +64,134 @@ async function getTree(req, res, next) {
     }
 }
 
+/* ── GET /api/fs/list bounds (documented in docs/CONTRACTS.md) ── */
+
+/** Sort keys the listing accepts. Anything else falls back to the default. */
+const LIST_SORT_KEYS = ['name', 'size', 'modified', 'downloads'];
+const LIST_DEFAULT_SORT = 'modified';
+const LIST_DEFAULT_LIMIT = 20;
+/** Largest page served. Covers the largest page size the UI offers (100). */
+const LIST_MAX_LIMIT = 200;
+/** Per-entry stat calls in flight at once: concurrent, but cannot exhaust handles. */
+const LIST_ENRICH_CONCURRENCY = 16;
+
+function parsePositiveInt(raw, fallback) {
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) && n >= 1 ? n : fallback;
+}
+
+/** Lower-cased for strings; null/undefined stay null so they never pose as 0. */
+function sortValue(entry, key) {
+    const v = entry[key];
+    if (v === null || v === undefined) return null;
+    return typeof v === 'string' ? v.toLowerCase() : v;
+}
+
+/**
+ * Directory-first, then the requested key in the requested direction. A missing
+ * value sorts after every real value in BOTH directions, and ties break by name
+ * then path, so the order never depends on readdir or completion order.
+ */
+function compareEntries(sortKey, sortDir) {
+    const sign = sortDir === 'asc' ? 1 : -1;
+    return (a, b) => {
+        if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+
+        const va = sortValue(a, sortKey);
+        const vb = sortValue(b, sortKey);
+        if (va !== null || vb !== null) {
+            if (va === null) return 1;
+            if (vb === null) return -1;
+            if (va < vb) return -sign;
+            if (va > vb) return sign;
+        }
+
+        const na = a.name.toLowerCase();
+        const nb = b.name.toLowerCase();
+        if (na !== nb) return na < nb ? -1 : 1;
+        return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
+    };
+}
+
 /**
  * GET /api/fs/list
  * Returns directory contents, merged with metadata, supports filtering/sorting/pagination.
  */
 async function getList(req, res, next) {
     try {
-        const targetPath = req.query.path || '/';
-        const page = parseInt(req.query.page, 10) || 1;
-        const limit = parseInt(req.query.limit, 10) || 20;
-        const sortKey = req.query.sort || 'modified';
-        const sortDir = req.query.dir || 'desc';
-        const search = (req.query.search || '').toLowerCase();
-        const typeFilter = req.query.type || 'all';
+        const targetPath = req.query.path === undefined ? '/' : req.query.path;
+        validateClientPath(targetPath);
 
+        const page = parsePositiveInt(req.query.page, 1);
+        const limit = Math.min(parsePositiveInt(req.query.limit, LIST_DEFAULT_LIMIT), LIST_MAX_LIMIT);
+        const sortKey = LIST_SORT_KEYS.includes(req.query.sort) ? req.query.sort : LIST_DEFAULT_SORT;
+        const sortDir = req.query.dir === 'asc' ? 'asc' : 'desc';
+        const search = typeof req.query.search === 'string' ? req.query.search.toLowerCase() : '';
+        const typeFilter = typeof req.query.type === 'string' ? req.query.type : 'all';
+        // Library "Starred" view. Composes with search, sort and type like any filter.
+        const starredOnly = req.query.starredOnly === 'true';
+
+        // Fails the whole request when the target itself is unreadable.
         const rawItems = await FileSystemService.readDirectory(targetPath);
-        const enrichedItems = [];
+        const candidates = rawItems.filter((item) =>
+            !item.name.startsWith('.') && (!search || item.name.toLowerCase().includes(search)));
 
-        const counts = {
-            all: 0, folder: 0, image: 0, video: 0, document: 0, audio: 0, archive: 0, code: 0
-        };
+        // One store read primes the metadata cache, so the concurrent per-entry
+        // lookups below are cache hits rather than N racing cold reads.
+        await MetadataService.getFileMeta(targetPath);
 
-        for (const item of rawItems) {
-            if (item.name.startsWith('.')) continue;
-
+        let skipped = 0;
+        const enriched = await mapWithConcurrency(candidates, LIST_ENRICH_CONCURRENCY, async (item) => {
             const itemClientPath = targetPath === '/' ? `/${item.name}` : `${targetPath}/${item.name}`;
-            const isFolder = item.isDirectory();
 
-            const stats = await FileSystemService.getStats(itemClientPath);
-            const meta = await MetadataService.getFileMeta(itemClientPath);
-
-            let extKey = 'other';
-            if (isFolder) {
-                extKey = 'folder';
-            } else {
-                const ext = path.extname(item.name).toLowerCase().replace('.', '');
-                if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) extKey = 'image';
-                else if (['mp4', 'mkv', 'mov', 'avi', 'webm'].includes(ext)) extKey = 'video';
-                else if (['pdf', 'doc', 'docx', 'txt', 'xlsx', 'csv'].includes(ext)) extKey = 'document';
-                else if (['mp3', 'wav', 'flac', 'ogg'].includes(ext)) extKey = 'audio';
-                else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) extKey = 'archive';
-                else if (['js', 'html', 'css', 'json', 'py', 'php'].includes(ext)) extKey = 'code';
+            let stats;
+            try {
+                stats = await FileSystemService.getStats(itemClientPath);
+            } catch {
+                // Vanished between readdir and stat, or unreadable. Not the
+                // operator's error, and not a reason to fail the siblings.
+                skipped++;
+                return null;
             }
+            const meta = await MetadataService.getFileMeta(itemClientPath);
+            const isFolder = stats.isDirectory;
 
-            const fileObj = {
+            return {
                 id: itemClientPath,
                 name: item.name,
                 path: itemClientPath,
-                isFolder: isFolder,
-                size: stats.size,
+                isFolder,
+                // The classification the type filter compares against - shipped so
+                // the UI badge cannot disagree with the chip that filters it.
+                type: isFolder ? 'folder' : classifyFile(item.name),
+                // A directory's st_size is 4096 on ext4 and 0 on NTFS: neither is a
+                // measurement of its contents, so it is reported as unavailable.
+                size: isFolder ? null : stats.size,
                 modified: stats.modified,
                 downloads: isFolder ? null : meta.downloads,
                 starred: meta.starred,
                 status: 'internal',
-                _extKey: extKey
             };
-
-            if (search && !fileObj.name.toLowerCase().includes(search)) continue;
-
-            enrichedItems.push(fileObj);
-
-            counts.all++;
-            if (counts[extKey] !== undefined) counts[extKey]++;
-        }
-
-        let filteredItems = enrichedItems;
-        if (typeFilter !== 'all') {
-            filteredItems = filteredItems.filter(f => f._extKey === typeFilter);
-        }
-
-        filteredItems.sort((a, b) => {
-            if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
-
-            let valA = a[sortKey] || 0;
-            let valB = b[sortKey] || 0;
-
-            if (typeof valA === 'string') { valA = valA.toLowerCase(); valB = valB.toLowerCase(); }
-
-            if (valA < valB) return sortDir === 'asc' ? -1 : 1;
-            if (valA > valB) return sortDir === 'asc' ? 1 : -1;
-            return 0;
         });
+
+        if (skipped > 0) {
+            console.warn(`[List] ${targetPath}: skipped ${skipped} entries that vanished or could not be read`);
+        }
+
+        const entries = enriched.filter((entry) => entry && (!starredOnly || entry.starred));
+
+        const counts = { all: 0, folder: 0, ...emptyBreakdown() };
+        for (const entry of entries) {
+            counts.all++;
+            counts[entry.type]++;
+        }
+
+        const filteredItems = typeFilter === 'all' ? entries : entries.filter((e) => e.type === typeFilter);
+        filteredItems.sort(compareEntries(sortKey, sortDir));
 
         const total = filteredItems.length;
         const startIndex = (page - 1) * limit;
         const paginatedItems = filteredItems.slice(startIndex, startIndex + limit);
-
-        paginatedItems.forEach(item => delete item._extKey);
 
         res.json({
             items: paginatedItems,
@@ -324,70 +369,79 @@ async function downloadFile(req, res, next) {
     }
 }
 
-// Add multer requirement at the top of fs.controller.js
-const multer = require('multer');
-
-// Configure Multer for streaming uploads directly to memory/disk
-const storage = multer.diskStorage({
-    destination: async (req, file, cb) => {
-        try {
-            const clientDest = req.body.destination || '/';
-            const secureDest = PathService.resolveSecurePath(clientDest);
-            // Ensure the destination exists
-            await fs.promises.access(secureDest);
-            cb(null, secureDest);
-        } catch (err) {
-            cb(new AppError('Invalid upload destination.', 400));
-        }
-    },
-    filename: (req, file, cb) => {
-        try {
-            const cleanName = validateFileName(file.originalname);
-            // Optional: Add logic here to check overwrite flag and append (1) if needed
-            cb(null, cleanName);
-        } catch (err) {
-            cb(err);
-        }
-    }
-});
-
-const uploadMiddleware = multer({ storage }).single('file');
-
 /**
  * POST /api/fs/upload
- * Handles multipart/form-data file uploads
+ * Multipart fields: `file` (required), `destination` (client folder, default '/'),
+ * `overwrite` ('true' to replace an existing file; anything else refuses).
+ *
+ * Placement is decided by UploadService AFTER the whole body is parsed, so the
+ * file lands in `destination` whatever the field order, and `data.path` is the
+ * path actually written - never a form field re-read after the fact.
  */
-async function uploadFile(req, res, next) {
-    uploadMiddleware(req, res, (err) => {
-        if (err) {
-            return next(new AppError(err.message, 400));
+function uploadFile(req, res, next) {
+    UploadService.middleware(req, res, async (err) => {
+        const staged = UploadService.stagedPathOf(req);
+        try {
+            if (err) throw UploadService.toUploadError(err);
+            if (!req.file) throw new AppError('No file provided.', 400);
+
+            const destination = await UploadService.resolveDirectory(req.body.destination || '/');
+            const overwrite = req.body.overwrite === 'true';
+            const { clientPath, name } = await UploadService.commit(
+                req.file.path, destination, req.file.targetName, { overwrite });
+
+            MetadataService.addActivity({
+                type: 'upload',
+                user: 'system',
+                action: 'uploaded',
+                target: name,
+                folder: destination.clientPath,
+            }).catch(() => { });
+
+            res.status(201).json({
+                success: true,
+                data: {
+                    name,
+                    path: clientPath,
+                    size: req.file.size
+                }
+            });
+        } catch (error) {
+            await UploadService.discard(staged);
+            next(error);
         }
-
-        if (!req.file) {
-            return next(new AppError('No file provided.', 400));
-        }
-
-        const clientDest = req.body.destination || '/';
-        const clientPath = clientDest === '/' ? `/${req.file.filename}` : `${clientDest}/${req.file.filename}`;
-
-        // Log the activity
-        MetadataService.addActivity({
-            type: 'upload',
-            user: 'system',
-            action: 'uploaded',
-            target: req.file.filename,
-            folder: clientDest,
-        }).catch(() => { });
-
-        res.status(201).json({
-            success: true,
-            data: {
-                name: req.file.filename,
-                path: clientPath,
-                size: req.file.size
-            }
-        });
     });
+}
+
+/**
+ * POST /api/fs/star
+ * Body: { path: "/media/a.png", starred?: boolean }
+ * Without `starred` the flag is toggled; with it the call is idempotent.
+ * Responds with the state actually stored, never the state requested.
+ */
+async function setStar(req, res, next) {
+    try {
+        const { path: clientPath, starred } = req.body || {};
+        validateClientPath(clientPath);
+        if (starred !== undefined && typeof starred !== 'boolean') {
+            throw new AppError('starred must be a boolean when provided.', 400);
+        }
+
+        // 404 for a path that does not exist: a star on nothing is not an outcome.
+        await FileSystemService.getStats(clientPath);
+
+        const current = (await MetadataService.getFileMeta(clientPath)).starred;
+        const result = starred === undefined || starred !== current
+            ? await MetadataService.toggleStar(clientPath)
+            : current;
+
+        res.json({
+            success: true,
+            data: { path: clientPath, starred: result },
+        });
+    } catch (error) {
+        next(error);
+    }
 }
 
 /**
@@ -434,7 +488,7 @@ async function downloadZip(req, res, next) {
         res.setHeader('Content-Disposition', `attachment; filename="${zipName}"; filename*=UTF-8''${encodeURIComponent(zipName)}`);
         res.setHeader('Cache-Control', 'no-cache');
 
-        const archive = archiver('zip', { zlib: { level: 5 } });
+        const archive = new ZipArchive({ zlib: { level: 5 } });
 
         archive.on('error', (err) => {
             console.error('[ZIP Stream Error]:', err.message);
@@ -482,5 +536,9 @@ module.exports = {
     deleteItems,
     downloadFile,
     uploadFile,
-    downloadZip
+    downloadZip,
+    setStar,
+    LIST_ENRICH_CONCURRENCY,
+    LIST_MAX_LIMIT,
+    LIST_SORT_KEYS,
 };

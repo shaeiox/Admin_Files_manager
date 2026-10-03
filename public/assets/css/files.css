@@ -7,6 +7,12 @@
    TOOLBAR
    ══════════════════════════════════════════ */
 
+/* Height the sticky toolbar occupies, so the sticky tree panel sits below it
+   instead of sliding underneath (one row of 36px controls + padding + margin). */
+body[data-page="files"] {
+  --files-toolbar-offset: 78px;
+}
+
 .files-toolbar {
   display: flex;
   align-items: center;
@@ -88,6 +94,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-6);
+  margin-bottom: var(--spacing-20);
   overflow-x: auto;
   padding-bottom: 2px;
   scrollbar-width: none;
@@ -147,11 +154,17 @@
    FILE TABLE (LIST VIEW)
    ══════════════════════════════════════════ */
 
+/* `overflow: auto` (not hidden) keeps the rounded corners AND lets wide content
+   scroll, so no column is ever unreachable. The wrapper is also the vertical
+   scroll container, which is what keeps the sticky header visible: a sticky
+   element sticks to its nearest scrolling ancestor, and a page-level sticky
+   header would otherwise slide under the sticky toolbar. */
 .files-table-wrap {
-  border-radius: var(--radius-cards);
+  border-radius: var(--radius-cards) var(--radius-cards) 0 0;
   border: 1px solid var(--border-card);
   background: var(--bg-card);
-  overflow: hidden;
+  overflow: auto;
+  max-height: max(320px, calc(100vh - var(--topbar-height) - 220px));
 }
 
 [data-theme="dark"] .files-table-wrap {
@@ -164,6 +177,8 @@
   border-collapse: collapse;
 }
 
+.files-table .col-name { min-width: 200px; }
+
 .files-table thead th {
   position: sticky;
   top: 0;
@@ -175,12 +190,24 @@
 }
 
 .files-table th.sortable {
-  cursor: pointer;
   user-select: none;
   transition: color var(--transition-fast);
 }
 
 .files-table th.sortable:hover { color: var(--text-primary); }
+
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
 
 .sort-ind {
   display: inline-flex;
@@ -189,8 +216,10 @@
   transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
-.files-table th.sortable:hover .sort-ind { opacity: 0.45; }
+.files-table th.sortable:hover .sort-ind,
+.sort-btn:focus-visible .sort-ind { opacity: 0.45; }
 
+/* The glyph is an UP chevron: ascending points up, descending is rotated down. */
 .files-table th.is-sorted .sort-ind { opacity: 1; color: var(--accent-primary); }
 .files-table th.is-sorted.desc .sort-ind { transform: rotate(180deg); }
 
@@ -219,12 +248,29 @@
 
 .files-table tbody tr:last-child td { border-bottom: none; }
 
+.files-table tbody tr:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+.mono-sm { font-size: var(--text-caption); }
+
+.star-mark {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: var(--spacing-6);
+  color: var(--color-warning);
+}
+
+.star-mark svg { width: 12px; height: 12px; fill: currentColor; }
+
 .col-check { width: 44px; }
 .col-size { width: 100px; }
-.col-type { width: 110px; }
+.col-type { width: 130px; }
+
+.files-table .tag { white-space: nowrap; }
 .col-downloads { width: 110px; }
 .col-modified { width: 140px; }
-.col-status { width: 110px; }
 .col-actions { width: 60px; }
 
 /* ── File name cell ── */
@@ -293,7 +339,8 @@
 }
 
 tr:hover .row-actions,
-tr.is-selected .row-actions { opacity: 1; }
+tr.is-selected .row-actions,
+tr:focus-within .row-actions { opacity: 1; }
 
 @media (hover: none) {
   .row-actions { opacity: 1; }
@@ -333,6 +380,30 @@ tr.is-selected .row-actions { opacity: 1; }
   background: var(--accent-subtle);
 }
 
+.file-card:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.file-card-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-12);
+  min-width: 0;
+}
+
+/* Bounded stagger: at most STAGGER_STEPS (8) distinct delays, so a 100-card
+   page never produces a long cascade. Mirrors files.js staggerIndex(). */
+.file-card.stagger-1 { animation-delay: 20ms; }
+.file-card.stagger-2 { animation-delay: 40ms; }
+.file-card.stagger-3 { animation-delay: 60ms; }
+.file-card.stagger-4 { animation-delay: 80ms; }
+.file-card.stagger-5 { animation-delay: 100ms; }
+.file-card.stagger-6 { animation-delay: 120ms; }
+.file-card.stagger-7 { animation-delay: 140ms; }
+
+.file-card-type { align-self: flex-start; margin-top: var(--spacing-4); }
+
 .file-card-check {
   position: absolute;
   top: var(--spacing-12);
@@ -343,6 +414,7 @@ tr.is-selected .row-actions { opacity: 1; }
 }
 
 .file-card:hover .file-card-check,
+.file-card:focus-within .file-card-check,
 .file-card.is-selected .file-card-check { opacity: 1; }
 
 .file-card-menu {
@@ -354,7 +426,13 @@ tr.is-selected .row-actions { opacity: 1; }
   z-index: 2;
 }
 
-.file-card:hover .file-card-menu { opacity: 1; }
+.file-card:hover .file-card-menu,
+.file-card:focus-within .file-card-menu { opacity: 1; }
+
+@media (hover: none) {
+  .file-card-check,
+  .file-card-menu { opacity: 1; }
+}
 
 .file-thumb {
   width: 100%;
@@ -362,17 +440,36 @@ tr.is-selected .row-actions { opacity: 1; }
   border-radius: var(--radius-md);
   background: var(--bg-tag);
   border: 1px solid var(--border-secondary);
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-6);
   overflow: hidden;
   position: relative;
 }
 
-.file-thumb img {
+[data-preview] img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
+
+.preview-note {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: 0 var(--spacing-8);
+}
+
+/* A preview that fails to decode shows the stated-absence state, never a
+   broken-image glyph (files.js onPreviewError adds the class). */
+.preview-fallback { display: none; }
+.is-preview-failed img { display: none; }
+.is-preview-failed .ftype-icon.preview-fallback { display: grid; }
+.is-preview-failed .preview-note.preview-fallback { display: block; }
 
 .file-thumb .ftype-icon {
   width: 46px;
@@ -440,9 +537,10 @@ tr.is-selected .row-actions { opacity: 1; }
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   position: sticky;
-  top: calc(var(--topbar-height) + 12px);
-  max-height: calc(100vh - var(--topbar-height) - 48px);
+  top: calc(var(--topbar-height) + 12px + var(--files-toolbar-offset));
+  max-height: calc(100vh - var(--topbar-height) - var(--files-toolbar-offset) - 48px);
   overflow-y: auto;
+  overflow-x: hidden; /* names ellipsize; nothing is lost by clipping x */
 }
 
 .tree-head {
@@ -485,6 +583,11 @@ tr.is-selected .row-actions { opacity: 1; }
 
 .tree-item:hover { background: var(--bg-hover); color: var(--text-primary); }
 
+.tree-item:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
 .tree-item.is-active {
   background: var(--accent-subtle);
   color: var(--accent-primary);
@@ -497,7 +600,11 @@ tr.is-selected .row-actions { opacity: 1; }
   display: grid;
   place-items: center;
   flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text-tertiary);
+  cursor: pointer;
   transition: transform var(--transition-fast);
 }
 
@@ -542,6 +649,24 @@ tr.is-selected .row-actions { opacity: 1; }
 
 .tree-node.is-open > .tree-children { display: flex; }
 
+.tree-note {
+  margin: var(--spacing-12) var(--spacing-4) 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+.tree-note-path {
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.tree-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+}
+
 /* ══════════════════════════════════════════
    FILE DETAILS DRAWER
    ══════════════════════════════════════════ */
@@ -565,6 +690,19 @@ tr.is-selected .row-actions { opacity: 1; }
 
 .drawer.is-open { transform: translateX(0); }
 
+.drawer:focus { outline: none; }
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-modal-backdrop);
+  z-index: var(--z-modal-backdrop);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.drawer-backdrop.is-open { opacity: 1; }
+
 .drawer-header {
   display: flex;
   align-items: center;
@@ -575,6 +713,7 @@ tr.is-selected .row-actions { opacity: 1; }
 }
 
 .drawer-title {
+  margin: 0;
   font-family: var(--font-geist);
   font-size: var(--text-body);
   font-weight: var(--font-weight-medium);
@@ -596,13 +735,23 @@ tr.is-selected .row-actions { opacity: 1; }
   border-radius: var(--radius-lg);
   background: var(--bg-tag);
   border: 1px solid var(--border-secondary);
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-8);
   overflow: hidden;
   position: relative;
 }
 
-.drawer-preview img { width: 100%; height: 100%; object-fit: cover; }
+.drawer-preview img { object-fit: contain; }
+
+.drawer-badges {
+  display: flex;
+  gap: var(--spacing-8);
+  margin-top: var(--spacing-8);
+  flex-wrap: wrap;
+}
 
 .drawer-preview .ftype-icon {
   width: 56px;
@@ -624,7 +773,10 @@ tr.is-selected .row-actions { opacity: 1; }
   display: flex;
   flex-direction: column;
   gap: var(--spacing-2);
+  margin: 0;
 }
+
+.meta-list dd { margin: 0; }
 
 .meta-row {
   display: flex;
@@ -637,6 +789,30 @@ tr.is-selected .row-actions { opacity: 1; }
 }
 
 .meta-row:last-child { border-bottom: none; }
+
+.meta-path {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-6);
+  min-width: 0;
+}
+
+.meta-path-text {
+  direction: ltr;
+  word-break: break-all;
+}
+
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
 
 .meta-key { color: var(--text-tertiary); white-space: nowrap; }
 
@@ -676,6 +852,8 @@ tr.is-selected .row-actions { opacity: 1; }
   gap: var(--spacing-8);
   background: var(--bg-tertiary);
 }
+
+.drawer-primary { flex: 1; }
 
 /* ══════════════════════════════════════════
    DRAG & DROP OVERLAY
@@ -740,8 +918,22 @@ tr.is-selected .row-actions { opacity: 1; }
   justify-content: space-between;
   gap: var(--spacing-16);
   padding: var(--spacing-12) var(--spacing-16);
-  border-top: 1px solid var(--border-secondary);
+  border: 1px solid var(--border-card);
+  border-top-color: var(--border-secondary);
+  border-radius: 0 0 var(--radius-cards) var(--radius-cards);
+  background: var(--bg-card);
   flex-wrap: wrap;
+}
+
+.grid-files + .table-footer {
+  margin-top: var(--spacing-16);
+  border-top-color: var(--border-card);
+  border-radius: var(--radius-cards);
+}
+
+.page-gap {
+  cursor: default;
+  pointer-events: none;
 }
 
 .footer-info {
@@ -766,6 +958,159 @@ tr.is-selected .row-actions { opacity: 1; }
 }
 
 /* ══════════════════════════════════════════
+   PAGE LAYOUT, STATES, SKELETON
+   ══════════════════════════════════════════ */
+
+.files-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--spacing-20);
+  align-items: start;
+}
+
+/* The bulk bar floats over the page; reserve room so it never hides the last rows. */
+body.has-bulk-bar .page { padding-bottom: calc(var(--spacing-24) * 4); }
+
+.state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--spacing-8);
+  margin-top: var(--spacing-12);
+}
+
+.state-error .empty-icon {
+  color: var(--color-error);
+  background: var(--color-error-bg);
+}
+
+.state-panel-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-8);
+  padding: var(--spacing-8) var(--spacing-4);
+}
+
+.state-title {
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.state-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding: 0 var(--spacing-4);
+}
+
+.files-container .skeleton,
+.tree-skeleton .skeleton {
+  background: var(--bg-tag);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.skeleton-line { height: 12px; width: 70%; }
+.skeleton-line.short { width: 40%; }
+.skeleton-box { width: 16px; height: 16px; }
+.skeleton-thumb { width: 100%; aspect-ratio: 4 / 3; }
+
+/* Same row height as a loaded row (34px icon + 2 x 12px padding), so the layout
+   does not jump when content arrives. */
+.files-table-skeleton td { height: 59px; }
+
+.file-card-skeleton { animation: none; }
+
+/* ── Breadcrumb as a list of buttons ── */
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.breadcrumb-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  min-width: 0;
+}
+
+button.breadcrumb-item {
+  border: 0;
+  background: none;
+  font: inherit;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Upload tray ── */
+.upload-tray {
+  position: fixed;
+  top: calc(var(--topbar-height) + var(--spacing-12));
+  right: var(--spacing-16);
+  width: min(360px, calc(100vw - 2 * var(--spacing-16)));
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: var(--spacing-12);
+  border-radius: var(--radius-lg);
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-modal);
+  z-index: var(--z-dropdown);
+}
+
+.upload-tray-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-8);
+  margin-bottom: var(--spacing-8);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.upload-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upload-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  font-size: var(--text-caption);
+}
+
+.upload-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.upload-status { color: var(--text-tertiary); white-space: nowrap; }
+.upload-row.is-failed .upload-status { color: var(--color-error); white-space: normal; }
+.upload-row.is-done .upload-status { color: var(--color-success); }
+
+.upload-row progress {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--accent-primary);
+}
+
+/* ══════════════════════════════════════════
    RESPONSIVE
    ══════════════════════════════════════════ */
 
@@ -777,9 +1122,14 @@ tr.is-selected .row-actions { opacity: 1; }
   .col-downloads, .col-type { display: none; }
 }
 
+/* Columns hidden below are still reachable: Type, Downloads, Modified and Size
+   are all in the details drawer, and Type is part of every row's accessible name. */
 @media (max-width: 860px) {
   .files-toolbar { position: static; }
-  .col-modified, .col-status { display: none; }
+  .files-layout { grid-template-columns: minmax(0, 1fr); }
+  .tree-panel { position: static; max-height: 40vh; }
+  .files-table-wrap { max-height: none; }
+  .col-modified { display: none; }
   .drawer { width: 100%; }
   .toolbar-search { max-width: none; min-width: 0; width: 100%; }
   .toolbar-right { margin-left: 0; width: 100%; }
@@ -787,12 +1137,28 @@ tr.is-selected .row-actions { opacity: 1; }
 
 @media (max-width: 560px) {
   .col-size { display: none; }
+  .files-table .col-name { min-width: 160px; }
   .bulk-bar {
     left: var(--spacing-12);
     right: var(--spacing-12);
     transform: translateY(120%);
     justify-content: space-between;
+    gap: var(--spacing-6);
+    padding: var(--spacing-8) var(--spacing-8) var(--spacing-8) var(--spacing-12);
   }
+  .bulk-bar .divider-v { display: none; }
+  /* The scope stays announced; only its visible words go. */
+  .bulk-scope {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  /* Every segment stays operable: the trail scrolls instead of hiding segments. */
+  .breadcrumb { overflow-x: auto; }
+  .breadcrumb .breadcrumb-list .breadcrumb-item:not(.is-current) { display: inline-block; }
   .bulk-bar.is-visible { transform: translateY(0); }
   .files-table td, .files-table th {
     padding-left: var(--spacing-12);

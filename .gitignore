@@ -4,8 +4,8 @@ npm-debug.log
 yarn-error.log
 
 # Environment variables (Security: Never commit secrets)
-#.env
-#.env.local
+.env
+.env.local
 
 # Operating System Files
 .DS_Store
@@ -17,3 +17,6 @@ data/*.json
 
 # Storage / Downloads (If testing locally)
 download/
+
+# Scratch harnesses and probes (never committed, never discovered by npm test)
+temp/

@@ -37,10 +37,8 @@ This document outlines the atomic steps to build a secure, high-performance Node
         download count silently discards that count.
 - [x] Implement `DELETE /api/fs/delete` (Delete files/folders securely). Registered at `fs.routes.js:18` → `deleteItems` (`fs.controller.js:231`). Permanent (`fs.rm`, recursive) — no trash.
 - [x] Implement `GET /api/fs/download` (Stream file to client with proper Content-Disposition headers). Registered at `fs.routes.js:11` → `downloadFile` (`fs.controller.js:286`), `createReadStream` + `pipe`.
-- [ ] Implement `POST /api/fs/download-zip`. **Controller exists and is exported** (`downloadZip`, `fs.controller.js:398`, Archiver stream,
-      `req.on('close')` cleanup at `:447`) but the route is **commented out** at `fs.routes.js:16`, while `api.js:263` still builds a form
-      with `action = .../fs/download-zip` and `files.js:1169` calls `API.downloadZip(...)`. **Multi-file ZIP download therefore returns
-      404.** Deliberately not fixed in this phase — see "Known pre-existing issues".
+- [x] Implement `POST /api/fs/download-zip`. Route enabled by files-page-correctness (task 0.4); the controller now uses
+      Archiver 8's `ZipArchive` (the v5 factory no longer exists). Contract tests in `test/api/fs.contract.test.js`.
 
 ## 🚀 Phase 6: Streaming Upload Engine
 - [x] Install streaming multipart parser. **`multer` 2.x** (`^2.4.0`), not busboy, and it lives in `fs.controller.js:328`.
@@ -127,13 +125,13 @@ have required decisions that belong in their own change.
 | # | Issue | Where |
 |---|---|---|
 | 1 | `err.stack` is serialised to clients outside production, leaking absolute OS paths. | `src/middlewares/errorHandler.js:20` |
-| 2 | CORS is fully open (`app.use(cors())`, no origin allow-list). | `server.js:19` |
-| 3 | There is no authentication or authorization on any endpoint, including upload and delete. | whole app |
-| 4 | `.env` is git-tracked and contains a machine-specific `STORAGE_ROOT`; `.gitignore:7` still has `#.env` commented out. | `.gitignore:7`, `.env` |
+| 2 | CORS is fully open (`app.use(cors())`, no origin allow-list). **Recorded decision, still open** — ADR-003 §9; to be fixed with authentication. | `server.js:19` |
+| 3 | There is no authentication or authorization on any endpoint, including upload and delete. **Recorded decision, still open** — ADR-003 §9; required before non-localhost exposure. | whole app |
+| 4 | `.env` is git-tracked and contains a machine-specific `STORAGE_ROOT`. **Partly resolved:** `.gitignore` now excludes `.env` and `temp/`; the already-tracked file must still be removed from the index (`git rm --cached .env`). | `.gitignore`, `.env` |
 | 5 | `MetadataService._write` uses a **fixed** temp path, so concurrent writes can interleave and corrupt `metadata.json`. | `src/services/MetadataService.js` |
 | 6 | `MetadataService.renamePath` assigns the source download count over the target's instead of merging, so renaming onto an already-counted path discards that count. | `src/services/MetadataService.js:220-229` |
-| 7 | File-type taxonomy drift persists. `src/utils/fileTypes.js` is the canonical **server-side** source and `FileSystemService` + the Dashboard breakdown use it, but `fs.controller.js` still duplicates the extension lists inline (currently an exact copy — so a future edit to one side will silently diverge from the other) and `app.js` carries a third, already-diverged hand-mirrored map (e.g. `ts`/`rs`/`go` and `avif`/`heic` are client-only, so the server classes them as `other`). | `src/utils/fileTypes.js:26-33` · `src/controllers/fs.controller.js:98-103` · `public/assets/js/app.js:277-284` |
-| 8 | `router.post('/download-zip')` is commented out while `api.js:263` still posts to it, so multi-file ZIP download 404s. | `fs.routes.js:16` |
-| 9 | `server.js` registers the `/api` 404 catch-all **twice** (lines 41-43 and 46-48). Harmless today — the first one terminates the chain, so the second is dead code — but it is duplication that will mislead the next reader. | `server.js:40-48` |
-| 10 | `files.js` single-file downloads use `window.open(..., '_blank')`, which bypasses the hidden-iframe download pattern used everywhere else and is exposed to popup blocking. | `files.js:895`, `files.js:1251` |
+| 7 | ~~File-type taxonomy drift~~ **Resolved** by files-page-correctness: `fs.controller.js` classifies through `src/utils/fileTypes.js`, whose set now equals `app.js` `FileTypes`; `test/utils/fileTypes.test.js` guards it. | `src/utils/fileTypes.js` · `public/assets/js/app.js` |
+| 8 | ~~`router.post('/download-zip')` is commented out~~ **Resolved** by files-page-correctness. | `fs.routes.js` |
+| 9 | ~~`server.js` registers the `/api` 404 catch-all twice~~ **Resolved** by files-page-correctness; a test counts the registrations. | `server.js` |
+| 10 | ~~`files.js` single-file downloads use `window.open`~~ **Resolved** by files-page-correctness; a test fails on `window.open(` in `files.js`. | `files.js` |
 | 11 | (cosmetic) A stray newline splits the JSDoc of `getTopDownloads` mid-word: it reads `"When a \n etain predicate"` instead of `"When a retain predicate"`. Inside a comment, so it is syntactically harmless — but it means the file has been through a lossy round-trip at least once. | `src/services/MetadataService.js:178-179` |

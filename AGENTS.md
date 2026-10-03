@@ -15,7 +15,7 @@
 | Runtime | Node.js (CommonJS) | `"type": "commonjs"` — `require()`, **not** `import` |
 | Framework | Express 5.x | Pathless middleware fallback (`app.use`) — Express 4 `app.get('*')` patterns will not work |
 | Validation | Custom (`src/utils/validators.js`) | No Zod/Joi — validate via `validateFileName` / `validateClientPath` |
-| Uploads | Multer 2.x (`diskStorage`) | Streams to `STORAGE_ROOT` directly; never buffer into memory |
+| Uploads | Multer 2.x (`diskStorage`, via `UploadService`) | Streams to a hidden staging file inside `STORAGE_ROOT`, then moved into place; never buffer into memory |
 | Archiving | Archiver 8.x | ZIP streams are piped, never collected in memory |
 | Persistence | JSON file via `MetadataService` | Atomic temp-file-then-rename writes; singleton instance |
 | Frontend | Vanilla JS + CSS (no bundler) | Modules attach to `window` (`window.API`, `window.AFM.*`); `<script>` tag load order matters |
@@ -27,19 +27,26 @@
 ```bash
 npm run dev      # Start with nodemon (http://localhost:3000)
 npm start        # Start in production mode
-npm test         # node:test, zero dependencies. 285 tests: services, API, frontend, live-server + error-disclosure.
+npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 465 tests, exits 0:
+                 # services, API contracts (live server), frontend modules in a vm, integration, guardrails.
 ```
 
 - No lint/format/build/typecheck tooling is configured. Do not invent commands.
 - **Required env:** `STORAGE_ROOT` (absolute path). The server refuses to boot without it
-  (`src/config/env.js` calls `process.exit(1)`). Optional: `PORT` (default `3000`).
+  (`src/config/env.js` calls `process.exit(1)`). Optional: `PORT` (default `3000`),
+  `UPLOAD_MAX_BYTES` (positive integer bytes, default 5 GiB; read by `UploadService`).
+- **Tests never touch the real metadata store.** `MetadataService` resolves `data/metadata.json` from
+  `process.cwd()`, and test files run in parallel processes, so every suite that boots the server
+  points `MetadataService.dbPath` at a temp file before requiring `server.js` (see
+  `test/api/fs.contract.test.js`). Two suites writing the real store once corrupted it.
 - Health check: `GET /api/health`.
 
 ## Architecture Rules (non-negotiable)
 
 1. **Layered flow:** `routes → controllers → services → fs`.
    - Controllers parse/validate input and format responses.
-   - Services own all filesystem access (`FileSystemService`, `MetadataService`, `PathService`).
+   - Services own all filesystem access (`FileSystemService`, `MetadataService`, `PathService`,
+     `UploadService`, `PreviewService`).
    - Never register filesystem calls directly in `routes`; never bypass services from controllers.
 2. **The path boundary is `PathService`.** Every client-supplied path must pass
    `PathService.resolveSecurePath()` (traversal guard) before touching disk. The API surface speaks
@@ -57,11 +64,12 @@ npm test         # node:test, zero dependencies. 285 tests: services, API, front
    route/controller, never `throw` raw strings or plain `Error` for expected failures.
 6. **Response envelope — it depends on read vs. mutating.** The convention is deliberately not uniform:
    - **Mutating** endpoints return the envelope: `{ success: true, ... }`. (`POST /api/fs/folder`, `PUT /api/fs/rename`,
-     `DELETE /api/fs/delete`, `POST /api/fs/upload`.)
+     `DELETE /api/fs/delete`, `POST /api/fs/upload`, `POST /api/fs/star`.) A `200` from `DELETE /api/fs/delete` can still
+     carry failures in `data.failed` — read it; never report the number of paths sent as the number deleted.
    - **Read-only aggregate** endpoints return a **bare top-level shape** with no envelope. `GET /api/fs/tree` returns a bare
      array (`[rootNode]`); `GET /api/fs/list` returns a bare object (`{ items, total, counts }`); `GET /api/dashboard/summary`
-     returns a bare object; `GET /api/dashboard/health` returns a bare array. The dashboard endpoints follow that existing
-     precedent — they are not an exception to it.
+     returns a bare object; `GET /api/dashboard/health` returns a bare array; `GET /api/fs/thumbnail/capability` returns a
+     bare object. The dashboard endpoints follow that existing precedent — they are not an exception to it.
    - **Errors** always use `{ success: false, error: string }`, serialized by the global `errorHandler`.
 
    Match the row you are imitating, and document the shape in `docs/CONTRACTS.md` in the same change.
@@ -73,10 +81,14 @@ npm test         # node:test, zero dependencies. 285 tests: services, API, front
    UI, extend `app.js` (Toast/Modal/Format/Icons); when calling the API, go through `window.API`
    (`public/assets/js/api.js`) — do not call `fetch` ad hoc from page modules.
 9. **Downloads never navigate the main frame.** Single files use hidden iframes; ZIP uses a hidden
-   form POST targeted at an iframe (see `api.js`). Keep this pattern. Two pre-existing call sites in
-   `files.js` (`window.open(..., '_blank')` for single files) bypass it and are popup-blocker exposed —
-   route new code through `API.downloadFile` / `API.downloadMultipleFiles` / `API.downloadZip`, not
-   `window.open`. Note the ZIP route is currently commented out (`fs.routes.js:16`), so `downloadZip` 404s.
+   form POST targeted at an iframe (see `api.js`). Keep this pattern: go through `API.downloadFile` /
+   `API.downloadMultipleFiles` / `API.downloadZip`, never `window.open` (a test fails on `window.open(`
+   in `files.js`). `POST /api/fs/download-zip` is live.
+10. **Escape every filesystem-derived string before it reaches markup.** File names, paths and
+   breadcrumb segments come from an operator-controlled root that may be populated out of band, and
+   the content security policy is disabled, so `AFM.escapeHtml` at render time is the only layer.
+   `Modal.prompt` / `Modal.confirm` insert their `title`, `message` and `value` as raw HTML — escape
+   what you pass them. `test/integration/escaping.test.js` and `test/frontend/files.test.js` enforce it.
 
 ## Hard Constraints & Red Lines
 
@@ -84,8 +96,20 @@ npm test         # node:test, zero dependencies. 285 tests: services, API, front
   path-consuming code path goes through it. Deletion of the storage root is explicitly blocked.
 - **Do not run in read-only environments** without `STORAGE_ROOT` being writable; writes are
   expected to fail at runtime otherwise.
-- **Do not commit:** `.env` (contains secrets; currently not ignored in `.gitignore` — see ADR-001
-  open questions), `data/*.json` (runtime metadata), `download/`.
+- **Do not commit:** `.env` (contains secrets; ignored by `.gitignore` — ADR-001 follow-up closed in ADR-003, but a
+  file that was already tracked must also be removed from the index with `git rm --cached .env`),
+  `data/*.json` (runtime metadata), `download/`, `temp/` (scratch; ignored and never discovered by `npm test`).
+- **Multipart field order is load-bearing for uploads.** Send `destination` and `overwrite` BEFORE `file`:
+  multer resolves the destination when the first file chunk arrives. `UploadService` stages bytes in a
+  dot-prefixed `.upload-*.part` file and places the file only after the whole body is parsed, so a late
+  `destination` is honoured rather than misfiled — but an early one is validated before any byte is written.
+  `overwrite` other than `"true"` refuses with `409`; never write directly to the final name.
+- **Previews are optional and bounded.** `GET /api/fs/thumbnail` produces ≤512 px images only if an image
+  transformer is installed (none is; adding one is its own security-reviewed change). Non-images are refused
+  from the name before any byte is read; failures carry `X-Preview: unavailable`. Never point an `<img>` at
+  `/api/fs/download`, and never relax its `application/octet-stream`.
+- **The API is unauthenticated and `cors()` admits any origin** — a recorded decision (ADR-003), not an
+  oversight, and not closed. Authentication must land before the service is reachable beyond localhost.
 - **Filename rules are cross-platform strict:** reject `[<>:"|?*\x00-\x1F]`, reserved Windows names
   (`CON`, `PRN`, `COM1-9`, ...), leading/trailing dots/spaces, and any `/` or `..`. Match
   `validateFileName`; don't loosen it for convenience.
@@ -113,9 +137,13 @@ npm test         # node:test, zero dependencies. 285 tests: services, API, front
   uses `Promise.all`, so that case is a 500, not a degraded 200. Don't extend this pattern to sources that currently
   fail wholly without deciding which behaviour you want per capability.
 - **Some frontend calls are ahead of the backend.** `settings.js` requests `/api/settings` (GET + PUT) and
-  `/api/settings/action`, none of which exist server-side, so they 404. `files.js` calls `API.downloadZip`, whose route
-  is commented out. `dashboard.js` and `app.js` are fully backed — their calls resolve. Don't assume a called endpoint is
-  implemented; verify against `fs.routes.js` and `server.js` first (see "Known gaps" in `docs/CONTRACTS.md`).
+  `/api/settings/action`, none of which exist server-side, so they 404. `dashboard.js`, `app.js` and `files.js` are
+  fully backed — their calls resolve. Don't assume a called endpoint is implemented; verify against `fs.routes.js` and
+  `server.js` first (see "Known gaps" in `docs/CONTRACTS.md`).
+- **The Files page renders only what exists.** No control without a working handler, no success message for an
+  operation that did not happen, no fabricated fallback data (an outage is an error state with a retry, never an
+  empty folder or a synthetic tree). Source-level tests in `test/frontend/files.test.js` pin this; a removed control
+  takes its handler with it. The sidebar is duplicated byte-for-byte on four pages and a test asserts they match.
 
 ## When You Change Code
 

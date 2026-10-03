@@ -456,9 +456,9 @@
     "semantic_hash": "e6e4bb6d5e8cb3d5282bdb4012b09b5f"
   },
   "AGENTS.md": {
-    "mtime": 1791047556.195304,
-    "seen": 1791050049.4775045,
-    "ast_hash": "8069aca51b784a7d67f97261afe17aab",
+    "mtime": 1791050855.063118,
+    "seen": 1791051686.4224768,
+    "ast_hash": "30a3b2418e7d266232ecc98feb8cb502",
     "semantic_hash": ""
   },
   "PROJECT_TREE.md": {
@@ -516,27 +516,27 @@
     "semantic_hash": "a88f7d80935e1a432dc9b5affe49eb27"
   },
   "public/files.html": {
-    "mtime": 1791042064.8583474,
-    "seen": 1791045592.7003338,
-    "ast_hash": "a61f049fb6e5c4c8dda4ff71266da935",
+    "mtime": 1791051568.289533,
+    "seen": 1791051686.4225743,
+    "ast_hash": "f69792ce47eaa19a3e73789e903fd921",
     "semantic_hash": ""
   },
   "public/index.html": {
-    "mtime": 1791042908.2825959,
-    "seen": 1791045592.7003367,
-    "ast_hash": "c9a7c94c811e55ec77c60f42b7dfdc83",
+    "mtime": 1791051562.6022513,
+    "seen": 1791051686.4225783,
+    "ast_hash": "100f0275c8a70c6430fa220de28050c4",
     "semantic_hash": ""
   },
   "public/settings.html": {
-    "mtime": 1791042472.0381038,
-    "seen": 1791045592.7003403,
-    "ast_hash": "642f042664ee5220c5b472c6e05e2e5c",
+    "mtime": 1791051578.5266144,
+    "seen": 1791051686.422582,
+    "ast_hash": "0ff458793cde8d81cd737b022ec4bbbf",
     "semantic_hash": ""
   },
   "public/uploads.html": {
-    "mtime": 1791042107.6379378,
-    "seen": 1791045592.700342,
-    "ast_hash": "1f7576cdc6af26dfcefeff3ac3bef824",
+    "mtime": 1791051574.9348671,
+    "seen": 1791051686.4225845,
+    "ast_hash": "4adc38ddbb406baa23877174fd0e0773",
     "semantic_hash": ""
   },
   "src/controllers/dashboard.controller.js": {
@@ -705,6 +705,12 @@
     "mtime": 1791046584.4580083,
     "seen": 1791050049.4775352,
     "ast_hash": "9164ac01a7f1217fede06fd656f7ad78",
+    "semantic_hash": ""
+  },
+  "test/integration/live-server.test.js": {
+    "mtime": 1791050773.923752,
+    "seen": 1791051686.4222567,
+    "ast_hash": "b18effb2ba798eac7f5dfdcd46a42858",
     "semantic_hash": ""
   }
 }

@@ -7,9 +7,10 @@
 ```
 admin-files-manager/
 ├── server.js                     # ⭐ ENTRY POINT — Express app assembly + boot
-├── package.json                  # Scripts & dependencies (CommonJS)
+├── package.json                  # Scripts & dependencies (CommonJS); `test` is scoped to test/**/*.test.js
 ├── nodemon.json                  # Dev reload ignores data/*, public/*
-├── .env                          # PORT, STORAGE_ROOT (never commit)
+├── .env                          # PORT, STORAGE_ROOT, optional UPLOAD_MAX_BYTES — git-ignored, never commit
+├── temp/                         # Scratch (git-ignored; never discovered by npm test)
 │
 ├── src/                          # ─── Backend ───
 │   ├── config/
@@ -18,18 +19,22 @@ admin-files-manager/
 │   │   ├── fs.routes.js          # /api/fs router — wires endpoints to controller fns
 │   │   └── dashboard.routes.js   # /api/dashboard router — /summary + /health (read-only, no fs remount)
 │   ├── controllers/
-│   │   ├── fs.controller.js      # HTTP handlers: parse/validate → call services → respond
+│   │   ├── fs.controller.js      # HTTP handlers: parse/validate → call services → respond (list, upload, star, ZIP…)
+│   │   ├── preview.controller.js # GET /api/fs/thumbnail[/capability] — bounded previews or an explicit "unavailable"
 │   │   └── dashboard.controller.js  # Composes services into the dashboard DTO; shapes the response
 │   ├── services/                 # 🔒 All filesystem + metadata access (no Express here)
 │   │   ├── PathService.js        # Client path ⇄ secure OS path; traversal guard (THE boundary)
 │   │   ├── FileSystemService.js  # stat/readdir/mkdir/rename/rm/unlink → AppError; tree/volume/health aggregation
-│   │   └── MetadataService.js    # JSON-file DB (data/metadata.json), atomic writes, singleton
+│   │   ├── MetadataService.js    # JSON-file DB (data/metadata.json), atomic writes, singleton
+│   │   ├── UploadService.js      # Multer engine + staging: placement decided after the body is parsed; overwrite; size cap
+│   │   └── PreviewService.js     # Thumbnail capability + bounded transform (only if a transformer is installed)
 │   ├── middlewares/
 │   │   └── errorHandler.js       # Global error serializer ({ success:false, error })
 │   └── utils/
 │       ├── AppError.js           # Error class carrying HTTP statusCode
 │       ├── validators.js         # validateFileName / validateClientPath
-│       └── fileTypes.js          # File-type taxonomy (CATEGORIES/EXTENSION_MAP) — single server-side source
+│       ├── fileTypes.js          # File-type taxonomy (CATEGORIES/EXTENSION_MAP) — single server-side source, = client FileTypes
+│       └── concurrency.js        # mapWithConcurrency — bounded, order-preserving async map (listing enrichment)
 │
 ├── public/                       # ─── Frontend SPA (served statically, no build) ───
 │   ├── index.html                # Dashboard page        (data-page="dashboard")
@@ -50,7 +55,7 @@ admin-files-manager/
 │           ├── theme.js          # Theme controller (loaded first, pre-CSS)
 │           ├── sidebar.js        # Sidebar collapse + mobile drawer
 │           ├── dashboard.js      # Page module (index.html)
-│           ├── files.js          # Page module (files.html) — table/grid, tree, drawer, DnD
+│           ├── files.js          # Page module (files.html) — see "Files page module" below
 │           ├── uploads.js        # Page module (uploads.html) — queue, progress, presets
 │           └── settings.js       # Page module (settings.html)
 │
@@ -69,10 +74,20 @@ admin-files-manager/
 │   │   ├── MetadataService.test.js
 │   │   └── MetadataService.dashboard.test.js# activities / top-download ranking inputs
 │   ├── api/
-│   │   └── dashboard.contract.test.js       # GET /api/dashboard/summary + /health payload shape
+│   │   ├── dashboard.contract.test.js       # GET /api/dashboard/summary + /health payload shape
+│   │   └── fs.contract.test.js              # /api/fs/* against a live server: upload placement ON DISK,
+│   │                                        #   overwrite/size, listing taxonomy + resilience, star, ZIP, previews
+│   ├── integration/
+│   │   ├── live-server.test.js              # traversal guard wired into the running app
+│   │   ├── error-disclosure.test.js         # no stack / no path in error bodies
+│   │   └── escaping.test.js                 # hostile name placed out of band → listed → rendered as text
+│   ├── utils/
+│   │   └── fileTypes.test.js                # server taxonomy == client FileTypes; no inline copy in the controller
 │   └── frontend/
 │       ├── app.test.js                      # shared core helpers (panel states, storage display)
-│       └── dashboard.test.js                # dashboard renderers, no-history guarantees
+│       ├── dashboard.test.js                # dashboard renderers, no-history guarantees
+│       └── files.test.js                    # files.js in a vm with stub DOM/API: states, navigation, selection,
+│                                            #   a11y semantics, escaping, and source-level guards
 │
 └── docs/                         # ─── Project brain (reference docs, NOT runtime code) ───
     ├── REPO_MAP.md               # ← you are here (this file is the authoritative map)
@@ -84,7 +99,9 @@ admin-files-manager/
     ├── checklist..md             # Legacy checklist (typo name kept as-is)
     └── decisions/
         ├── ADR-001-architecture-baseline.md
-        └── ADR-002-dashboard-data-architecture.md
+        ├── ADR-002-dashboard-data-architecture.md
+        └── ADR-003-files-page-integrity.md      # upload placement, taxonomy, star, page-scoped selection,
+                                                 #   previews, list focus model, security posture
 ```
 
 ## Entry Points
@@ -94,7 +111,7 @@ admin-files-manager/
 | `server.js` | `npm start` / `npm run dev` | Builds middleware chain (helmet → cors → json → urlencoded → morgan → static), then mounts `/api/health`, `/api/fs`, and `/api/dashboard`, adds the API 404 catch-all, HTML fallback for SPA, global `errorHandler`, listens on `config.port` |
 | `src/config/env.js` | Imported first by `server.js` | Loads `.env`, hard-exits if `STORAGE_ROOT` is unset |
 | `public/index.html` | Browser GET `/` | Dashboard; other pages are sibling HTML files |
-| `test/**/*.test.js` | `npm test` (`node --test`) | Zero-dependency `node:test` suites; no build step, no test framework config |
+| `test/**/*.test.js` | `npm test` (`node --test "test/**/*.test.js"`) | Zero-dependency `node:test` suites; discovery is scoped to `test/`, so a scratch `*.test.js` elsewhere cannot break the suite. Every server-booting suite points `MetadataService.dbPath` at a temp file — parallel test processes must never write the real `data/metadata.json` |
 
 ### ⚠ Mount order in `server.js` is load-bearing, not cosmetic
 
@@ -129,6 +146,8 @@ and verify the ordering in the same change.
 │       → services/  [🔒 ALL disk + metadata access]             │
 │         ├─ PathService  (client path → secure OS path)         │
 │         ├─ FileSystemService (stat/readdir/mkdir/rename/rm)    │
+│         ├─ UploadService (multer staging → final placement)    │
+│         ├─ PreviewService (bounded thumbnails, optional)       │
 │         └─ MetadataService (data/metadata.json, fire-and-forget)│
 │       → utils/validators.js → utils/AppError.js                │
 │   → middlewares/errorHandler.js (last middleware, catches all)  │
@@ -139,9 +158,9 @@ and verify the ordering in the same change.
 
 - `routes → controllers → services → (fs | path | env)`; `utils` and `config` are shared leaves.
 - Services never import Express, `req`, or `res` — they take/return plain data.
-- Controllers may use `multer`/`archiver` for HTTP-specific streaming but must not touch `fs`
-  themselves except the download stream (`fs.createReadStream(stats.securePath)`) and Multer
-  destination setup — both already mediated by `PathService`.
+- Controllers may use `archiver` for HTTP-specific streaming but must not touch `fs` themselves
+  except the download stream (`fs.createReadStream(stats.securePath)`), which is mediated by
+  `PathService`. Multer's storage engine, staging and placement live in `UploadService`.
 - Frontend page modules depend on `app.js` + `api.js`; they must not duplicate API calls.
 
 ## Read Path (dashboard aggregation)
@@ -188,6 +207,27 @@ Rules worth knowing before you touch this path:
   not a degraded 200. Do not extend the degradation pattern to a source that currently fails wholly
   without deciding deliberately which behaviour you want.
 
+## Files page module (`public/assets/js/files.js`)
+
+- **Pure layer** (`Files.pure`): helpers and renderers, state in → HTML string out. Every value from
+  the filesystem or the metadata store passes through `esc()` (= `AFM.escapeHtml`) before markup.
+- **Controller** (`Files._controller` is the test seam): one delegated listener per stable container
+  (`#filesContainer`, `#folderTree`, `#breadcrumb`, `#filterChips`, `#fileDrawer`, …), bound once in
+  `init()`. Re-rendering never re-binds, so no control can collect a second handler.
+- **Navigation has one owner**, `navigateTo()` → `applyNavigation()`: path, page, filter, search,
+  search box, pending-search cancellation, breadcrumb and tree highlight. The only other writer of
+  `currentPath` is `syncAfterMutation()` (rename/delete of an ancestor). Tree expansion is state
+  (`state.expanded`), not a render rule.
+- **Selection is page-scoped** and pruned to rendered ids after every reload; navigation and
+  mutations clear it deliberately.
+- **List focus model — WAI-ARIA grid with a roving tab index** (recorded decision, ADR-003 §8): one
+  tab stop per view (the last focused entry, else the first). Arrow keys / Home / End move; Enter
+  opens; Space selects; F2 renames; Delete deletes; Shift+F10 / ContextMenu opens the menu. Only the
+  active entry's checkbox and action buttons are tab stops. The tree uses the same pattern with
+  ArrowRight/ArrowLeft for expansion.
+- **Drawer** is a modal dialog; its Escape handler is registered in the capture phase so it runs
+  before `app.js`'s global Escape and only closes the topmost layer.
+
 ## Request Lifecycle (typical mutation)
 
 1. `server.js` middleware chain runs (`helmet`, `cors`, `morgan`, body parsing).
@@ -211,7 +251,7 @@ Rules worth knowing before you touch this path:
 | New disk operation | `src/services/FileSystemService.js` |
 | New aggregation over the tree | `src/services/FileSystemService.js` (return raw values; shape the DTO in the controller) |
 | New metadata/entity | `src/services/MetadataService.js` (+ the `data/metadata.json` shape in CONTRACTS.md) |
-| New file-type category | `src/utils/fileTypes.js` (`CATEGORIES` + `EXTENSION_MAP`) — one source, and `FileSystemService` breakdown keys must match it. ⚠ `fs.controller.js` still carries its own inline copy (known drift) |
+| New file-type category / extension | `src/utils/fileTypes.js` (`CATEGORIES` + `EXTENSION_MAP`) **and** `public/assets/js/app.js` `FileTypes` in the same change — `test/utils/fileTypes.test.js` fails if they differ. Both the listing and the Dashboard breakdown classify through `classifyFile()` |
 | New validation rule | `src/utils/validators.js` |
 | New error type / status | `src/utils/AppError.js` (throw it; never `res.status(...).json(...)` an error inline) |
 | New shared UI component | `public/assets/js/app.js` + `public/assets/css/components.css` |
@@ -220,5 +260,5 @@ Rules worth knowing before you touch this path:
 | New page style | new `public/assets/css/<page>.css`, linked after `components.css` |
 | Test for a service | `test/services/<Service>.<method>.test.js` (`node:test`, zero deps) |
 | Test for an endpoint payload | `test/api/<area>.contract.test.js` |
-| Test for frontend helpers | `test/frontend/<module>.test.js` (no browser; pure functions exported off `window.AFM`) |
+| Test for frontend helpers | `test/frontend/<module>.test.js` (no browser; real `app.js` + the module in a `vm` context with stub DOM/API — see `files.test.js`) |
 | Record a decision | `docs/decisions/ADR-NNN-*.md` + a pointer from this map |

@@ -1,12 +1,12 @@
 # Graph Report - Admin-Files-Manager-fixed  (2026-10-03)
 
 ## Corpus Check
-- 112 files · ~191,021 words
+- 113 files · ~192,570 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 15 file(s) not represented in the graph (top: .css 8, (none) 6, .tmp 1)
+- Unclassified: 14 file(s) not represented in the graph (top: .css 8, (none) 6)
 
 ## Summary
-- 1175 nodes · 1725 edges · 73 communities (70 shown, 3 thin omitted)
+- 1190 nodes · 1745 edges · 79 communities (77 shown, 2 thin omitted)
 - Extraction: 83% EXTRACTED · 17% INFERRED · 0% AMBIGUOUS · INFERRED: 299 edges (avg confidence: 0.87)
 - Token cost: 0 input · 0 output
 
@@ -29,7 +29,7 @@
 - Optimization Patterns
 - package.json
 - ADDED Requirements
-- API and Interface Design
+- Documentation and ADRs
 - Code Review and Quality
 - MetadataService
 - server.js
@@ -53,18 +53,18 @@
 - idea-refine.sh
 - ADDED Requirements
 - ADDED Requirements
-- FileSystemService.js
+- live-server.test.js
 - dashboard.test.js
 - Decisions
 - .resolveSecurePath
-- AGENTS.md - Dimension Files Manager operating rules
+- api.js
 - PathService.test.js
 - FileSystemService
 - Test-Driven Development
-- dashboard.controller.js
+- Incremental Implementation
 - app.test.js
 - Shipping and Launch
-- MetadataService.js
+- AGENTS.md - Dimension Files Manager operating rules
 - dashboard.contract.test.js
 - FileSystemService.volume.test.js
 - FileSystemService.tree.test.js
@@ -84,25 +84,33 @@
 - opencode.json
 - Requirement: Bare Response Envelope
 - Requirement: Partial Capability Failure
-- PathService.js
+- API and Interface Design
 - Requirement: Filesystem Router Separation
 - Requirement: No Operating-System Path Leakage
 - Requirement: Route Registration Precedes Catch-All
-- scanFolders
+- index.html - Dashboard SPA page (data-page="dashboard")
+- Browser Testing with DevTools
+- Debugging and Error Recovery
+- The Migration Process
+- CONTRACTS.md - API & Data Contracts
+- Deprecation and Migration
+- theme.js
 
 ## God Nodes (most connected - your core abstractions)
 1. `MetadataService` - 24 edges
 2. `Decisions` - 19 edges
 3. `/graphify (knowledge graph pipeline)` - 19 edges
 4. `FileSystemService` - 18 edges
-5. `AGENTS.md - Dimension Files Manager operating rules` - 17 edges
-6. `Constraint-Driven Development` - 17 edges
+5. `Constraint-Driven Development` - 17 edges
+6. `AGENTS.md - Dimension Files Manager operating rules` - 17 edges
 7. `Performance Optimization` - 16 edges
 8. `CONTRACTS.md - API & Data Contracts` - 16 edges
 9. `Hardening Patterns` - 15 edges
 10. `Phase 6 — Shared Frontend Contract` - 14 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `D7 — Reuse `_extKey` in place` --references--> `FileSystemService`  [INFERRED]
+  openspec/changes/dashboard-real-data/design.md → src/services/FileSystemService.js
 - `D13 — Metadata bootstrap owned by `MetadataService`; restore `data/.gitkeep`` --references--> `MetadataService`  [INFERRED]
   openspec/changes/dashboard-real-data/design.md → src/services/MetadataService.js
 - `Why` --references--> `validateClientPath()`  [INFERRED]
@@ -111,8 +119,6 @@
   openspec/changes/dashboard-real-data/specs/dashboard-api/spec.md → test/services/FileSystemService.tree.test.js
 - `Seam 3 — Data source for the sidebar` --references--> `loadGlobalData()`  [INFERRED]
   openspec/changes/dashboard-real-data/p6-contract.md → public/assets/js/app.js
-- `Decision` --references--> `getSummary()`  [INFERRED]
-  docs/decisions/ADR-002-dashboard-data-architecture.md → src/controllers/dashboard.controller.js
 
 ## Import Cycles
 - None detected.
@@ -128,15 +134,15 @@
 - **Agent Quality Bar Enforcement Stack** — _agents_skills_constraint_driven_development_skill, _agents_skills_constraint_driven_development_references_floor_guard, _agents_skills_ci_cd_and_automation_skill, _agents_skills_code_review_and_quality_skill, _agents_skills_git_workflow_and_versioning_skill [INFERRED 0.85]
 - **Untrusted Input Boundary Discipline** — _agents_skills_api_and_interface_design_skill_validate_at_boundaries, _agents_skills_browser_testing_with_devtools_skill_untrusted_browser_content, _agents_skills_debugging_and_error_recovery_skill_error_output_as_untrusted_data, _agents_skills_context_engineering_skill_trust_levels [INFERRED 0.85]
 
-## Communities (73 total, 3 thin omitted)
+## Communities (79 total, 2 thin omitted)
 
 ### Community 0 - "Phase 7 — Verified Facts (normative for all P7 agents)"
 Cohesion: 0.15
 Nodes (12): `/api/health` vs `/api/dashboard/health` — two different things, File ownership, Live payload — `GET /api/dashboard/summary`, Load average is deliberately absent, New files that REPO_MAP must list, No history is retained, Phase 7 — Verified Facts (normative for all P7 agents), Response envelope convention — correct the current documentation (+4 more)
 
 ### Community 1 - "fs.controller.js"
-Cohesion: 0.15
-Nodes (22): Streaming as the default for I/O-heavy endpoints (rationale: uploads/download/ZIP are piped, never buffered whole in memory), API, AppError, archiver, createFolder(), deleteItems(), downloadFile(), downloadZip() (+14 more)
+Cohesion: 0.05
+Nodes (50): Node's filesystem is the database (rationale: zero infrastructure, backup = copy two directories; SQLite/Postgres rejected as drift-prone over-engineering), Streaming as the default for I/O-heavy endpoints (rationale: uploads/download/ZIP are piped, never buffered whole in memory), IMPORTANT: keep the reminder string free of backticks and $(...) constructs., API, ref_fs, ref_os, ref_path, BREAKDOWN_COLORS (+42 more)
 
 ### Community 2 - "/graphify (knowledge graph pipeline)"
 Cohesion: 0.06
@@ -163,8 +169,8 @@ Cohesion: 0.09
 Nodes (31): openspec-apply-change SKILL, Blocked State Handling (state: blocked pauses implementation; select the next ready artifact, never bypass the gate), context vs operationGuidance Contract (prompt-level inputs, never evidence of task completion, never copied into artifacts), Task Checkbox Completion (- [ ] -> - [x] only when the specified behavior is fully implemented), openspec-archive-change SKILL, Archive Target Naming (YYYY-MM-DD-<change>; never stack a second date prefix), Delta Spec Sync State Assessment (existingOutputPaths is the only delta-spec source; MODIFIED/RENAMED on a missing main spec is sync-blocked), Never Archive While a Spec Sync Is In Flight (step 5 would move changeRoot out from under a running sync, so the sync must run inline and synchronously) (+23 more)
 
 ### Community 8 - "Observability and Instrumentation"
-Cohesion: 0.17
-Nodes (18): Feeding CI Failures Back to Agents, Debugging and Error Recovery, Error-Specific Patterns, Instrumentation Guidelines, The Stop-the-Line Rule, The Triage Checklist, Observability and Instrumentation, Cardinality Is the Failure Mode (+10 more)
+Cohesion: 0.23
+Nodes (13): Instrumentation Guidelines, Observability and Instrumentation, Cardinality Is the Failure Mode, Mandatory Correlation IDs, Entry-Point Attribution, Define Working Before Instrumenting, Percentiles Never Averages, RED and USE Metrics (+5 more)
 
 ### Community 9 - "app.js"
 Cohesion: 0.06
@@ -182,13 +188,13 @@ Nodes (15): description, devDependencies, nodemon, directories, doc, keywords, m
 Cohesion: 0.05
 Nodes (38): ADDED Requirements, Dashboard Frontend, Purpose, Requirement: Backend-Owned Values Are Not Re-Derived, Requirement: Existing Client And UI Primitives Are Reused, Requirement: Explicit Panel States, Requirement: Markup Structure Is Valid, Requirement: No Fabricated Fallback Values (+30 more)
 
-### Community 13 - "API and Interface Design"
-Cohesion: 0.05
-Nodes (50): API and Interface Design, Consistent Error Semantics, Contract First, Hyrum's Law, Honouring an Idempotency Key, The One-Version Rule, Prefer Addition Over Modification, TypeScript Interface Patterns (+42 more)
+### Community 13 - "Documentation and ADRs"
+Cohesion: 0.17
+Nodes (13): Change Descriptions, Code Simplification, Chesterton's Fence, Claude Code Simplifier Plugin, Follow Project Conventions, The Rule of 500, The Simplification Process, Documentation and ADRs (+5 more)
 
 ### Community 14 - "Code Review and Quality"
-Cohesion: 0.13
-Nodes (19): Code Review and Quality, Change Sizing, Dependency Discipline, Finding Severity Labels, Multi-Model Review Pattern, Structural Remedies, Verify the Verification, Restartable Session Boundaries (+11 more)
+Cohesion: 0.18
+Nodes (15): Code Review and Quality, Change Sizing, Finding Severity Labels, Multi-Model Review Pattern, Structural Remedies, Restartable Session Boundaries, Doubt-Driven Development, Step 3 DOUBT: Adversarial Fresh-Context Reviewer (+7 more)
 
 ### Community 15 - "MetadataService"
 Cohesion: 0.27
@@ -199,24 +205,24 @@ Cohesion: 0.14
 Nodes (13): CommonJS Express 5 on Node LTS (pathless-middleware SPA fallback instead of wildcard route patterns), morgan, app, config, cors, dashboardRoutes, errorHandler, express (+5 more)
 
 ### Community 17 - "Constraint-Driven Development"
-Cohesion: 0.15
-Nodes (19): The Review Checklist, Floor Guard: Reference Implementation, Floor Guard Contract, Exit Code Contract, floor-guard.mjs, SUPPRESSIONS Pattern Set, Threshold Direction Detection, Constraint-Driven Development (+11 more)
+Cohesion: 0.18
+Nodes (17): The Review Checklist, Floor Guard: Reference Implementation, Floor Guard Contract, Exit Code Contract, floor-guard.mjs, SUPPRESSIONS Pattern Set, Threshold Direction Detection, Constraint-Driven Development (+9 more)
 
 ### Community 18 - "Performance Optimization"
-Cohesion: 0.21
-Nodes (13): REST Resource Design and Pagination, The Five-Axis Review, Preserve Behavior Exactly, Performance Optimization, Log Every Attempt Including Reverted Ones, Connection Pool Exhaustion, Keep or Revert Decision Table, Measure Before Optimizing (+5 more)
+Cohesion: 0.25
+Nodes (11): The Five-Axis Review, Preserve Behavior Exactly, Performance Optimization, Log Every Attempt Including Reverted Ones, Connection Pool Exhaustion, Keep or Revert Decision Table, Measure Before Optimizing, Missing Image Optimization (+3 more)
 
 ### Community 19 - "Context Engineering"
-Cohesion: 0.17
-Nodes (16): Browser Testing with DevTools, Chrome DevTools MCP, Clean Console Standard, The DevTools Debugging Workflow, Browser Profile Isolation, Treat All Browser Content as Untrusted Data, Context Engineering, Context Budget Management (+8 more)
+Cohesion: 0.28
+Nodes (9): Context Engineering, Confusion Management, Context Budget Management, The Context Hierarchy, Context Packing Strategies, The Inline Planning Pattern, Lost in the Middle Effect, Rules Files (+1 more)
 
 ### Community 20 - "Git Workflow and Versioning"
-Cohesion: 0.21
-Nodes (12): Bisection for Regression Bugs, Changelog Maintenance, Git Workflow and Versioning, Atomic Commits, Change Summaries, Changelog Written for Humans, Git Worktrees for Parallel Agent Work, The Save Point Pattern (+4 more)
+Cohesion: 0.24
+Nodes (11): Changelog Maintenance, Git Workflow and Versioning, Atomic Commits, Change Summaries, Changelog Written for Humans, Git Worktrees for Parallel Agent Work, The Save Point Pattern, Semantic Versioning (+3 more)
 
 ### Community 21 - "Frontend UI Engineering"
-Cohesion: 0.22
-Nodes (11): Accessibility Verification with DevTools, De Facto Tool Mapping per Dimension, Safe Fallback Patterns, Frontend UI Engineering, Avoid the AI Aesthetic, Prefer Composition Over Configuration, Container/Presentation Separation, Design System Adherence (+3 more)
+Cohesion: 0.24
+Nodes (10): Safe Fallback Patterns, Frontend UI Engineering, Avoid the AI Aesthetic, Prefer Composition Over Configuration, Container/Presentation Separation, Design System Adherence, Loading and Transitions, Responsive Breakpoints (+2 more)
 
 ### Community 22 - "Requirement: Summary Field Contract"
 Cohesion: 0.27
@@ -240,7 +246,7 @@ Nodes (30): ADDED Requirements, Dashboard Metadata, Purpose, Requirement: Activi
 
 ### Community 27 - "fs.routes.js"
 Cohesion: 0.25
-Nodes (7): Layered Flow routes -> controllers -> services -> fs (controllers never bypass services; routes never register filesystem calls), Layered backend with framework-free services (rationale: a monolithic route file would scatter path validation exactly where traversal bugs breed), Dependency Rules (services never import Express/req/res; page modules must not duplicate API calls), Where to Add Things (endpoint, disk operation, metadata entity, validation rule, shared UI, page module, page style), express, fsController, router
+Nodes (7): backend-checklist.md - Node.js Backend Build Checklist, Eight-Phase Backend Plan (setup, security/FS services, metadata, read APIs, mutation APIs, streaming upload, telemetry, settings), Layered backend with framework-free services (rationale: a monolithic route file would scatter path validation exactly where traversal bugs breed), Where to Add Things (endpoint, disk operation, metadata entity, validation rule, shared UI, page module, page style), express, fsController, router
 
 ### Community 28 - "env.js"
 Cohesion: 0.29
@@ -274,53 +280,53 @@ Nodes (22): ADDED Requirements, Dashboard Health, Purpose, Requirement: Dashboar
 Cohesion: 0.09
 Nodes (22): ADDED Requirements, Purpose, Requirement: Capacity Is Nullable And Declared Unavailable, Requirement: Storage Root Containment Determines The Volume, Requirement: Three Distinct Quantities, Requirement: Volume Availability Reflects A Real Reading, Requirement: Volume Usage Uses Available-Block Semantics, Scenario: Available volume is declared available (+14 more)
 
-### Community 37 - "FileSystemService.js"
-Cohesion: 0.20
-Nodes (10): ref_os, { classifyFile, emptyBreakdown }, fs, os, PathService, CATEGORIES, classifyFile(), emptyBreakdown() (+2 more)
+### Community 37 - "live-server.test.js"
+Cohesion: 0.13
+Nodes (12): ref_node_child_process, assert, { execFileSync }, fs, fsp, http, os, OUTSIDE (+4 more)
 
 ### Community 38 - "dashboard.test.js"
 Cohesion: 0.11
 Nodes (14): ref_node_vm, assert, createFormatStub(), DASHBOARD_SRC, dashboardSource, fs, INDEX_SRC, indexSource (+6 more)
 
 ### Community 39 - "Decisions"
-Cohesion: 0.14
-Nodes (14): D10 — Remove historical affordances; record no history, D12 — Self-terminating polling; adopt the existing pattern, D13 — Metadata bootstrap owned by `MetadataService`; restore `data/.gitkeep`, D14 — Sidebar scope is all four pages, D1 — Mount `/api/dashboard` before the `/api` catch-all, D2 — Bare responses, not `{success, data}`, D3 — No `DashboardService`, D4 — Skip links entirely; do not resolve-then-check (+6 more)
+Cohesion: 0.13
+Nodes (15): D10 — Remove historical affordances; record no history, D12 — Self-terminating polling; adopt the existing pattern, D13 — Metadata bootstrap owned by `MetadataService`; restore `data/.gitkeep`, D14 — Sidebar scope is all four pages, D1 — Mount `/api/dashboard` before the `/api` catch-all, D2 — Bare responses, not `{success, data}`, D3 — No `DashboardService`, D4 — Skip links entirely; do not resolve-then-check (+7 more)
 
 ### Community 40 - ".resolveSecurePath"
-Cohesion: 0.27
-Nodes (10): PathService as the Single Path Boundary (client paths only cross the API; absolute securePath never leaves the services layer), A single, mandatory path boundary (rationale: the API accepts arbitrary client paths, so path containment is centralized to be auditable in one function), Context, D11 — `node:test`, no dependency, no `engines`, D5 — `PathService` separator boundary, single resolution basis, Security boundary, Testing strategy, Security boundary (+2 more)
+Cohesion: 0.16
+Nodes (15): PathService as the Single Path Boundary (client paths only cross the API; absolute securePath never leaves the services layer), A single, mandatory path boundary (rationale: the API accepts arbitrary client paths, so path containment is centralized to be auditable in one function), Context, D11 — `node:test`, no dependency, no `engines`, D5 — `PathService` separator boundary, single resolution basis, D8c - Where stale-metadata filtering lives, Design, Goals / Non-Goals (+7 more)
 
-### Community 41 - "AGENTS.md - Dimension Files Manager operating rules"
-Cohesion: 0.06
-Nodes (52): AGENTS.md - Dimension Files Manager operating rules, AppError Error Contract (throw AppError from any layer; errorHandler is the sole serializer; never res.status().json() an error inline), Downloads Never Navigate the Main Frame (hidden iframe for files, hidden form POST for ZIP), No-Build Frontend (IIFE modules on window; script tag load order is part of the contract), Response Envelope Contract ({ success: true, data } / { success: false, error }), architecture.md - Legacy Deep-Dive Architecture Document, Dimension Design System Rules (violet #6b62f2 only as gradient wash, pill CTAs, weight 500 max, 1px hairline borders, 2% colorfulness is intentional), Global Namespace Map (window.AFM, Theme, Sidebar, Dashboard, Files, Uploads - no other globals) (+44 more)
+### Community 41 - "api.js"
+Cohesion: 0.20
+Nodes (12): Downloads Never Navigate the Main Frame (hidden iframe for files, hidden form POST for ZIP), checklist..md - Linux File-System Migration Checklist, Static-Prototype-to-Backed-UI Migration Checklist (API bridge, global data injection, dashboard, file browser, mutations, XHR upload, settings), /api/fs Endpoint Table (tree, list, download, folder, upload, rename, delete, download-zip), No-build vanilla frontend (rationale: trades DX niceties for zero toolchain; internal admin UI needs no framework, SEO, or CDN pipeline), Module Boundary Diagram (browser -> window.API -> HTTP -> routes -> controllers -> services), Files, Uploads (+4 more)
 
 ### Community 42 - "PathService.test.js"
 Cohesion: 0.13
 Nodes (12): AppError, assert, ENV_MODULE, fs, NORMALIZED_ROOT_SPELLINGS, os, path, SERVICE_MODULE (+4 more)
 
 ### Community 43 - "FileSystemService"
-Cohesion: 0.17
-Nodes (13): ADR-002 — Dashboard Data Architecture: Real Aggregates, Typed Absences, Bounded Walks, Consequences, Context, Decision, References, D7 — Reuse `_extKey` in place, D8c - Where stale-metadata filtering lives, Service responsibilities (+5 more)
+Cohesion: 0.21
+Nodes (9): ADR-002 — Dashboard Data Architecture: Real Aggregates, Typed Absences, Bounded Walks, Consequences, Context, Decision, References, Service responsibilities, 5. Metadata aggregation and contract freeze, AppError (+1 more)
 
 ### Community 44 - "Test-Driven Development"
 Cohesion: 0.25
 Nodes (11): Browser Testing with Chrome DevTools, DAMP Over DRY in Tests, Prefer Real Implementations Over Mocks, The Prove-It Pattern, RED-GREEN-REFACTOR Cycle, Subagent Reproduction Test, Test-Driven Development, Test Pyramid (+3 more)
 
-### Community 45 - "dashboard.controller.js"
-Cohesion: 0.28
-Nodes (7): BREAKDOWN_COLORS, buildStats(), buildStorageBreakdown(), { CATEGORIES }, FileSystemService, getSummary(), MetadataService
+### Community 45 - "Incremental Implementation"
+Cohesion: 0.18
+Nodes (13): The Five Principles, Maintain Balance, Prefer Clarity Over Cleverness, Scope to What Changed, Expand/Contract Schema Migration, Step 1 CLAIM, Incremental Implementation, Rule 2: Keep It Compilable (+5 more)
 
 ### Community 46 - "app.test.js"
 Cohesion: 0.16
-Nodes (10): ref_node_fs, APP_PATH, APP_SOURCE, assert, fs, mountSidebar(), path, sidebarNodes() (+2 more)
+Nodes (10): ref_node_path, APP_PATH, APP_SOURCE, assert, fs, mountSidebar(), path, sidebarNodes() (+2 more)
 
 ### Community 47 - "Shipping and Launch"
 Cohesion: 0.22
 Nodes (11): Definition of Done, Verification Checkpoints, Error Budget Release Gate, Feature Flag Strategy, Monitoring and Observability, Post-Launch Verification, Pre-Launch Checklist, Rollback Strategy (+3 more)
 
-### Community 48 - "MetadataService.js"
+### Community 48 - "AGENTS.md - Dimension Files Manager operating rules"
 Cohesion: 0.20
-Nodes (8): Eventually-Consistent Metadata (fire-and-forget writes must never block or fail the filesystem operation they accompany), Node's filesystem is the database (rationale: zero infrastructure, backup = copy two directories; SQLite/Postgres rejected as drift-prone over-engineering), JSON metadata store trade-offs (per-process singleton cache loses consistency under multiple instances; no trash/recycle; silent upload overwrite; npm test is a stub), IMPORTANT: keep the reminder string free of backticks and $(...) constructs., ref_fs, ref_path, fs, path
+Nodes (17): AGENTS.md - Dimension Files Manager operating rules, Eventually-Consistent Metadata (fire-and-forget writes must never block or fail the filesystem operation they accompany), Layered Flow routes -> controllers -> services -> fs (controllers never bypass services; routes never register filesystem calls), No-Build Frontend (IIFE modules on window; script tag load order is part of the contract), architecture.md - Legacy Deep-Dive Architecture Document, Dimension Design System Rules (violet #6b62f2 only as gradient wash, pill CTAs, weight 500 max, 1px hairline borders, 2% colorfulness is intentional), Mock Data Extension Points (replace dashboard.js arrays, files.js makeFiles(), uploads.js tick() with real API/XHR calls), Sidebar HTML Duplicated Across Pages (no template engine; adding a nav item means updating all four pages) (+9 more)
 
 ### Community 49 - "dashboard.contract.test.js"
 Cohesion: 0.15
@@ -328,11 +334,11 @@ Nodes (11): ref_node_http, assert, fs, http, os, path, NOTE: an unreadable subtr
 
 ### Community 50 - "FileSystemService.volume.test.js"
 Cohesion: 0.15
-Nodes (10): ref_node_os, assert, ENV_MODULE, fs, os, path, PATHSERVICE_MODULE, SERVICE_MODULE (+2 more)
+Nodes (10): ref_node_test, assert, ENV_MODULE, fs, os, path, PATHSERVICE_MODULE, SERVICE_MODULE (+2 more)
 
 ### Community 51 - "FileSystemService.tree.test.js"
 Cohesion: 0.15
-Nodes (10): ref_node_path, assert, ENV_MODULE, fs, os, path, PATHSERVICE_MODULE, SERVICE_MODULE (+2 more)
+Nodes (10): ref_node_fs, assert, ENV_MODULE, fs, os, path, PATHSERVICE_MODULE, SERVICE_MODULE (+2 more)
 
 ### Community 52 - "FileSystemService.rename.test.js"
 Cohesion: 0.15
@@ -340,15 +346,15 @@ Nodes (10): AppError, assert, ENV_MODULE, fs, os, path, PATHSERVICE_MODULE, SERV
 
 ### Community 53 - "MetadataService.dashboard.test.js"
 Cohesion: 0.17
-Nodes (10): ref_node_assert, assert, freshStore(), fs, fsp, MetadataServiceSingleton, os, path (+2 more)
+Nodes (10): ref_node_os, assert, freshStore(), fs, fsp, MetadataServiceSingleton, os, path (+2 more)
 
 ### Community 54 - "MetadataService.test.js"
 Cohesion: 0.18
-Nodes (10): ref_node_test, AppError, assert, freshInstance(), fs, fsp, MetadataServiceSingleton, os (+2 more)
+Nodes (10): ref_node_assert, AppError, assert, freshInstance(), fs, fsp, MetadataServiceSingleton, os (+2 more)
 
 ### Community 55 - "CI/CD and Automation"
-Cohesion: 0.31
-Nodes (10): CI/CD and Automation, Build Cop Role, CI Optimization, Faster is Safer, GitHub Actions CI Configuration, The Quality Gate Pipeline, Rollback Plan, Shift Left (+2 more)
+Cohesion: 0.27
+Nodes (11): CI/CD and Automation, Build Cop Role, CI Optimization, Faster is Safer, GitHub Actions CI Configuration, The Quality Gate Pipeline, Rollback Plan, Shift Left (+3 more)
 
 ### Community 56 - "ADDED Requirements"
 Cohesion: 0.33
@@ -359,8 +365,8 @@ Cohesion: 0.29
 Nodes (6): Capabilities, Impact, Modified Capabilities, New Capabilities, Proposal, Why
 
 ### Community 58 - "Interview Me"
-Cohesion: 0.36
-Nodes (8): Four-Question Intake with Defaults, Confusion Management, Interview Me, The 95 Percent Confidence Stop, Hypothesis with a Confidence Number, One Question at a Time, Confirmed Statement of Intent, Terminal Turn and Stop Rule
+Cohesion: 0.31
+Nodes (9): Four-Question Intake with Defaults, Reference-Led UI Quality, Interview Me, The 95 Percent Confidence Stop, Hypothesis with a Confidence Number, One Question at a Time, Confirmed Statement of Intent, Terminal Turn and Stop Rule (+1 more)
 
 ### Community 59 - "Skill Discovery Map"
 Cohesion: 0.32
@@ -368,11 +374,11 @@ Nodes (8): Keeping the Spec Alive, Spec-Driven Development, Core Operating Behav
 
 ### Community 60 - "Architecture"
 Cohesion: 0.14
-Nodes (13): Architecture, Cross-platform considerations, Design, Filesystem aggregation strategy, Goals / Non-Goals, Human Approval Points, Migration Plan, Open Questions (+5 more)
+Nodes (15): AppError Error Contract (throw AppError from any layer; errorHandler is the sole serializer; never res.status().json() an error inline), HTTP Error Model (400 invalid input, 403 traversal/root-deletion/EACCES, 404 ENOENT, 409 conflict, 500 unmapped), Request Lifecycle for a Mutation (middleware chain -> route -> validate -> resolveSecurePath -> async fs -> non-blocking metadata -> envelope), Architecture, Cross-platform considerations, Error handling, Filesystem aggregation strategy, Performance strategy (+7 more)
 
 ### Community 61 - "Tasks"
-Cohesion: 0.25
-Nodes (7): 2. Dashboard API — route and controller skeleton, 7. Documentation, 8. Integration verification, 9. Final review, Definition of Done, Dependency chain, Tasks
+Cohesion: 0.20
+Nodes (9): 2. Dashboard API — route and controller skeleton, 3. Filesystem aggregation, 4. Storage capacity, 7. Documentation, 8. Integration verification, 9. Final review, Definition of Done, Dependency chain (+1 more)
 
 ### Community 62 - "Three-Tier Boundary System (Always / Ask First / Never)"
 Cohesion: 0.29
@@ -394,9 +400,9 @@ Nodes (5): Requirement: Bare Response Envelope, Scenario: Bare shape matches rea
 Cohesion: 0.40
 Nodes (5): Requirement: Partial Capability Failure, Scenario: Metadata store unavailable, Scenario: Partial-failure convention is documented, Scenario: Storage capacity unavailable, Scenario: Storage root unreadable
 
-### Community 68 - "PathService.js"
-Cohesion: 0.40
-Nodes (3): AppError, config, path
+### Community 68 - "API and Interface Design"
+Cohesion: 0.23
+Nodes (12): API and Interface Design, Consistent Error Semantics, Contract First, Hyrum's Law, Honouring an Idempotency Key, The One-Version Rule, Prefer Addition Over Modification, REST Resource Design and Pagination (+4 more)
 
 ### Community 69 - "Requirement: Filesystem Router Separation"
 Cohesion: 0.50
@@ -410,30 +416,58 @@ Nodes (4): Requirement: No Operating-System Path Leakage, Scenario: Filenames ar
 Cohesion: 0.50
 Nodes (4): Requirement: Route Registration Precedes Catch-All, Scenario: Dashboard routes are reachable, Scenario: Filesystem router is not remounted under the dashboard prefix, Scenario: Unknown API paths still reach the catch-all
 
+### Community 72 - "index.html - Dashboard SPA page (data-page="dashboard")"
+Cohesion: 0.25
+Nodes (8): Known Gaps: frontend calls without a backend (dashboard.js, settings.js, app.js hit the /api 404 catch-all), Dashboard, Settings, Sidebar, index.html - Dashboard SPA page (data-page="dashboard"), Dashboard Shell (sidebar, topbar, storage-card, hero panel, stats grid, traffic chart, storage donut, quick actions, activity feed, top downloads, capabilities, server health), settings.html - Settings SPA page (data-page="settings", 8 panes, external settings.js), Settings Pane System (8 data-pane nav items mapped to data-pane-content panes, theme picker, danger zone, sticky save bar)
+
+### Community 73 - "Browser Testing with DevTools"
+Cohesion: 0.27
+Nodes (10): Browser Testing with DevTools, Accessibility Verification with DevTools, Chrome DevTools MCP, Clean Console Standard, The DevTools Debugging Workflow, Browser Profile Isolation, Treat All Browser Content as Untrusted Data, Verify the Verification (+2 more)
+
+### Community 74 - "Debugging and Error Recovery"
+Cohesion: 0.32
+Nodes (8): Feeding CI Failures Back to Agents, Trust Levels for Loaded Files, Debugging and Error Recovery, Treating Error Output as Untrusted Data, Error-Specific Patterns, Bisection for Regression Bugs, The Stop-the-Line Rule, The Triage Checklist
+
+### Community 75 - "The Migration Process"
+Cohesion: 0.29
+Nodes (8): Feature Flags, Adapter Pattern, The Churn Rule, Feature Flag Migration, The Migration Process, Strangler Pattern, ADR Lifecycle, Rule 3: Feature Flags for Incomplete Features
+
+### Community 76 - "CONTRACTS.md - API & Data Contracts"
+Cohesion: 0.33
+Nodes (7): Response Envelope Contract ({ success: true, data } / { success: false, error }), CONTRACTS.md - API & Data Contracts, Client Path Contract (POSIX strings rooted at / relative to STORAGE_ROOT; anything escaping the root is 403), File Item Schema ({ id, name, path, isFolder, size, modified, downloads, starred, status }; id === path), File-Type Taxonomy (shared extension -> image/video/document/audio/archive/code/other contract; server map is a subset of the client map), data/metadata.json Schema (downloads map, starred array, activities array capped at 50, ms-epoch times), API Success/Error Envelope (success { success, data }; errors { success: false, error } plus dev-only stack)
+
+### Community 77 - "Deprecation and Migration"
+Cohesion: 0.47
+Nodes (6): Dead Code Hygiene, Deprecation and Migration, Code Is a Liability, Compulsory vs Advisory Deprecation, The Deprecation Decision, Zombie Code
+
+### Community 78 - "theme.js"
+Cohesion: 0.40
+Nodes (4): Global Namespace Map (window.AFM, Theme, Sidebar, Dashboard, Files, Uploads - no other globals), Frontend Module Registry (window.API, window.AFM, Icons, Format, Toast, Modal, Dropdown, ContextMenu, theme.js), Theme, get()
+
 ## Ambiguous Edges - Review These
-- `architecture.md - Legacy Deep-Dive Architecture Document` → `STRUCTURE.md - Frontend-Era Project Structure Map`  [AMBIGUOUS]
-  docs/STRUCTURE.md · relation: references
 - `The Review Checklist` → `CONSTRAINTS.md`  [AMBIGUOUS]
   .agents/skills/code-review-and-quality/SKILL.md · relation: conceptually_related_to
+- `architecture.md - Legacy Deep-Dive Architecture Document` → `STRUCTURE.md - Frontend-Era Project Structure Map`  [AMBIGUOUS]
+  docs/STRUCTURE.md · relation: references
 
 ## Knowledge Gaps
-- **456 isolated node(s):** `idea-refine.sh script`, `$schema`, `plugin`, `name`, `version` (+451 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 536 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **467 isolated node(s):** `idea-refine.sh script`, `$schema`, `plugin`, `name`, `version` (+462 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 549 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **What is the exact relationship between `architecture.md - Legacy Deep-Dive Architecture Document` and `STRUCTURE.md - Frontend-Era Project Structure Map`?**
-  _Edge tagged AMBIGUOUS (relation: references) - confidence is low._
 - **What is the exact relationship between `The Review Checklist` and `CONSTRAINTS.md`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
+- **What is the exact relationship between `architecture.md - Legacy Deep-Dive Architecture Document` and `STRUCTURE.md - Frontend-Era Project Structure Map`?**
+  _Edge tagged AMBIGUOUS (relation: references) - confidence is low._
 - **Why does `stats()` connect `Requirement: Summary Field Contract` to `Phase 7 — Verified Facts (normative for all P7 agents)`, `FileSystemService.tree.test.js`, `Requirement: Bare Response Envelope`, `FileSystemService`?**
-  _High betweenness centrality (0.049) - this node is a cross-community bridge._
-- **Why does `Performance Optimization` connect `Performance Optimization` to `Observability and Instrumentation`, `Constraint-Driven Development`, `Optimization Patterns`, `CI/CD and Automation`?**
-  _High betweenness centrality (0.047) - this node is a cross-community bridge._
-- **Why does `Test-Driven Development` connect `Test-Driven Development` to `/graphify (knowledge graph pipeline)`, `Skill Discovery Map`, `Planning and Task Breakdown`?**
-  _High betweenness centrality (0.046) - this node is a cross-community bridge._
+  _High betweenness centrality (0.045) - this node is a cross-community bridge._
+- **Why does `Performance Optimization` connect `Performance Optimization` to `API and Interface Design`, `Observability and Instrumentation`, `Optimization Patterns`, `Constraint-Driven Development`, `Frontend UI Engineering`, `CI/CD and Automation`?**
+  _High betweenness centrality (0.036) - this node is a cross-community bridge._
+- **Why does `Optimization Patterns` connect `Optimization Patterns` to `Performance Optimization`?**
+  _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **Are the 9 inferred relationships involving `MetadataService` (e.g. with `Context` and `D13 — Metadata bootstrap owned by `MetadataService`; restore `data/.gitkeep``) actually correct?**
   _`MetadataService` has 9 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 6 inferred relationships involving `FileSystemService` (e.g. with `Context` and `D7 — Reuse `_extKey` in place`) actually correct?**

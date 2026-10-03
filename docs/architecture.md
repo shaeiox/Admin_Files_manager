@@ -850,7 +850,7 @@ assuming a module is still simulated** — this table used to send readers to re
 | `app.js` | hardcoded sidebar storage/user figures | ✅ **Real** | `GET /api/health` (env), `GET /api/dashboard/summary` (`storage`) |
 | `uploads.js` | `tick()` simulation loop | ✅ **Real upload** via `window.API.upload()` XHR with progress. ⚠ The in-page **speed graph** (`metrics.speedHistory`) is still driven by a local 1 s timer over *this session only* — it is a live throughput readout, not history | `POST /api/fs/upload` |
 | `settings.html` / `settings.js` | inline mock save handlers | ❌ **Still ahead of the backend.** Calls `/api/settings` (GET + PUT) and `/api/settings/action`, none of which exist → 404. Note it is now a **separate `js/settings.js`** module, not an inline `<script>` | — |
-| ZIP download | `window.API.downloadZip()` | ❌ **Route commented out** in `fs.routes.js`, so it 404s | — |
+| ZIP download | `window.API.downloadZip()` | ✅ **Real** (route enabled by files-page-correctness) | `POST /api/fs/download-zip` |
 
 Note the naming history, because it is a trap: the Dashboard's old mock traffic series was called
 `chartData` in this document but `traffic` in the code, and `serverHealth` here vs `health` in the
@@ -1018,10 +1018,9 @@ window.Uploads   = { init }   // only on uploads page
 - No routing — each page is a separate HTML file, no client-side routing
 - **No auth — and therefore no user identity.** The sidebar footer renders the `GET /api/health`
   environment, not a person (see §15.6). There is no user store to render.
-- Uploads are real (`window.API.upload()` XHR → `POST /api/fs/upload`), but **ZIP download is broken
-  at the routing layer** — `download-zip` is commented out in `fs.routes.js`, so
-  `API.downloadZip()` 404s. Two call sites in `files.js` also use `window.open()` instead of the
-  iframe download helpers, which exposes them to popup blockers.
+- Uploads are real (`window.API.upload()` XHR → `POST /api/fs/upload`), and the destination is
+  honoured whatever the multipart field order (see `docs/CONTRACTS.md`). ZIP download is live, and
+  every download in `files.js` goes through the iframe helpers in `api.js` (no `window.open`).
 - **`settings.js` calls endpoints that do not exist** — `/api/settings` (GET + PUT) and
   `/api/settings/action` all 404.
 - No i18n — English only; Language dropdown in Settings is UI-only

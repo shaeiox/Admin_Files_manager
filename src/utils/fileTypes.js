@@ -5,25 +5,15 @@
  * File-type taxonomy — SHARED CONTRACT.
  *
  * Documented at docs/CONTRACTS.md "File-type taxonomy (shared contract)".
- * Both the directory listing (fs.controller.js `_extKey`) and the Dashboard
- * storage breakdown (FileSystemService.getTreeStats) must agree, otherwise the
- * donut and the file list disagree about the same file.
+ * The single server-side classifier: the directory listing (fs.controller.js
+ * getList — each item's `type`, the type filter and `counts`) and the Dashboard
+ * storage breakdown (FileSystemService.getTreeStats) both classify through
+ * classifyFile(), so the donut and the file list cannot disagree about a file.
  *
- * The contract previously existed as an inline block in fs.controller.js plus a
- * hand-mirrored client map, with "when extending one side, mirror it on the
- * other" as the only enforcement. That is a silent-drift hazard: nothing failed
- * when the two sides diverged. This module is the single server-side source.
- *
- * KNOWN GAP (escalated, not silently resolved): fs.controller.js still carries
- * its own inline copy. Collapsing it to use this module is a ~12-line removal
- * and is tracked as an escalation, not applied unilaterally, because that file
- * is outside this phase's ownership.
- *
- * NO AUTOMATED GUARD EXISTS. `docs/CONTRACTS.md` ("File-type taxonomy (shared
- * contract)") is the only place the mapping is written down, and the copies are
- * reconciled by hand. A pinning test is the obvious next step, but a test over
- * this module alone would NOT catch the drift that matters: it would have to
- * compare fs.controller.js's inline copy against this one.
+ * The extension set mirrors the client's `FileTypes` table in
+ * public/assets/js/app.js. test/utils/fileTypes.test.js asserts the two sets are
+ * equal and that fs.controller.js carries no inline copy, so editing either
+ * side alone fails the suite.
  */
 
 const CATEGORIES = ['image', 'video', 'document', 'audio', 'archive', 'code', 'other'];

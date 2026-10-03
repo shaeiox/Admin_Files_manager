@@ -21,12 +21,16 @@
   | `POST /api/fs/folder` | write | `{ success, data }` |
   | `POST /api/fs/upload` | write | `{ success, data }` |
   | `PUT /api/fs/rename` | write | `{ success, data }` |
-  | `DELETE /api/fs/delete` | write | `{ success, data }` |
+  | `DELETE /api/fs/delete` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
+  | `POST /api/fs/star` | write | `{ success, data }` |
+  | `GET /api/fs/thumbnail/capability` | read | `{ available, formats, maxSize }` — bare object |
 
-  (Verified against every `res.json` call in `fs.controller.js` and `dashboard.controller.js`.
-  `GET /api/fs/download` and `POST /api/fs/download-zip` are streams and return no JSON body.)
-- **Error:** any status with `{ "success": false, "error": "human-readable message" }`
-  (+ `stack` string in development only, from `errorHandler`).
+  (Verified against every `res.json` call in `fs.controller.js`, `preview.controller.js` and
+  `dashboard.controller.js`. `GET /api/fs/download`, `POST /api/fs/download-zip` and a successful
+  `GET /api/fs/thumbnail` are streams/bytes and return no JSON body.)
+- **Error:** any status with `{ "success": false, "error": "human-readable message" }`. Never a
+  `stack`, in any environment: `errorHandler` forwards only `AppError` messages (authored static
+  strings, no absolute path) and masks everything else.
 - **Dashboard failure semantics (separate from the shape rule):** the dashboard endpoints answer
   **`200` with per-capability degradation** for the *filesystem* and *volume* capabilities — an
   unreadable volume or an unreadable subtree removes only its own contribution instead of failing
@@ -38,6 +42,22 @@
   (e.g. `/media/videos/clip.mp4`). The server rejects anything that escapes the root (`403`).
 - **Timestamps:** file `modified` is a **millisecond epoch number**; activity `time` is ms epoch.
 
+### Security posture — stated limitations (ADR-003)
+
+These are recorded decisions, not oversights, and none of them is closed:
+
+- **The API is unauthenticated.** Every endpoint below, including upload, rename, delete and star,
+  answers any caller. This is the current design for a trusted, single-operator host.
+  **Authentication is required before the service is exposed beyond localhost** — a follow-up change.
+- **Cross-origin access is open.** `server.js` mounts `cors()` with its defaults, which allow any
+  origin. Combined with the absence of authentication, **any web page the operator visits can call
+  every mutating endpoint.** Recorded at the same severity as the missing authentication.
+- **The content security policy is disabled** (`helmet({ contentSecurityPolicy: false })`).
+  Rendering-time escaping in the page modules is therefore the **only** layer between a
+  filesystem-derived string and the DOM. Escaping does not fully compensate for the missing policy.
+- **`.env` is excluded from version control** (`.gitignore`), closing the ADR-001 open question on
+  the environment file; ADR-003 tracks the remainder.
+
 ## Endpoints
 
 | Method | Path | Status | Notes |
@@ -45,14 +65,17 @@
 | GET | `/api/health` | ✅ live | Boot/env check — **unchanged by the dashboard work**, byte-identical payload |
 | GET | `/api/dashboard/summary` | ✅ live | Read-only aggregate; bare object, `200` with per-capability degradation |
 | GET | `/api/dashboard/health` | ✅ live | Read-only aggregate; bare array of runtime metric objects |
-| GET | `/api/fs/tree` | ✅ live | Sidebar tree, 2 levels deep |
-| GET | `/api/fs/list` | ✅ live | Directory listing, filter/sort/paginate |
+| GET | `/api/fs/tree` | ✅ live | Sidebar tree, exactly 2 levels below the root |
+| GET | `/api/fs/list` | ✅ live | Directory listing, filter/sort/paginate, `starredOnly` |
 | GET | `/api/fs/download` | ✅ live | Stream single file attachment |
+| GET | `/api/fs/thumbnail/capability` | ✅ live | Whether previews can be produced (bare object) |
+| GET | `/api/fs/thumbnail` | ✅ live | Bounded image preview, or an explicit unavailable marker |
 | POST | `/api/fs/folder` | ✅ live | Create directory |
-| POST | `/api/fs/upload` | ✅ live | Multipart upload (Multer → disk) |
+| POST | `/api/fs/upload` | ✅ live | Multipart upload — **field order matters**, see below |
+| POST | `/api/fs/star` | ✅ live | Toggle or set the starred flag |
+| POST | `/api/fs/download-zip` | ✅ live | Streams a ZIP of up to 500 paths |
 | PUT | `/api/fs/rename` | ✅ live | Same-directory rename |
-| DELETE | `/api/fs/delete` | ✅ live | Bulk delete (≤500 paths) |
-| POST | `/api/fs/download-zip` | ❌ **404** | Controller exists and is exported, but the route is **commented out** at `fs.routes.js:16`. `API.downloadZip()` still posts to it, so **ZIP download 404s in the UI today.** Re-enable the route to fix — see ADR-001 follow-ups. |
+| DELETE | `/api/fs/delete` | ✅ live | Bulk delete (≤500 paths); a `200` can be a partial failure |
 
 ### GET /api/health
 
@@ -229,20 +252,33 @@ There is **no** time-series store, snapshot table, or history file anywhere in t
     "path": "/",
     "icon": "hardDrive",
     "children": [
-      { "id": "/media", "name": "media", "path": "/media", "children": [ /* depth ≤ 2 */ ] }
+      { "id": "/media", "name": "media", "path": "/media", "children": [ /* one more level */ ] }
     ]
   }
 ]
 ```
-Hidden files (dot-prefixed) are excluded; folders sorted by name.
+- Hidden files (dot-prefixed) are excluded; folders sorted by name.
+- **Depth is a constant: exactly two levels below the root** (`fs.controller.js` `scanFolders`
+  stops at `depth > 2`; pinned by `test/api/fs.contract.test.js` and mirrored by `TREE_DEPTH` in
+  `files.js`). A folder deeper than that is not in the tree; the Files page says so and the
+  breadcrumb, which always shows the full path, is the way back up.
 
-### GET /api/fs/list
+### GET /api/fs/list → `200`
 
-**Query:** `path` (default `/`), `page` (default 1), `limit` (default 20), `sort`
-(`modified|name|size` — any item field; default `modified`), `dir` (`asc|desc`, default `desc`),
-`search` (substring, case-insensitive), `type` (`all|folder|image|video|document|audio|archive|code`).
+**Query** (every parameter is validated; nothing is trusted):
 
-**Response `200`:**
+| Param | Accepted | Default | Invalid value |
+|---|---|---|---|
+| `path` | client path | `/` | `400` |
+| `page` | integer ≥ 1 | `1` | treated as `1` |
+| `limit` | integer ≥ 1 | `20` | clamped to **`200`** (`LIST_MAX_LIMIT`) |
+| `sort` | `name` \| `size` \| `modified` \| `downloads` | `modified` | falls back to `modified` |
+| `dir` | `asc` \| `desc` | `desc` | anything but `asc` is `desc` |
+| `search` | substring of the **name**, case-insensitive | — | — |
+| `type` | `all` \| `folder` \| `image` \| `video` \| `document` \| `audio` \| `archive` \| `code` \| `other` | `all` | matches nothing |
+| `starredOnly` | `true` | off | anything but `true` is off |
+
+**Response:**
 ```json
 {
   "items": [
@@ -251,6 +287,7 @@ Hidden files (dot-prefixed) are excluded; folders sorted by name.
       "name": "report.pdf",
       "path": "/docs/report.pdf",
       "isFolder": false,
+      "type": "document",
       "size": 48213,
       "modified": 1758500000000,
       "downloads": 7,
@@ -259,18 +296,58 @@ Hidden files (dot-prefixed) are excluded; folders sorted by name.
     }
   ],
   "total": 1,
-  "counts": { "all": 1, "folder": 0, "image": 0, "video": 0, "document": 1, "audio": 0, "archive": 0, "code": 0 }
+  "counts": { "all": 1, "folder": 0, "image": 0, "video": 0, "document": 1, "audio": 0, "archive": 0, "code": 0, "other": 0 }
 }
 ```
-- Folders sort before files; `downloads` is `null` for folders; `counts` reflects the whole
-  directory *before* pagination (after search/type filter).
-- `_extKey` is internal-only and stripped before the response.
+- **Ordering:** folders always precede files, in both directions — a descending size sort ranks
+  files only. Within each group the requested key decides; a missing value (`null`) sorts after
+  every real value in both directions; ties break by name, then path. Order never depends on
+  `readdir` or on completion order.
+- **`type`** is the classification the `type` filter compares against (`folder`, or
+  `classifyFile(name)`). The UI renders its badge from it, so a badge cannot disagree with its chip.
+- **`size` is `null` for a folder.** A directory's `st_size` (4096 on ext4, 0 on NTFS) measures
+  nothing about its contents, so the payload is identical on both platforms. `downloads` is also
+  `null` for folders.
+- **`counts`** covers every entry that survived `search` and `starredOnly` (before the `type`
+  filter and pagination). `counts.all` equals the sum of every other key, **including `other`** —
+  the unclassified bucket is counted, never dropped.
+- `total` is the full matching count after the `type` filter; a `page` past the end returns
+  `items: []` with the true `total`.
+- An entry that vanishes between the directory read and its `stat` (or cannot be stat-ed) is
+  skipped and logged; the request still answers `200`. An unreadable **target** directory fails the
+  request (`404`/`403`).
+- Per-entry enrichment runs with bounded concurrency (`LIST_ENRICH_CONCURRENCY = 16`); the metadata
+  store is read once per listing.
+- `status` is a constant placeholder (`"internal"`) kept for compatibility; it measures nothing and
+  the Files page does not render it.
 
 ### GET /api/fs/download?path=...
 
 - Streams `application/octet-stream` attachment; sets `Content-Disposition` (UTF-8 encoded
   filename), `Content-Length`, `Cache-Control: no-cache`.
 - Directories: `400`. Increment download counter on stream open (fire-and-forget).
+- Never use it as an image source: the forced octet-stream type is deliberate (it stops untrusted
+  content rendering inline). Previews have their own endpoint.
+
+### GET /api/fs/thumbnail/capability → `200`
+
+`{ "available": false, "formats": [], "maxSize": 512 }` — `available` is `true` only when an image
+transformer (`sharp`) is installed; this repository installs none, so as shipped previews are
+unavailable and the UI says so. `formats` lists the extensions a preview can be produced for.
+
+### GET /api/fs/thumbnail?path=...&size=...
+
+Read-only. `size` is the long edge in pixels, clamped to `16..512` (default `256`); non-integer
+`size` is `400`. On success: `200`, `image/webp`, bounded in both dimensions, never the original
+bytes. Otherwise an error envelope with the explicit marker header **`X-Preview: unavailable`**:
+
+| Status | When |
+|---|---|
+| `415` | Not a previewable raster format (decided from the **name**, before any byte is read; SVG is refused) or a folder |
+| `404` | No transformer installed |
+| `413` | Source larger than 50 MiB |
+| `422` | The image could not be decoded |
+| `403` | Path traversal |
 
 ### POST /api/fs/folder
 
@@ -282,14 +359,46 @@ Errors: `400` invalid name/path · `404` parent missing · `409` name exists.
 
 ### POST /api/fs/upload
 
-`multipart/form-data`: file field **`file`** (single), plus field `destination` (client path,
-default `/`). → **`201`**
+`multipart/form-data` fields:
+
+| Field | Required | Meaning |
+|---|---|---|
+| `destination` | no (default `/`) | Existing folder, client path |
+| `overwrite` | no | `"true"` replaces an existing **file**; anything else (including absent) refuses with `409` |
+| `file` | yes | One file |
+
+**Multipart field order is load-bearing — send `destination` and `overwrite` BEFORE `file`.**
+Multer resolves the storage destination when the first file chunk arrives, so a field sent after
+the file part has not been parsed at that moment. The server now stages the bytes in a hidden
+`.upload-<random>.part` file and decides the final location only after the whole body is parsed, so
+a late `destination` is still honoured rather than misfiled — but a destination sent first is
+validated **before any byte is written**, and every client in this repository sends it first.
+
+→ **`201`**
 ```json
 { "success": true, "data": { "name": "a.pdf", "path": "/docs/a.pdf", "size": 48213 } }
 ```
-Errors: `400` no file / invalid destination / invalid filename. Filenames are sanitized via
-`validateFileName`; destination must already exist (`404`-class failure otherwise). Overwrites are
-currently **allowed silently** (known gap — see ADR-001).
+- `data.path` is the path the file was actually written to, derived from the resolved destination
+  — never from a form field re-read after the fact.
+- `overwrite` refusal is atomic (`link()`, exclusive-copy fallback); replacement is a single
+  `rename()`. A failed or refused upload leaves no staged or partial file and never touches an
+  existing file. A name held by a folder is always `409`.
+- **Size limit:** `UPLOAD_MAX_BYTES` environment variable (positive integer bytes), default
+  **5 GiB**. Larger files fail with `413` naming the limit; the partial file is removed.
+
+Errors (static messages, no absolute path): `400` no file / destination missing / destination not a
+folder / invalid filename · `403` destination outside the root · `409` name exists (or held by a
+folder) · `413` too large.
+
+### POST /api/fs/star
+
+**Body:** `{ "path": "/docs/a.pdf", "starred"?: boolean }` → **`200`**
+```json
+{ "success": true, "data": { "path": "/docs/a.pdf", "starred": true } }
+```
+Without `starred` each call toggles once; with it the call is idempotent (sets that value).
+`data.starred` is the value actually stored. Errors: `400` missing path or non-boolean `starred` ·
+`404` path does not exist.
 
 ### PUT /api/fs/rename
 
@@ -312,29 +421,24 @@ best-effort after disk rename.
   }
 }
 ```
-- Per-item failure never aborts the batch; total failure (`deleted` empty, `failed` non-empty)
-  surfaces the first error with its status. Deletion is **permanent** (recursive `fs.rm`).
+- **A `200` (and `success: true`) does NOT mean every path was deleted.** Per-item failure never
+  aborts the batch; survivors are listed in `data.failed` with a reason. A client must read
+  `data.deleted` / `data.failed` and report a partial failure as one — the count of deleted items is
+  `data.deleted.length`, never the number of paths sent.
+- Total failure (`deleted` empty, `failed` non-empty) is a non-2xx: the first error with its status.
+- Deletion is **permanent** (recursive `fs.rm`): there is no trash and no restore.
 - Errors: `400` empty/oversized batch.
 
-### POST /api/fs/download-zip — ⚠️ currently `404`
+### POST /api/fs/download-zip
 
-**Not reachable as shipped.** The route line is **commented out** at `fs.routes.js:16`:
-
-```js
-// router.post('/download-zip', fsController.downloadZip);
-```
-
-`downloadZip` is implemented in `fs.controller.js` and exported, and `API.downloadZip()` in
-`public/assets/js/api.js` builds a hidden form posting to `${BASE_URL}/fs/download-zip`
-(`api.js:263`) into a hidden iframe — so **every ZIP download in the UI currently 404s** at the
-`/api` catch-all. Uncommenting the route line is the whole fix.
-
-The contract below is the behaviour **once re-enabled**:
-
-**Body:** `{ "paths": [...] }` — JSON or form-urlencoded (`paths` = JSON string; the SPA posts a
-urlencoded form targeted at a hidden iframe). ≤500 paths. → **`200`** `application/zip` stream,
-filename `download-YYYY-MM-DD.zip`. Increments download counters (files only). Directory entries
-become recursive ZIP folders. Tracked as a follow-up in ADR-001 and ADR-002.
+**Body:** `{ "paths": [...] }` — JSON, or form-urlencoded with `paths` as a JSON string (the SPA
+posts a hidden form targeted at a hidden iframe, so the page never navigates). → **`200`**
+`application/zip` stream, `Content-Disposition: attachment; filename="download-YYYY-MM-DD.zip"`.
+- 1–500 paths; empty or more than 500 is `400`.
+- Every path is validated **before** the first byte is streamed: a traversing path is `403` and no
+  archive is produced.
+- A directory becomes a recursive folder entry under its own name. Download counters increment for
+  files only.
 
 ## Error Model
 
@@ -343,11 +447,15 @@ become recursive ZIP folders. Tracked as a follow-up in ADR-001 and ADR-002.
 | `400` | Invalid input | Bad name/path, no file, non-directory for readDir/download, empty batch |
 | `403` | Forbidden | Path traversal attempt; storage-root deletion; OS permission denial (`EACCES`/`EPERM`) |
 | `404` | Not found | Missing item/parent, `ENOENT` |
-| `409` | Conflict | Create/rename collides with existing item |
-| `500` | Server error | Unmapped fs error. Message sanitized to a generic string in production |
+| `409` | Conflict | Create/rename/upload collides with an existing item |
+| `413` | Too large | Upload over `UPLOAD_MAX_BYTES`; preview source over 50 MiB |
+| `415` | Unsupported | Preview requested for a non-image or a folder |
+| `422` | Unprocessable | Preview could not be decoded |
+| `500` | Server error | Unmapped fs error. Message masked to a generic string |
 
 All errors are produced by throwing `AppError(message, statusCode)` and are serialized centrally by
-`src/middlewares/errorHandler.js`. In production, `500` messages are masked; `stack` is dev-only.
+`src/middlewares/errorHandler.js`. Only `AppError` messages reach the client; no `stack` is sent in
+any environment.
 
 **Exception:** the two Dashboard endpoints do **not** follow this model. They answer `200` with
 per-capability degradation, so a partial failure is expressed in the payload
@@ -373,14 +481,16 @@ per-capability degradation, so a partial failure is expressed in the payload
 
 ### File item (API + frontend)
 
-`{ id, name, path, isFolder, size, modified, downloads, starred, status }` — `id === path` is the
-client path and doubles as the stable identifier across API and UI.
+`{ id, name, path, isFolder, type, size, modified, downloads, starred, status }` — `id === path` is
+the client path and doubles as the stable identifier across API and UI. `size` and `downloads` are
+`null` for folders.
 
 ### Frontend module registry (window globals)
 
 | Global | Source | Responsibility |
 |---|---|---|
-| `API` | `assets/js/api.js` | `get/post/put/del/upload/downloadFile/downloadZip`, `BASE_URL` |
+| `API` | `assets/js/api.js` | `get/post/put/del/upload/downloadFile/downloadMultipleFiles/downloadZip`, `BASE_URL` |
+| `Files` | `assets/js/files.js` | Files page; `Files.pure` (renderers/helpers) and `Files._controller` are test seams |
 | `AFM` | `assets/js/app.js` | Shared helpers namespace (`Toast`, `Modal`, `Format`, `Icons`, DOM utils) |
 | `Icons` / `icon()` / `hydrateIcons()` | `assets/js/app.js` | Inline SVG system (`<i data-icon="name">`) |
 | `Format` | `assets/js/app.js` | bytes/duration/relative-time/number formatters |
@@ -401,10 +511,9 @@ backed. The old `POST /folders` and `POST /shares` calls are gone — folder cre
 **live** `POST /api/fs/folder`, and the share affordance was removed along with the other fabricated
 UI rather than left as a dangling call.
 
-Still broken, but not a missing backend — see the endpoint table for the route status:
-
-- `files.js` → `API.downloadZip` posts to `POST /api/fs/download-zip`, whose route is commented
-  out at `fs.routes.js:16`, so **ZIP download 404s**.
+`files.js` is fully backed: every call it makes (`/fs/tree`, `/fs/list`, `/fs/folder`,
+`/fs/upload`, `/fs/rename`, `/fs/delete`, `/fs/star`, `/fs/download-zip`, `/fs/download`,
+`/fs/thumbnail/capability`) resolves.
 
 When implementing a gap, add the route/controller, then move it from this list into the endpoint
 table above.
@@ -412,24 +521,32 @@ table above.
 ### File-type taxonomy (shared contract)
 
 Classification is by lowercase file extension. **`src/utils/fileTypes.js` is the single
-server-side source of truth** — it exports `CATEGORIES`, `EXTENSION_MAP`, `classifyFile(name)`, and
-`emptyBreakdown()`, and it is what both `FileSystemService.getTreeStats` (the Dashboard donut) and
-`fs.controller.js` (`_extKey`, the listing filter) are meant to classify through, so a file cannot
-count as `document` in the donut and `other` in the file list.
+server-side source of truth** — `CATEGORIES`, `EXTENSION_MAP`, `classifyFile(name)`,
+`emptyBreakdown()` — and both `FileSystemService.getTreeStats` (the Dashboard donut) and
+`fs.controller.js` `getList` (the listing's `type`, filter and `counts`) classify through it.
 
-Server map (client map in `app.js` `FileTypes` is a superset):
-`image` jpg/jpeg/png/gif/webp/svg · `video` mp4/mkv/mov/avi/webm · `document` pdf/doc/docx/txt/xlsx/csv ·
-`audio` mp3/wav/flac/ogg · `archive` zip/rar/7z/tar/gz · `code` js/html/css/json/py/php ·
-`other` (fallback). When extending one side, mirror it on the other.
+The server set was reconciled **upward** to the client's `FileTypes` table in `app.js` (the
+superset), so every extension the UI badges is reachable by its chip:
 
-**Known drift (deliberately not collapsed yet):** `fs.controller.js` still carries its own **inline
-copy** of the map at lines ~97-103 instead of importing `src/utils/fileTypes.js`, and the client
-map in `app.js` is still hand-mirrored. Collapsing the inline copy is a ~12-line removal that was
-left alone because that file is outside the dashboard phase's ownership — it is tracked as an
-escalation, not silently resolved. Until then the two server-side copies can drift, and **nothing
-fails when they do**. (`src/utils/fileTypes.js` documents a `test/services/fileTypes.test.js` that
-pins the shared module; that file does not currently exist, so no test guards either copy. Adding
-it is a tracked follow-up.)
+| Category | Extensions |
+|---|---|
+| `image` | jpg jpeg png gif webp svg bmp ico avif heic |
+| `video` | mp4 mkv mov avi webm flv wmv m4v |
+| `audio` | mp3 wav flac aac ogg m4a wma |
+| `document` | pdf doc docx txt rtf odt xls xlsx ppt pptx csv md |
+| `archive` | zip rar 7z tar gz bz2 xz iso dmg |
+| `code` | js ts jsx tsx html css scss json xml php py java go rs sh yml yaml sql |
+| `other` | everything else, including extension-free and dot-prefixed names |
 
-Folders are not in the taxonomy: `classifyFile` is only meaningful for regular files, and a folder
-has no bytes to attribute, so folders never appear in the Dashboard breakdown.
+**Guarded by `test/utils/fileTypes.test.js`**, which asserts the server and client extension sets
+are equal and that `fs.controller.js` carries no inline extension literal. Editing one side without
+the other fails the suite.
+
+Two breakdowns, two contracts — never cross-asserted:
+- the **listing** `counts` include `folder` (the chip row presents folders as a browsable type) and
+  `other`;
+- the **storage** breakdown (`emptyBreakdown()`, Dashboard donut) has no `folder` key — a folder has
+  no bytes to attribute.
+
+Effect of the reconciliation on the Dashboard: files previously counted as `other` (e.g. `.ts`,
+`.md`, `.bmp`) now fall into their real category, so the donut's slices shift. Recorded in ADR-003.

@@ -137,36 +137,18 @@
       <!-- Topbar -->
       <header class="topbar">
         <div class="topbar-left">
-          <button class="mobile-menu-btn" aria-label="Open menu">
+          <button type="button" class="mobile-menu-btn" aria-label="Open menu">
             <i data-icon="menu" data-icon-size="18"></i>
           </button>
-          <nav class="breadcrumb" id="breadcrumb" aria-label="Breadcrumb">
-            <span class="breadcrumb-item">Files</span>
-          </nav>
-        </div>
-
-        <div class="topbar-center">
-          <div class="search-field">
-            <i data-icon="search" data-icon-size="16" class="search-icon"></i>
-            <input id="globalSearch" class="search-input" type="search" placeholder="Search files, folders, users…"
-              aria-label="Global search">
-            <div class="search-kbd">
-              <span class="kbd kbd-mod">⌘</span>
-              <span class="kbd">K</span>
-            </div>
-          </div>
+          <nav class="breadcrumb" id="breadcrumb" aria-label="Breadcrumb"></nav>
         </div>
 
         <div class="topbar-right">
-          <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme" title="Toggle theme">
+          <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle theme" title="Toggle theme">
             <span class="icon-sun"><i data-icon="sun" data-icon-size="12"></i></span>
             <span class="icon-moon"><i data-icon="moon" data-icon-size="12"></i></span>
           </button>
-          <button class="btn-icon" data-tip="Notifications" aria-label="Notifications">
-            <i data-icon="bell" data-icon-size="16"></i>
-            <span class="notif-dot"></span>
-          </button>
-          <button class="btn btn-primary btn-sm" id="btnTopbarUpload">
+          <button type="button" class="btn btn-primary btn-sm" id="btnTopbarUpload">
             <i data-icon="plus" data-icon-size="15"></i>
             <span>Upload</span>
           </button>
@@ -183,22 +165,21 @@
               <span class="dot"></span>
               File Browser
             </span>
-            <h1 class="page-title">All files</h1>
-            <p class="page-subtitle">Browse, organize, and manage every file across your storage tiers with precision.
-            </p>
+            <h1 class="page-title" id="pageTitle">All files</h1>
+            <p class="page-subtitle" id="pageSubtitle">Browse, organize, and manage the files in your storage root.</p>
           </div>
 
           <div class="page-actions">
-            <button class="btn btn-ghost btn-sm" data-quick="newFolder">
+            <button type="button" class="btn btn-ghost btn-sm" id="btnNewFolder">
               <i data-icon="folderPlus" data-icon-size="15"></i>
               <span>New folder</span>
             </button>
-            <button class="btn btn-primary btn-sm" id="btnPageUpload">
+            <button type="button" class="btn btn-primary btn-sm" id="btnPageUpload">
               <i data-icon="upload" data-icon-size="15"></i>
               <span>Upload files</span>
             </button>
-            <!-- Hidden input for direct uploading -->
-            <input type="file" id="hiddenFileInput" multiple style="display: none;">
+            <!-- Opened by the two Upload buttons and the empty-folder action. -->
+            <input type="file" id="hiddenFileInput" multiple hidden aria-hidden="true" tabindex="-1">
           </div>
         </div>
 
@@ -207,156 +188,131 @@
           <div class="toolbar-left">
             <div class="search-field toolbar-search">
               <i data-icon="search" data-icon-size="15" class="search-icon"></i>
-              <input id="filesSearch" class="search-input" type="search" placeholder="Filter files by name…"
-                aria-label="Filter files">
+              <label for="filesSearch" class="sr-only">Search names in this folder</label>
+              <input id="filesSearch" class="search-input" type="search" placeholder="Search names in this folder…"
+                autocomplete="off">
             </div>
           </div>
 
           <div class="toolbar-right">
-            <div class="btn-group" role="tablist" aria-label="View mode">
-              <button class="btn-icon is-active" data-view="list" data-tip="List view" aria-label="List view">
+            <div class="btn-group" id="viewToggle" role="group" aria-label="View">
+              <button type="button" class="btn-icon is-active" data-view="list" data-tip="List view" aria-label="List view" aria-pressed="true">
                 <i data-icon="list" data-icon-size="15"></i>
               </button>
-              <button class="btn-icon" data-view="grid" data-tip="Grid view" aria-label="Grid view">
+              <button type="button" class="btn-icon" data-view="grid" data-tip="Grid view" aria-label="Grid view" aria-pressed="false">
                 <i data-icon="grid" data-icon-size="15"></i>
               </button>
             </div>
 
             <div class="dropdown">
-              <button class="btn btn-ghost btn-sm" data-dropdown="sortDropdown">
+              <button type="button" class="btn btn-ghost btn-sm" id="sortTrigger" data-dropdown="sortDropdown" aria-controls="sortDropdown">
                 <i data-icon="sort" data-icon-size="14"></i>
-                Sort
+                <span id="sortLabel">Sort</span>
               </button>
               <div class="dropdown-menu" id="sortDropdown">
-                <div class="dropdown-label">Sort by</div>
-                <button class="dropdown-item" data-sort-act="name"><i data-icon="fileText" data-icon-size="15"></i>
-                  Name</button>
-                <button class="dropdown-item" data-sort-act="size"><i data-icon="hardDrive" data-icon-size="15"></i>
-                  Size</button>
-                <button class="dropdown-item" data-sort-act="modified"><i data-icon="calendar" data-icon-size="15"></i>
-                  Date modified</button>
-                <button class="dropdown-item" data-sort-act="downloads"><i data-icon="download" data-icon-size="15"></i>
-                  Downloads</button>
+                <div class="dropdown-label">Sort by (choose again to reverse)</div>
+                <button type="button" class="dropdown-item" data-sort-act="name"><i data-icon="fileText" data-icon-size="15"></i>
+                  Name <span class="sort-dir"></span></button>
+                <button type="button" class="dropdown-item" data-sort-act="size"><i data-icon="hardDrive" data-icon-size="15"></i>
+                  Size <span class="sort-dir"></span></button>
+                <button type="button" class="dropdown-item" data-sort-act="modified"><i data-icon="calendar" data-icon-size="15"></i>
+                  Date modified <span class="sort-dir"></span></button>
+                <button type="button" class="dropdown-item" data-sort-act="downloads"><i data-icon="download" data-icon-size="15"></i>
+                  Downloads <span class="sort-dir"></span></button>
               </div>
             </div>
 
-            <div class="dropdown">
-              <button class="btn-icon is-bordered" data-dropdown="moreDropdown" data-tip="More actions">
-                <i data-icon="moreVertical" data-icon-size="16"></i>
-              </button>
-              <div class="dropdown-menu" id="moreDropdown">
-                <div class="dropdown-label">Actions</div>
-                <button class="dropdown-item">
-                  <i data-icon="download" data-icon-size="15"></i>
-                  Export list
-                  <span class="shortcut">CSV</span>
-                </button>
-                <button class="dropdown-item">
-                  <i data-icon="refresh" data-icon-size="15"></i>
-                  Refresh
-                </button>
-                <button class="dropdown-item">
-                  <i data-icon="scan" data-icon-size="15"></i>
-                  Scan for duplicates
-                </button>
-                <div class="dropdown-divider"></div>
-                <button class="dropdown-item">
-                  <i data-icon="sliders" data-icon-size="15"></i>
-                  Column settings
-                </button>
-              </div>
-            </div>
+            <button type="button" class="btn-icon is-bordered" id="btnRefresh" data-tip="Refresh" aria-label="Refresh">
+              <i data-icon="refresh" data-icon-size="16"></i>
+            </button>
           </div>
         </div>
 
         <!-- Filter chips row -->
-        <div class="filter-row" id="filterChips" style="margin-bottom:20px;"></div>
+        <div class="filter-row" id="filterChips" role="group" aria-label="Filter by type"></div>
 
         <!-- Layout: tree + content -->
-        <div
-          style="display:grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--spacing-20); align-items: start;">
+        <div class="files-layout">
 
           <!-- Folder tree -->
           <aside class="tree-panel" aria-label="Folder tree">
             <div class="tree-head">
-              <div class="tree-title">Folders</div>
-              <button class="btn-icon btn-icon-sm" data-quick="newFolder" data-tip="New folder">
+              <div class="tree-title" id="treeTitle">Folders</div>
+              <button type="button" class="btn-icon btn-icon-sm" id="btnTreeNewFolder" data-tip="New folder here" aria-label="New folder in the current folder">
                 <i data-icon="plus" data-icon-size="13"></i>
               </button>
             </div>
-            <div class="tree" id="folderTree"></div>
+            <div class="tree" id="folderTree" role="tree" aria-labelledby="treeTitle"></div>
           </aside>
 
           <!-- Files container (list or grid) -->
-          <section id="filesContainer" aria-label="Files"></section>
+          <section id="filesContainer" class="files-container" aria-label="Files"></section>
         </div>
+
+        <!-- Announces result counts and selection changes the operator would otherwise miss. -->
+        <div id="filesStatus" class="sr-only" role="status" aria-live="polite"></div>
       </div>
     </main>
   </div>
 
   <!-- ══════════════════════════════════════════
        BULK ACTION BAR
+       Acts on the selected items of the current page only.
        ══════════════════════════════════════════ -->
-  <div class="bulk-bar" id="bulkBar" role="toolbar" aria-label="Bulk actions">
-    <div class="bulk-count"><span class="num">0</span> selected</div>
+  <div class="bulk-bar" id="bulkBar" role="toolbar" aria-label="Actions for selected items" aria-hidden="true" inert>
+    <div class="bulk-count"><span class="num">0</span> selected <span class="bulk-scope">on this page</span></div>
     <div class="divider-v"></div>
     <div class="bulk-actions">
-      <button class="btn-icon" id="bulkDownload" data-tip="Download selected">
+      <button type="button" class="btn-icon" id="bulkDownload" data-tip="Download selected" aria-label="Download selected">
         <i data-icon="download" data-icon-size="16"></i>
       </button>
-      <button class="btn-icon" id="bulkMove" data-tip="Move to folder">
-        <i data-icon="move" data-icon-size="16"></i>
-      </button>
-      <button class="btn-icon" id="bulkShare" data-tip="Share">
-        <i data-icon="share" data-icon-size="16"></i>
-      </button>
-      <button class="btn-icon" id="bulkStar" data-tip="Star">
+      <button type="button" class="btn-icon" id="bulkStar" data-tip="Star or unstar selected" aria-label="Star or unstar selected">
         <i data-icon="star" data-icon-size="16"></i>
       </button>
-      <button class="btn-icon" id="bulkRename" data-tip="Rename">
-        <i data-icon="edit" data-icon-size="16"></i>
-      </button>
-      <button class="btn-icon" id="bulkDelete" data-tip="Delete">
+      <button type="button" class="btn-icon" id="bulkDelete" data-tip="Delete selected permanently" aria-label="Delete selected permanently">
         <i data-icon="trash" data-icon-size="16"></i>
       </button>
     </div>
     <div class="divider-v"></div>
-    <button class="btn-icon btn-icon-sm" id="bulkClear" data-tip="Clear selection">
+    <button type="button" class="btn-icon btn-icon-sm" id="bulkClear" data-tip="Clear selection" aria-label="Clear selection">
       <i data-icon="x" data-icon-size="15"></i>
     </button>
   </div>
 
   <!-- ══════════════════════════════════════════
-       FILE DETAILS DRAWER
+       FILE DETAILS DRAWER (modal dialog)
        ══════════════════════════════════════════ -->
-  <aside class="drawer" id="fileDrawer" aria-label="File details" aria-hidden="true">
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <aside class="drawer" id="fileDrawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" aria-hidden="true" tabindex="-1">
     <div class="drawer-header">
-      <div class="drawer-title">File details</div>
-      <button class="btn-icon btn-icon-sm" id="drawerClose" data-tip="Close" aria-label="Close details">
+      <h2 class="drawer-title" id="drawerTitle">File details</h2>
+      <button type="button" class="btn-icon btn-icon-sm" id="drawerClose" data-tip="Close" aria-label="Close details">
         <i data-icon="x" data-icon-size="15"></i>
       </button>
     </div>
     <div class="drawer-body"></div>
-    <div class="drawer-footer">
-      <button class="btn btn-ghost btn-sm">
-        <i data-icon="share" data-icon-size="14"></i>
-        Share
-      </button>
-      <button class="btn btn-primary btn-sm" style="flex:1;">
-        <i data-icon="download" data-icon-size="14"></i>
-        Download
-      </button>
-    </div>
+    <div class="drawer-footer"></div>
   </aside>
+
+  <!-- ══════════════════════════════════════════
+       UPLOAD TRAY — per-file progress, cancel, and outcome
+       ══════════════════════════════════════════ -->
+  <section class="upload-tray" id="uploadTray" aria-label="Uploads" hidden>
+    <div class="upload-tray-head">
+      <span class="upload-summary"></span>
+      <button type="button" class="btn btn-ghost btn-sm" data-upload-dismiss hidden>Dismiss</button>
+    </div>
+    <ul class="upload-list"></ul>
+  </section>
 
   <!-- ══════════════════════════════════════════
        DRAG & DROP OVERLAY
        ══════════════════════════════════════════ -->
-  <div class="drop-overlay" id="dropOverlay">
+  <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
     <div class="drop-inner">
       <i data-icon="uploadCloud" data-icon-size="44"></i>
-      <div class="drop-title">Drop files to upload</div>
-      <div class="drop-desc">Release to add files to your queue</div>
+      <div class="drop-title">Drop files or folders to upload</div>
+      <div class="drop-desc">They are uploaded into the folder you are browsing</div>
     </div>
   </div>
 
