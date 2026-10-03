@@ -23,17 +23,27 @@ This document tracks the step-by-step migration of the Dimension frontend from a
 ## 👤 Phase 2: Global Data & Sidebar Dynamic Injection
 - [x] Remove hardcoded user information (Name, Role, Avatar) from HTML sidebars.
 - [x] Remove hardcoded storage quota numbers (e.g., "342 GB of 500 GB").
-- [x] Create a `loadGlobalData()` fetcher in `app.js` that calls `/api/user/profile` and `/api/storage/quota`.
-- [x] Implement graceful fallbacks so the UI doesn't break if the backend is offline.
-- [x] Dynamically render the storage progress bar based on actual Linux disk usage stats.
+- [x] Create a `loadGlobalData()` fetcher in `app.js`. **Rewritten in Phase 6:** it originally called
+      `/api/user/profile` and `/api/storage/quota`, neither of which exists — so both catch-blocks fired on every
+      page load and rendered fabricated fallbacks ("Linux Admin", `342 GB of 500 GB`). It now calls
+      `GET /api/health` and `GET /api/dashboard/summary`.
+- [x] Handle backend failure without breaking the UI. **Corrected in Phase 6:** this was implemented as graceful
+      *fallbacks* that invented values. It is now graceful *degradation* — an explicit unavailable state, never a
+      substitute number.
+- [x] Dynamically render the storage progress bar from real volume capacity. Cross-platform via
+      `fs.promises.statfs` with no platform gate (it was originally specified as "Linux disk usage stats").
 
 ---
 
 ## 📊 Phase 3: Dashboard API Connection (`js/dashboard.js`)
-- [x] Remove all static mock arrays (`stats`, `chartData`, `storageBreakdown`, `activities`, `topFiles`, `serverHealth`).
+- [x] Remove all static mock arrays. The fields named here as `chartData` and `serverHealth` never matched the
+      code — they were `traffic` and `health`. `traffic` has since been **removed entirely**, so the live set is
+      `stats`, `storage`, `storageBreakdown`, `activities`, `topFiles`, `health`.
 - [x] Fetch aggregate telemetry data from `/api/dashboard/summary` on page load.
-- [x] Bind fetched data to the Top Stat Cards (with sparklines).
-- [x] Bind fetched data to the Traffic Bar Chart and Storage Donut Chart (SVG).
+- [x] Bind fetched data to the Top Stat Cards. **Sparklines removed in Phase 6** — the app retains no history, so a
+      sparkline has no series to plot and a fabricated one is worse than none.
+- [x] Bind fetched data to the Storage Donut (SVG). **The traffic bar chart was removed in Phase 6** for the same
+      reason: no retained history, so no honest series exists.
 - [x] Bind fetched data to the Activity Feed and Top Downloads lists.
 - [x] Remove the fake `setInterval` randomizer and replace it with a lightweight polling mechanism calling `/api/dashboard/health` for live server telemetry.
 
@@ -44,15 +54,20 @@ This document tracks the step-by-step migration of the Dimension frontend from a
 - [x] Fetch the Folder Tree hierarchy from `/api/fs/tree`.
 - [x] Fetch directory contents using `/api/fs/list?path=...`.
 - [x] Shift Pagination, Sorting, Searching, and Type Filtering to the backend (passed as URL Query Parameters).
-- [x] Replace hardcoded IDs with absolute OS paths (e.g., `/media/videos`).
-- [x] Dynamically generate the top breadcrumb navigation by splitting the current OS path string.
+- [x] Build paths for the API. **Corrected:** this originally said *absolute OS paths*, which contradicts
+      `AGENTS.md` rule 2 — the API speaks only in POSIX client paths rooted at `/`, and absolute `securePath`
+      values never leave the services layer.
+- [x] Dynamically generate the top breadcrumb navigation by splitting the client path string (not an OS path).
 
 ---
 
 ## ✍️ Phase 5: File Browser - Mutations & Actions (`js/files.js`)
-- [x] Connect the "New Folder" prompt to `POST /api/fs/folder` (maps to Linux `mkdir`).
-- [x] Connect the "Rename" prompt to `PUT /api/fs/rename` (maps to Linux `mv`).
-- [x] Connect "Delete" and "Bulk Delete" to `DELETE /api/fs/delete` (maps to Linux `rm -rf` or moving to `.trash`).
+- [x] Connect the "New Folder" prompt to `POST /api/fs/folder`.
+- [x] Connect the "Rename" prompt to `PUT /api/fs/rename`. Same-directory only, by design — cross-directory moves
+      need a dedicated API.
+- [x] Connect "Delete" and "Bulk Delete" to `DELETE /api/fs/delete`. **Corrected:** this originally said
+      "moving to `.trash`". There is **no trash and no recycle bin** — deletion is permanent `fs.rm` recursion, as
+      `AGENTS.md` states. Any copy implying otherwise is wrong.
 - [x] Ensure `loadFiles()` and `loadTree()` are called after successful mutations to keep the UI strictly synced with the server disk.
 - [x] Update Context Menu and Row actions to trigger real API handlers.
 

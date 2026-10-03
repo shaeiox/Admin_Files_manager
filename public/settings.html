@@ -32,6 +32,9 @@
          SIDEBAR
          ══════════════════════════════════════════ -->
     <aside class="sidebar" aria-label="Primary navigation">
+      <!-- Shared sidebar. Duplicated byte-for-byte in index.html, files.html,
+           uploads.html and settings.html (no templating, no build step); a test
+           asserts the four copies are identical, so edit all four together. -->
       <div class="sidebar-header">
         <a href="index.html" class="brand" aria-label="Dimension home">
           <div class="brand-mark">
@@ -48,6 +51,8 @@
       </div>
 
       <div class="sidebar-body">
+
+        <!-- Overview group -->
         <div class="nav-group">
           <div class="nav-group-label">Overview</div>
           <a class="nav-item" href="index.html" data-nav="dashboard">
@@ -57,47 +62,36 @@
           <a class="nav-item" href="files.html" data-nav="files">
             <span class="nav-icon"><i data-icon="folder" data-icon-size="18"></i></span>
             <span class="nav-label">All Files</span>
-            <span class="nav-badge is-neutral">24.8K</span>
           </a>
           <a class="nav-item" href="uploads.html" data-nav="uploads">
             <span class="nav-icon"><i data-icon="uploadCloud" data-icon-size="18"></i></span>
             <span class="nav-label">Uploads</span>
-            <span class="nav-badge">Live</span>
-          </a>
-          <a class="nav-item" href="files.html" data-nav="downloads">
-            <span class="nav-icon"><i data-icon="download" data-icon-size="18"></i></span>
-            <span class="nav-label">Downloads</span>
           </a>
         </div>
 
+        <!-- Library group. Each entry is a real listing view of files.html
+             (see files.js LIBRARY_VIEWS); there is no sharing primitive and
+             deletion is permanent, so there is no Shared or Trash entry. -->
         <div class="nav-group">
           <div class="nav-group-label">Library</div>
-          <a class="nav-item" href="files.html">
+          <a class="nav-item" href="files.html?view=starred" data-nav-view="starred">
             <span class="nav-icon"><i data-icon="star" data-icon-size="18"></i></span>
             <span class="nav-label">Starred</span>
           </a>
-          <a class="nav-item" href="files.html">
-            <span class="nav-icon"><i data-icon="users" data-icon-size="18"></i></span>
-            <span class="nav-label">Shared</span>
-          </a>
-          <a class="nav-item" href="files.html">
+          <a class="nav-item" href="files.html?view=recent" data-nav-view="recent">
             <span class="nav-icon"><i data-icon="clock" data-icon-size="18"></i></span>
             <span class="nav-label">Recent</span>
           </a>
-          <a class="nav-item" href="files.html">
-            <span class="nav-icon"><i data-icon="trash" data-icon-size="18"></i></span>
-            <span class="nav-label">Trash</span>
-            <span class="nav-badge is-neutral">217</span>
+          <a class="nav-item" href="files.html?view=downloads" data-nav-view="downloads">
+            <span class="nav-icon"><i data-icon="download" data-icon-size="18"></i></span>
+            <span class="nav-label">Top downloads</span>
           </a>
         </div>
 
+        <!-- System group -->
         <div class="nav-group">
           <div class="nav-group-label">System</div>
-          <a class="nav-item" href="#">
-            <span class="nav-icon"><i data-icon="activity" data-icon-size="18"></i></span>
-            <span class="nav-label">Analytics</span>
-          </a>
-          <a class="nav-item" href="#">
+          <a class="nav-item" href="index.html#serverHealth">
             <span class="nav-icon"><i data-icon="server" data-icon-size="18"></i></span>
             <span class="nav-label">Server Health</span>
           </a>
@@ -107,30 +101,34 @@
           </a>
         </div>
 
-        <div class="storage-card">
+        <!-- Storage card — populated by AFM.updateStorageUI (see p6-contract seam 1).
+             No figure is asserted here: an unmeasured capacity must not render 0%. -->
+        <div class="storage-card" role="group" aria-label="Storage usage">
           <div class="storage-head">
             <span class="storage-title">Storage</span>
-            <span class="storage-pct">68%</span>
+            <span class="storage-pct">—</span>
           </div>
           <div class="storage-bar">
-            <div class="storage-fill" style="width: 68%"></div>
+            <div class="storage-fill" data-state="unavailable"></div>
           </div>
-          <div class="storage-meta">342 GB of 500 GB used</div>
+          <div class="storage-meta"></div>
         </div>
       </div>
 
+      <!-- Sidebar footer — populated by AFM.updateUserUI (see p6-contract seam 2).
+           This application has no user API and no authentication, so there is no
+           person to name: these elements stay empty until the environment is known.
+           It is a label, not a control, so it carries no button role. -->
       <div class="sidebar-footer">
-        <div class="sidebar-user" role="button" tabindex="0" aria-label="User menu">
-          <div class="user-avatar">?</div>
+        <div class="sidebar-user" role="group" aria-label="Environment">
+          <div class="user-avatar"></div>
           <div class="user-info">
-            <div class="user-name">Loading...</div>
-            <div class="user-role">...</div>
-          </div>
-          <div class="chev" style="color:var(--text-tertiary)">
-            <i data-icon="chevronsUpDown" data-icon-size="14"></i>
+            <div class="user-name"></div>
+            <div class="user-role"></div>
           </div>
         </div>
       </div>
+    </aside>
 
       <!-- ══════════════════════════════════════════
          MAIN AREA
@@ -524,39 +522,29 @@
                       <i data-icon="hardDrive" data-icon-size="18"></i>
                       Storage quota
                     </div>
-                    <div class="sg-desc">Current usage across all storage tiers.</div>
+                    <div class="sg-desc">There is no quota system in this build — volume usage is reported on the Dashboard.</div>
                   </div>
 
+                  <!--
+                    Quota panel.
+
+                    The previous version rendered a fabricated stacked bar
+                    (29% / 16.4% / 10.8% / 7.6% / 4.6%) and a legend totalling exactly
+                    342 GB, sitting beside an already-emptied headline figure. That
+                    inconsistency was introduced when the fabricated "342 GB of 500 GB"
+                    string was removed during Phase 6.
+
+                    There is no quota system, no storage tiering, and no handler bound to
+                    this panel (settings.js references none of it), so no honest per-category
+                    figure exists here. Rather than substitute a different invented number,
+                    the panel states the figure is unavailable and points at the Dashboard,
+                    which does report real volume usage.
+                  -->
                   <div class="quota-panel">
-                    <div class="quota-top">
-                      <div class="quota-used">
-                        342 GB <span class="of">of 500 GB</span>
-                      </div>
-                      <button class="btn btn-primary btn-sm">
-                        <i data-icon="arrowUp" data-icon-size="14"></i>
-                        Upgrade quota
-                      </button>
-                    </div>
-
-                    <div class="quota-bar">
-                      <div class="quota-seg" style="width:29%; background:#a78bfa;" data-tip="Videos"></div>
-                      <div class="quota-seg" style="width:16.4%; background:#f472b6;" data-tip="Images"></div>
-                      <div class="quota-seg" style="width:10.8%; background:#60a5fa;" data-tip="Documents"></div>
-                      <div class="quota-seg" style="width:7.6%; background:#fbbf24;" data-tip="Archives"></div>
-                      <div class="quota-seg" style="width:4.6%; background:#34d399;" data-tip="Other"></div>
-                    </div>
-
-                    <div class="quota-legend">
-                      <div class="ql-item"><span class="ql-swatch" style="background:#a78bfa"></span><span
-                          class="ql-name">Videos</span><span class="ql-val">145 GB</span></div>
-                      <div class="ql-item"><span class="ql-swatch" style="background:#f472b6"></span><span
-                          class="ql-name">Images</span><span class="ql-val">82 GB</span></div>
-                      <div class="ql-item"><span class="ql-swatch" style="background:#60a5fa"></span><span
-                          class="ql-name">Documents</span><span class="ql-val">54 GB</span></div>
-                      <div class="ql-item"><span class="ql-swatch" style="background:#fbbf24"></span><span
-                          class="ql-name">Archives</span><span class="ql-val">38 GB</span></div>
-                      <div class="ql-item"><span class="ql-swatch" style="background:#34d399"></span><span
-                          class="ql-name">Other</span><span class="ql-val">23 GB</span></div>
+                    <div class="setting-hint">
+                      Quota breakdown unavailable &mdash; this build has no quota or
+                      storage-tier system. Live volume usage and a real per-file-type
+                      breakdown are reported on the <a href="/">Dashboard</a>.
                     </div>
                   </div>
                 </div>
@@ -570,39 +558,6 @@
                     <div class="sg-desc">Automate cleanup and tier transitions.</div>
                   </div>
                   <div class="sg-body">
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Trash retention</div>
-                        <div class="setting-hint">How long deleted files stay recoverable before permanent removal.
-                        </div>
-                      </div>
-                      <div class="setting-control">
-                        <select class="select">
-                          <option>7 days</option>
-                          <option selected>30 days</option>
-                          <option>90 days</option>
-                          <option>Never delete</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Move to cold storage after</div>
-                        <div class="setting-hint">Files untouched for this period are moved to slower, cheaper storage.
-                        </div>
-                      </div>
-                      <div class="setting-control">
-                        <select class="select">
-                          <option>Never</option>
-                          <option>30 days</option>
-                          <option selected>90 days</option>
-                          <option>180 days</option>
-                          <option>1 year</option>
-                        </select>
-                      </div>
-                    </div>
-
                     <div class="setting-row">
                       <div class="setting-info">
                         <div class="setting-name">Auto-purge temp folder</div>
@@ -753,73 +708,28 @@
                   </div>
 
                   <div class="sg-body">
-                    <div class="token-row">
-                      <div class="token-ico"><i data-icon="key" data-icon-size="15"></i></div>
-                      <div class="token-body">
-                        <div class="token-name">
-                          Production API
-                          <span class="badge badge-success badge-dot">Active</span>
-                        </div>
-                        <div class="token-key">
-                          <span>dim_live_</span><span class="masked">••••••••••••••••</span><span>a8f2</span>
-                          <button class="btn-icon btn-icon-sm" data-tip="Copy" data-copy="dim_live_a8f2">
-                            <i data-icon="copy" data-icon-size="13"></i>
-                          </button>
-                        </div>
-                      </div>
-                      <div class="token-meta">
-                        Created Jan 4<br>
-                        Last used 2m ago
-                      </div>
-                    </div>
+                    <!--
+                      API keys.
 
-                    <div class="token-row">
-                      <div class="token-ico"><i data-icon="key" data-icon-size="15"></i></div>
-                      <div class="token-body">
-                        <div class="token-name">
-                          Staging Deploy
-                          <span class="badge badge-success badge-dot">Active</span>
-                        </div>
-                        <div class="token-key">
-                          <span>dim_test_</span><span class="masked">••••••••••••••••</span><span>3b17</span>
-                          <button class="btn-icon btn-icon-sm" data-tip="Copy" data-copy="dim_test_3b17">
-                            <i data-icon="copy" data-icon-size="13"></i>
-                          </button>
-                        </div>
-                      </div>
-                      <div class="token-meta">
-                        Created Feb 12<br>
-                        Last used 3h ago
-                      </div>
-                    </div>
+                      This previously listed three fabricated credentials
+                      (dim_live_a8f2, dim_test_3b17, dim_live_c412) each with a working
+                      Copy button bound by initCopyButtons() in app.js - so a user could
+                      copy a non-existent secret to the clipboard and treat it as live.
 
-                    <div class="token-row">
-                      <div class="token-ico"><i data-icon="key" data-icon-size="15"></i></div>
-                      <div class="token-body">
-                        <div class="token-name">
-                          Legacy Migration
-                          <span class="badge badge-warning">Expiring soon</span>
-                        </div>
-                        <div class="token-key">
-                          <span>dim_live_</span><span class="masked">••••••••••••••••</span><span>c412</span>
-                          <button class="btn-icon btn-icon-sm" data-tip="Copy" data-copy="dim_live_c412">
-                            <i data-icon="copy" data-icon-size="13"></i>
-                          </button>
-                        </div>
-                      </div>
-                      <div class="token-meta">
-                        Created Oct 3, 2024<br>
-                        Expires in 6 days
-                      </div>
+                      There is no API-key backend: no route issues, validates or stores
+                      keys, and the application ships with no authentication. The rows are
+                      removed rather than replaced with different invented secrets.
+                    -->
+                    <div class="setting-hint">
+                      No API keys are configured — this build has no programmatic-access
+                      system. Keys are not issued, stored or validated, so none can be shown
+                      or copied here.
                     </div>
                   </div>
 
                   <div class="sg-footer">
-                    <div class="sg-footer-note">API keys grant full access. Never share them publicly.</div>
-                    <button class="btn btn-primary btn-sm">
-                      <i data-icon="plus" data-icon-size="14"></i>
-                      Generate new key
-                    </button>
+                    <div class="sg-footer-note">API keys are unavailable in this build.</div>
+
                   </div>
                 </div>
 
@@ -1018,7 +928,7 @@
                     <div class="setting-row">
                       <div class="setting-info">
                         <div class="setting-name">Empty trash</div>
-                        <div class="setting-hint">Permanently delete all 217 files currently in the trash.</div>
+                        <div class="setting-hint">Permanently delete every file currently in the trash.</div>
                       </div>
                       <div class="setting-control">
                         <button class="btn btn-danger btn-sm" data-danger="empty-trash">
@@ -1059,8 +969,7 @@
                     <div class="setting-row">
                       <div class="setting-info">
                         <div class="setting-name">Delete workspace</div>
-                        <div class="setting-hint">Permanently delete this workspace and all 24,837 files. There is no
-                          recovery.</div>
+                        <div class="setting-hint">Permanently delete this workspace and all of its files. There is no recovery.</div>
                       </div>
                       <div class="setting-control">
                         <button class="btn btn-danger btn-sm" data-danger="delete-workspace">
@@ -1191,19 +1100,19 @@
           const configs = {
             'empty-trash': {
               title: 'Empty trash permanently?',
-              message: 'All 217 files in the trash will be permanently deleted. This action cannot be undone.',
+              message: 'Every file in the trash will be permanently deleted. This action cannot be undone.',
               confirmText: 'Empty trash',
-              onConfirm: () => Toast.success('Trash emptied', '217 files permanently deleted'),
+              onConfirm: () => Toast.success('Trash emptied', 'Files in the trash permanently deleted'),
             },
             'revoke-keys': {
               title: 'Revoke all API keys?',
-              message: 'All 3 active API keys will be invalidated immediately. Any integration using them will stop working.',
+              message: 'No API keys exist in this build, so there is nothing to revoke.',
               confirmText: 'Revoke all',
-              onConfirm: () => Toast.success('API keys revoked', 'All 3 keys have been invalidated'),
+              onConfirm: () => Toast.info('No API keys', 'This build has no programmatic-access system.'),
             },
             'delete-workspace': {
               title: 'Delete this workspace?',
-              message: 'This will permanently delete Dimension HQ and all 24,837 files. There is absolutely no recovery from this action.',
+              message: 'This will permanently delete this workspace and every file in it. There is absolutely no recovery from this action.',
               confirmText: 'Delete forever',
               onConfirm: () => Toast.error('Workspace scheduled for deletion', 'Contact support within 24h to cancel'),
             },

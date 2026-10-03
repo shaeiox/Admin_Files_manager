@@ -32,6 +32,9 @@
          SIDEBAR
          ══════════════════════════════════════════ -->
     <aside class="sidebar" aria-label="Primary navigation">
+      <!-- Shared sidebar. Duplicated byte-for-byte in index.html, files.html,
+           uploads.html and settings.html (no templating, no build step); a test
+           asserts the four copies are identical, so edit all four together. -->
       <div class="sidebar-header">
         <a href="index.html" class="brand" aria-label="Dimension home">
           <div class="brand-mark">
@@ -48,6 +51,8 @@
       </div>
 
       <div class="sidebar-body">
+
+        <!-- Overview group -->
         <div class="nav-group">
           <div class="nav-group-label">Overview</div>
           <a class="nav-item" href="index.html" data-nav="dashboard">
@@ -57,47 +62,36 @@
           <a class="nav-item" href="files.html" data-nav="files">
             <span class="nav-icon"><i data-icon="folder" data-icon-size="18"></i></span>
             <span class="nav-label">All Files</span>
-            <span class="nav-badge is-neutral">24.8K</span>
           </a>
           <a class="nav-item" href="uploads.html" data-nav="uploads">
             <span class="nav-icon"><i data-icon="uploadCloud" data-icon-size="18"></i></span>
             <span class="nav-label">Uploads</span>
-            <span class="nav-badge">Live</span>
-          </a>
-          <a class="nav-item" href="files.html" data-nav="downloads">
-            <span class="nav-icon"><i data-icon="download" data-icon-size="18"></i></span>
-            <span class="nav-label">Downloads</span>
           </a>
         </div>
 
+        <!-- Library group. Each entry is a real listing view of files.html
+             (see files.js LIBRARY_VIEWS); there is no sharing primitive and
+             deletion is permanent, so there is no Shared or Trash entry. -->
         <div class="nav-group">
           <div class="nav-group-label">Library</div>
-          <a class="nav-item" href="files.html">
+          <a class="nav-item" href="files.html?view=starred" data-nav-view="starred">
             <span class="nav-icon"><i data-icon="star" data-icon-size="18"></i></span>
             <span class="nav-label">Starred</span>
           </a>
-          <a class="nav-item" href="files.html">
-            <span class="nav-icon"><i data-icon="users" data-icon-size="18"></i></span>
-            <span class="nav-label">Shared</span>
-          </a>
-          <a class="nav-item" href="files.html">
+          <a class="nav-item" href="files.html?view=recent" data-nav-view="recent">
             <span class="nav-icon"><i data-icon="clock" data-icon-size="18"></i></span>
             <span class="nav-label">Recent</span>
           </a>
-          <a class="nav-item" href="files.html">
-            <span class="nav-icon"><i data-icon="trash" data-icon-size="18"></i></span>
-            <span class="nav-label">Trash</span>
-            <span class="nav-badge is-neutral">217</span>
+          <a class="nav-item" href="files.html?view=downloads" data-nav-view="downloads">
+            <span class="nav-icon"><i data-icon="download" data-icon-size="18"></i></span>
+            <span class="nav-label">Top downloads</span>
           </a>
         </div>
 
+        <!-- System group -->
         <div class="nav-group">
           <div class="nav-group-label">System</div>
-          <a class="nav-item" href="#">
-            <span class="nav-icon"><i data-icon="activity" data-icon-size="18"></i></span>
-            <span class="nav-label">Analytics</span>
-          </a>
-          <a class="nav-item" href="#">
+          <a class="nav-item" href="index.html#serverHealth">
             <span class="nav-icon"><i data-icon="server" data-icon-size="18"></i></span>
             <span class="nav-label">Server Health</span>
           </a>
@@ -107,27 +101,30 @@
           </a>
         </div>
 
-        <div class="storage-card">
+        <!-- Storage card — populated by AFM.updateStorageUI (see p6-contract seam 1).
+             No figure is asserted here: an unmeasured capacity must not render 0%. -->
+        <div class="storage-card" role="group" aria-label="Storage usage">
           <div class="storage-head">
             <span class="storage-title">Storage</span>
-            <span class="storage-pct">68%</span>
+            <span class="storage-pct">—</span>
           </div>
           <div class="storage-bar">
-            <div class="storage-fill" style="width: 68%"></div>
+            <div class="storage-fill" data-state="unavailable"></div>
           </div>
-          <div class="storage-meta">342 GB of 500 GB used</div>
+          <div class="storage-meta"></div>
         </div>
       </div>
 
+      <!-- Sidebar footer — populated by AFM.updateUserUI (see p6-contract seam 2).
+           This application has no user API and no authentication, so there is no
+           person to name: these elements stay empty until the environment is known.
+           It is a label, not a control, so it carries no button role. -->
       <div class="sidebar-footer">
-        <div class="sidebar-user" role="button" tabindex="0" aria-label="User menu">
-          <div class="user-avatar">?</div>
+        <div class="sidebar-user" role="group" aria-label="Environment">
+          <div class="user-avatar"></div>
           <div class="user-info">
-            <div class="user-name">Loading...</div>
-            <div class="user-role">...</div>
-          </div>
-          <div class="chev" style="color:var(--text-tertiary)">
-            <i data-icon="chevronsUpDown" data-icon-size="14"></i>
+            <div class="user-name"></div>
+            <div class="user-role"></div>
           </div>
         </div>
       </div>

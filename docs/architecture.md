@@ -6,19 +6,55 @@
 
 ---
 
+## 0. Status of This Document — read before trusting any section
+
+This document was written when the project was a **frontend-only prototype with mocked data**. That
+era is over: there is now an Express 5 backend, a real filesystem, and a JSON metadata store. The
+document was not fully rewritten, so its sections are **not uniformly current**. Determine what to
+believe like this:
+
+| Section | Trust |
+|---|---|
+| §3–§8 (design system, tokens, theme, layout, components, `app.js` helpers) | ✅ Current |
+| §10–§14 (HTML conventions, breakpoints, motion, checklists) | ✅ Current |
+| **§15 (backend integration + Dashboard data path)** | ✅ Current — rewritten against the running server |
+| §1, §2, §9.1–§9.4, §18, §19 | ⚠ Corrected where they were factually wrong; still a **frontend-era** document, so treat the code as the source of truth |
+| `docs/STRUCTURE.md` | ❌ Superseded by `docs/REPO_MAP.md` |
+
+**When this document and the code disagree, the code wins** — except for `docs/CONTRACTS.md`, which
+is the schema contract and is authoritative on payload shapes. Use `docs/REPO_MAP.md` for
+navigation and `AGENTS.md` for the rules that are enforced.
+
+**One thing this document will never tell you, because it is not true:** there is no time-series
+store, no snapshot table, and no retained log. Every figure the Dashboard shows is instantaneous.
+Anything described here as a trend, a chart, a period comparison, or a percentage change was
+removed rather than faked — see §15.5.
+
+---
+
 ## 1. Project Identity
 
 **Name:** Dimension — Admin Files Manager for Download
-**Type:** Multi-page vanilla HTML/CSS/JS admin panel (no build step, no framework)
+**Type:** Multi-page vanilla HTML/CSS/JS admin panel (no build step, no framework) served by an
+Express 5 REST API over a sandboxed `STORAGE_ROOT`
 **Design system:** "Dimension" — dusk-lit workspace with frosted glass panels
 **Themes:** Dark (default) + Light + System
 **Target:** Modern browsers (Chrome, Safari, Firefox, Edge — latest 2 versions)
 
-The app is a **client-side prototype/UI shell**. All data is mocked in memory. There is no backend, no real upload endpoint, no persistence beyond `localStorage` for user preferences.
+The frontend is served as static files with no build step, but it is **not** a mockup: every
+Dashboard figure, every file listing, every upload and every download goes through the API. The
+filesystem is the database; a JSON file at `data/metadata.json` (created lazily at runtime, not
+checked in) tracks downloads, stars, and activity. See `docs/REPO_MAP.md` for the module layout and
+`docs/CONTRACTS.md` for payload schemas.
 
 ---
 
 ## 2. File Structure
+
+⚠ **Frontend-era tree.** The real layout has a `src/` backend and a `test/` suite that this section
+does not show, and the paths below are relative to `public/`, not the repository root. **Use
+`docs/REPO_MAP.md` for the actual map** — this listing is kept only because it names the frontend
+assets the later sections refer to.
 
 ```
 admin-files-manager/
@@ -522,22 +558,56 @@ Each page module is an IIFE-style singleton exposed on `window`. They only initi
 
 ### 9.1 Dashboard (`js/dashboard.js` — for `index.html`)
 
-**Renders (all mock data inside module):**
-- 4 stat cards with animated counters + sparklines
-- 14-day stacked bar chart (Uploads/Downloads/Shares)
-- Storage donut (SVG, 6 segments, animated stroke-dashoffset)
-- Activity feed (7 items)
-- Top downloads rank list (5 items)
-- Numbered capabilities list (7 items)
-- Server health (5 metrics with progress bars)
-- Quick actions grid (6 tiles)
+**Renders (every figure comes from the API — nothing here is mocked):**
 
-**Live updates:** `startLiveUpdates()` nudges server health values every 4.2s to simulate real-time.
+| Panel | Source field | Notes |
+|---|---|---|
+| Stat cards (3–4) | `stats[]` | `files`, `folders`, `treeBytes` always; a 4th `volume` card only when `storage.volumeAvailable` |
+| Storage line | `storage` | Volume used / total; renders the em-dash when unmeasured, never `0` |
+| Storage donut | `storageBreakdown[]` | SVG arcs + legend; rows with `bytes === 0` are omitted, folders never appear |
+| Activity feed | `activities[]` | Up to 8, from the metadata store |
+| Top downloads | `topFiles[]` | Up to 5, pruned to paths that still exist |
+| Capabilities list | derived from which payload fields arrived | Statements about the code, each gated on its own evidence — none carries a figure |
+| Server health | `health[]` | `Memory used` (%) and `Uptime` (s). **No status/level field and no progress bars** — there is no threshold source, so no verdict is asserted |
+| Quick actions | static list in the module | 4 tiles, each mapped to an endpoint or page that actually exists |
+
+**There is no chart, no sparkline, no trend and no period comparison.** Not because they were
+forgotten — the application retains no history, so those would be numbers nothing measured. The
+affordances were removed. See §15.5.
+
+**`null` vs `[]` in state is load-bearing.** `null` means "the server did not send this field"
+(→ unavailable); `[]` means "the server sent an empty collection" (→ empty). Collapsing the two is
+what previously made a missing reading look like a real zero.
+
+**State shape:**
+```js
+state = {
+  loading, errored,            // summary request
+  healthLoading, healthErrored, // metrics request
+  stats, storage, storageBreakdown, activities, topFiles, health,  // null until fetched
+}
+```
+There is no `state.all` and no chart series collection.
+
+**Request flow:**
+- `loadSummary()` → `GET /api/dashboard/summary` (bare object, no envelope to unwrap), then `renderAll()`
+- `readHealth()` → `GET /api/dashboard/health` (bare array), polled every 5 s. **Skipped entirely while
+  `document.visibilityState !== 'visible'`**, so a background tab costs nothing.
+- `renderAll()` calls, in order: `renderVolumeLine`, `renderStats`, `renderDonut`, `renderActivity`,
+  `renderTopFiles`, `renderCapabilities`, `renderHealth`.
+- **There is no second request for a trend.** Only the two endpoints above are called.
+
+Each panel maps its inputs onto exactly one of seven states —
+`loading | success | empty | unavailable | partial | error` — via `resolvePanelState()`, with
+deliberate precedence: an in-flight panel is `loading` even if it is also broken; a failed request is
+`error` even if the field was missing; a field the server never sent is `unavailable` even when rows
+exist.
 
 **Interactions:**
-- Quick action tiles with `data-quick` attribute → handled in `bindActions()`
-- Refresh button → re-renders stats and chart
-- Donut legend hover → highlights corresponding segment
+- Quick action tiles → handled in `bindActions()`
+- Refresh button → re-runs `loadSummary()` (all panels)
+- Donut legend row hover → highlights the matching arc (this is the **storage donut** legend; it has
+  no connection to the removed traffic chart)
 
 ### 9.2 Files Browser (`js/files.js` — for `files.html`)
 
@@ -584,31 +654,36 @@ User action → mutate state → applyFilters() → renderView() → bindRowInte
 
 ### 9.3 Uploads Manager (`js/uploads.js` — for `uploads.html`)
 
-**Simulated upload engine** — no real network calls.
+**Real upload engine** — `window.API.upload('/fs/upload', formData, onProgress)` over XHR (needed for
+progress events, which `fetch` does not support natively), with per-file abort. ⚠ The **speed graph**
+(`state.metrics.speedHistory`) is still sampled from a local 1 s timer, so it is a live throughput
+readout for the current session — **not** history.
 
 **State:**
 ```js
 state = {
   queue: [{ id, name, size, uploaded, speed, status, ... }],
-  concurrency: 3,
+  concurrency: 3,           // set by the selected preset
   activeCount: 0,
-  destination: '/releases/2025',
+  destination: '/',         // client path under STORAGE_ROOT, sent as formData 'destination'
   preset: 'balanced',
   options: { autoStart, overwrite, preservePath, compress },
   metrics: { totalFiles, totalUploaded, totalBytes, bytesUploaded, speedHistory },
-  ticker: null,  // setInterval handle
+  metricsTimer: null,       // setInterval handle for the 1 s metrics/speed sampler
 }
 ```
+⚠ There is no `ticker` and no `tick()` — the old simulated byte-jitter loop was removed when the
+engine became real. `metricsTimer` only drives the speed readout.
 
 **Upload lifecycle:**
 ```
 addFiles() → status='queued'
-  → startUploads() → setInterval(tick, 200ms)
+  → startUploads()
     → fillActive() promotes queued to 'uploading' (up to concurrency)
-    → tick() increments uploaded bytes with jitter, random 0.15% failure chance
-    → on complete: status='done', Toast fires, next queued item starts
+    → XHR upload begins; onprogress updates 'uploaded'/'speed' in place
+    → on complete: status='done', Toast fires, fillActive() starts the next queued item
     → on error: status='failed', can be retried
-  → when queue idle: clearInterval, ticker=null
+    → when the queue is idle, no further uploads are started
 ```
 
 **Item states:** `queued` → `uploading` → `done` | `failed` | `paused`
@@ -616,17 +691,21 @@ addFiles() → status='queued'
 **UI updates:**
 - `renderQueue()` — full re-render (used on add/remove)
 - `renderQueueItem(id)` — targeted single-item re-render (status changes)
-- `updateItemProgress(item)` — DOM-only micro-update per tick (no innerHTML)
+- progress updates — DOM-only micro-updates, no `innerHTML`
 - `renderGlobalProgress()` — overall bar + ETA
-- `renderMetrics()` — 4 metric tiles + live speed graph
+- `renderMetrics()` — 4 metric tiles + the session speed graph
 
 **Presets** — 4 configurations (Fast/Balanced/Optimize/Secure), each sets `concurrency` and `compress` on selection.
 
 **Dropzone** binds to `#dropzone`, `#fileInput`, `#folderInput`. Whole-window drag-and-drop supported.
 
-### 9.4 Settings (`settings.html` — inline `<script>`)
+### 9.4 Settings (`js/settings.js` — for `settings.html`)
 
-Uses a single inline IIFE (no separate `settings.js` file). This is intentional because settings logic is short and page-specific.
+A separate page module loaded after `app.js`, gated on `document.body.dataset.page === 'settings'`
+(there is also a small inline `<script>` at the end of `settings.html`, but the page logic itself
+lives in `settings.js`). ⚠ It calls `GET/PUT /api/settings` and `POST /api/settings/action`, and
+**none of those endpoints exist server-side**, so every call 404s and the module falls back to
+UI-local values. It will not persist anything.
 
 **Features:**
 - Pane switcher: `.settings-nav-item[data-pane]` swaps `.settings-pane[data-pane-content]`
@@ -756,18 +835,126 @@ Settings has a "Reduce motion" toggle, but currently only a UI stub — implemen
 
 ---
 
-## 15. Extension Points / Real Backend Integration
+## 15. Backend Integration & the Dashboard Data Path
 
-When wiring to a real backend, replace these mock-data sources:
+### 15.1 Integration status — what is still mocked
 
-| File | Mock function | Replace with |
-|---|---|---|
-| `dashboard.js` | `stats`, `chartData`, `storageBreakdown`, `activities`, `topFiles`, `serverHealth` arrays | API fetches |
-| `files.js` | `makeFiles()`, `folderTree` const | `GET /api/files`, `GET /api/folders` |
-| `uploads.js` | `tick()` simulation loop | Real `XMLHttpRequest` / `fetch` with progress events |
-| `settings.html` | Inline mock save handlers | `PATCH /api/settings` |
+The old version of this table said "when wiring to a real backend, replace these mock-data
+sources". The backend exists now, and most of the list is done. **Read the status column before
+assuming a module is still simulated** — this table used to send readers to rewrite working code.
 
-**Upload engine:** Replace the `tick()` interval with per-file `XMLHttpRequest` (needed for progress events, which `fetch` doesn't natively support well). The state shape is already compatible.
+| File | What it used to do | Status now | Endpoint |
+|---|---|---|---|
+| `dashboard.js` | `stats`, `traffic`, `storageBreakdown`, `activities`, `topFiles`, `health` arrays | ✅ **Real** | `GET /api/dashboard/summary`, `GET /api/dashboard/health` |
+| `files.js` | `makeFiles()`, `folderTree` const | ✅ **Real** | `GET /api/fs/tree`, `GET /api/fs/list` |
+| `app.js` | hardcoded sidebar storage/user figures | ✅ **Real** | `GET /api/health` (env), `GET /api/dashboard/summary` (`storage`) |
+| `uploads.js` | `tick()` simulation loop | ✅ **Real upload** via `window.API.upload()` XHR with progress. ⚠ The in-page **speed graph** (`metrics.speedHistory`) is still driven by a local 1 s timer over *this session only* — it is a live throughput readout, not history | `POST /api/fs/upload` |
+| `settings.html` / `settings.js` | inline mock save handlers | ❌ **Still ahead of the backend.** Calls `/api/settings` (GET + PUT) and `/api/settings/action`, none of which exist → 404. Note it is now a **separate `js/settings.js`** module, not an inline `<script>` | — |
+| ZIP download | `window.API.downloadZip()` | ❌ **Route commented out** in `fs.routes.js`, so it 404s | — |
+
+Note the naming history, because it is a trap: the Dashboard's old mock traffic series was called
+`chartData` in this document but `traffic` in the code, and `serverHealth` here vs `health` in the
+code. **The current, correct field names are `stats`, `storage`, `storageBreakdown`, `activities`,
+`topFiles`, `health`.** There is no traffic field — see §15.5.
+
+### 15.2 The three storage quantities — never conflate them
+
+The Dashboard reports three byte figures. They measure different things, and mixing them up yields a
+number that looks plausible and means nothing.
+
+| Field | What it measures | How it is computed | Notes |
+|---|---|---|---|
+| `treeBytes` | Size of the **content** under `STORAGE_ROOT` | Sum of regular-file sizes found by the tree walk | Directory entry sizes are **excluded** (0 on Windows, block-sized on ext4, so including them makes identical content report differently per host). Links/junctions skipped. Dotfiles skipped. |
+| `usedBytes` | **Volume** usage — the whole disk, not this tree | `bsize * (blocks - bavail)` | `bavail` is pinned, **not** `bfree`: they are equal on Windows, but ext4 reserves blocks, so only `bavail` is cross-platform consistent. |
+| `totalBytes` | **Volume** capacity | `bsize * blocks` | `bsize` is used **exactly as reported**. It is not assumed to be a power of two, so multiplying by 1024 would be wrong. |
+
+**Unavailability is `null`, never `0`.** When capacity cannot be read, the response carries
+`usedBytes: null`, `totalBytes: null`, `volumeAvailable: false` — and still returns **HTTP 200**.
+Substituting `0` would be worse than failing: `0` reads as a real measurement. The UI renders an
+em-dash for unavailable, never `0` and never `0.0%`.
+
+Consequence worth internalising: the sidebar "Storage" card and the Dashboard donut show
+**different scopes** — the donut partitions `treeBytes`, the sidebar shows `usedBytes / totalBytes`
+of the entire volume. A user comparing them is not looking at a discrepancy.
+
+### 15.3 The bounded, link-skipping traversal
+
+`FileSystemService.getTreeStats()` walks the tree with an **explicit stack of client paths** (never
+of OS paths, so an unvalidated path can never sit on the stack) and enforces a hard budget:
+
+- **100,000 entries** and **2,000 ms**, whichever is hit first.
+- On exhaustion it returns the **partial** result with `truncated: true`. **A truncated total is a
+  wrong total**, so the flag is part of the response contract, not a diagnostic — it must reach the
+  user.
+- **Links and Windows junctions are skipped entirely** — no descent, no count, no name. The walk
+  classifies via `Dirent`, which does not follow links (`fs.stat` *does*, and would report a
+  junction as an ordinary directory). Each file is then re-checked with `lstat`, so an entry swapped
+  for a link between `readdir` and now is caught rather than followed out of the root.
+- **An unreadable subtree degrades to a recorded diagnostic** (`errors[]`, `inaccessible`) and never
+  fails the whole aggregation.
+- Sockets, FIFOs and device nodes are not counted as files.
+
+**Scope of the degradation — read this before assuming a 200 means "everything worked".** An
+unreadable *subdirectory* inside the walk, and an unreadable *volume capacity* reading, are both
+absorbed locally and still answer `200` (capacity reports `null` + `volumeAvailable: false`).
+An unreadable **metadata store is not** absorbed: `MetadataService._read` throws on a corrupt store and
+`getSummary` awaits its sources with `Promise.all`, so the whole request rejects and becomes a **500**.
+The degradation is deliberate and per-capability, not blanket — check the per-capability flags rather
+than trusting the status code.
+
+### 15.4 Router mount ordering — load-bearing, not cosmetic
+
+```
+/api/health  →  /api/fs  →  /api/dashboard  →  app.use('/api', catch-all)  →  SPA fallback  →  errorHandler
+```
+
+`/api/dashboard` **must** be registered **before** the `/api` 404 catch-all, and the reason matters
+more than the order: that catch-all is a **two-argument middleware**, `(req, res) => …`. It sends
+its response and **never calls `next()`**. It therefore *terminates* the chain for every `/api/*`
+path that reaches it. Anything registered after it is **unreachable** — not shadowed, not
+deprioritised, never invoked at all.
+
+Getting this wrong produces a server that boots cleanly, logs nothing, and 404s on every dashboard
+request: a silent failure with no stack trace to follow. When adding a router under `/api`, insert
+it above the catch-all and verify the ordering in the same change.
+
+`dashboard.routes.js` also deliberately does **not** re-mount `fsRoutes`. Doing so would republish
+upload, rename, delete, folder, download and ZIP under a second unauthenticated prefix.
+
+### 15.5 No history is retained — why there is no chart
+
+There is **no time-series store, no snapshot table, and no history file**. `morgan('dev')` writes to
+stdout only, so there is no log to parse either. Therefore:
+
+- 14-day traffic charts — **impossible**
+- trend percentages / period-over-period deltas — **impossible**
+- sparklines on stat cards — **impossible**
+
+The old affordances were **removed, not faked**. `traffic`, `renderChart` and `renderLegend` were
+deleted from `dashboard.js`; `stats[].trendAvailable` is hardcoded `false` and no numeric trend field
+is emitted. Reinstating any of them requires first building a real history store — that is a feature
+request, not a rendering fix.
+
+The same principle is why **load average is absent** from the health panel: `os.loadavg()` *exists*
+on Windows and returns `[0, 0, 0]` — a plausible-looking but fabricated reading with **no error to
+detect**. There is no portable capability probe and platform gating is forbidden, so the metric is
+omitted entirely rather than reported as a healthy `0%`.
+
+### 15.6 The sidebar has no user identity
+
+The sidebar footer is **not** a user profile, and there is no user to render one for: **this
+application has no authentication and no user directory.**
+
+The `.sidebar-user` element (avatar + name + role) is populated by `AFM.updateUserUI()` from
+`GET /api/health` — and the only true statement available is **the environment the server runs in**,
+so it renders the `env` value (e.g. `development`) with the role `Self-hosted`. If that request
+fails, it renders `Environment unavailable`. It never renders a person's name.
+
+`GET /api/health` is the liveness/environment endpoint and is unrelated to
+`GET /api/dashboard/health` (dashboard runtime metrics) despite the shared path segment.
+
+Do not "fix" the footer by hardcoding a persona — that is what an earlier version of this document
+described, and it was fiction.
 
 ---
 
@@ -829,13 +1016,21 @@ window.Uploads   = { init }   // only on uploads page
 ## 18. Known Limitations & TODOs
 
 - No routing — each page is a separate HTML file, no client-side routing
-- No auth — user profile in sidebar is static ("Sarah Chen · Administrator")
-- No real uploads — engine is simulated; replace `tick()` for production
+- **No auth — and therefore no user identity.** The sidebar footer renders the `GET /api/health`
+  environment, not a person (see §15.6). There is no user store to render.
+- Uploads are real (`window.API.upload()` XHR → `POST /api/fs/upload`), but **ZIP download is broken
+  at the routing layer** — `download-zip` is commented out in `fs.routes.js`, so
+  `API.downloadZip()` 404s. Two call sites in `files.js` also use `window.open()` instead of the
+  iframe download helpers, which exposes them to popup blockers.
+- **`settings.js` calls endpoints that do not exist** — `/api/settings` (GET + PUT) and
+  `/api/settings/action` all 404.
 - No i18n — English only; Language dropdown in Settings is UI-only
 - No accessibility audit — ARIA is added best-effort; run axe DevTools before shipping
 - Global search input is decorative — `Cmd+K` focuses it but nothing consumes the value
 - Reduce Motion toggle is UI-only — needs implementation
 - Sidebar HTML is duplicated 4x — a small build step (or SSI include) would DRY this up
+- No retained history — so no trend percentages, sparklines, or period-over-period charts are
+  possible at all (§15.5). This is a missing *capability*, not a missing feature to be built.
 
 ---
 
@@ -851,12 +1046,20 @@ window.Uploads   = { init }   // only on uploads page
 | Dropdown not closing | Check `Dropdown.init()` ran (called in `initApp`) |
 | Nav item not highlighting | Check `data-nav` attribute matches `body[data-page]` |
 | Colors not switching in light mode | Component using raw palette instead of Layer 2 token |
-| Chart not rendering | Check target element ID exists; check state.all is populated |
+| Dashboard panel stuck on a skeleton | The summary request failed — `state.errored` leaves the health panel errored too, deliberately, because the metrics request never ran |
+| A Dashboard panel reads "unavailable" | The server omitted that field (`null` state). It is **not** a rendering bug and **not** a zero — do not substitute `0` |
+| Dashboard volume card missing | `storage.volumeAvailable === false`; the 4th stat card is omitted entirely rather than shown as zero |
+| Storage total looks too low | Check `storage.truncated` — a truncated tree total is a *wrong* total, not a slow one |
+| Storage donut and sidebar disagree | Expected: the donut partitions `treeBytes`; the sidebar shows whole-volume `usedBytes / totalBytes` (§15.2) |
+| Dashboard request 404s with no server error | `/api/dashboard` was mounted **after** the `/api` catch-all, which never calls `next()` and makes it unreachable (§15.4) |
+| Sidebar footer says "Environment unavailable" | `GET /api/health` failed or returned no `env`. There is no user profile to fall back to — the app has no auth |
 | Upload progress stuck | Check `state.ticker` is not null; `activeCount` might be off |
 
 ---
 
 **End of architecture document.**
 
-For the design system reference, see `design.md`.
-For run instructions, see the main project README (or open any HTML file directly in a browser — no build required).
+For the design system reference, see `design.md` if present.
+For run instructions, see `AGENTS.md` (`npm run dev` / `npm start`). You **cannot** open an HTML file
+directly in a browser any more: `api.js` calls `/api/*`, so the pages need the Express server
+serving them.

@@ -868,51 +868,147 @@ function initCopyButtons() {
 }
 
 /* ══════════════════════════════════════════
+   SIDEBAR STATE — pure resolvers (no DOM)
+   ══════════════════════════════════════════ */
+
+/*
+ * The sidebar volume card and identity block render exactly one of two states:
+ * a measurement, or an explicit absence. There is no third state that renders a
+ * figure - "0.0%" and "0 B of 0 B" are the dangerous outputs, because a zero
+ * reads as a real reading. Whenever the server did not supply the numbers, the
+ * UI says so instead of inventing them.
+ */
+
+// Rendered in place of a figure that was not measured.
+const UNAVAILABLE_MARK = '—';
+const UNAVAILABLE_VOLUME_META = 'Volume usage unavailable';
+const UNAVAILABLE_IDENTITY_NAME = 'Unknown';
+const UNAVAILABLE_IDENTITY_ROLE = 'Environment unavailable';
+
+function finiteOrNull(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Decide what the sidebar volume card shows, from a `GET /api/dashboard/summary`
+ * `storage` payload. Pure - no DOM, no request - so it can be reasoned about
+ * without a browser.
+ * @param {object|null} storage - {treeBytes, usedBytes, totalBytes, volumeAvailable, truncated}
+ * @returns {{available: boolean, pctText: string, fillWidth: string,
+ *            meta: string, state: 'measured'|'unavailable'}}
+ */
+function resolveStorageDisplay(storage) {
+  const s = (storage && typeof storage === 'object') ? storage : {};
+  const used = finiteOrNull(s.usedBytes);
+  const total = finiteOrNull(s.totalBytes);
+
+  // `volumeAvailable` is the server's own declaration that it could read the
+  // volume. A missing/negative/zero capacity is an absence, not a measurement,
+  // and dividing by it would yield NaN, Infinity or a fabricated zero.
+  if (s.volumeAvailable !== true || used === null || total === null || total <= 0) {
+    return {
+      available: false,
+      pctText: UNAVAILABLE_MARK,
+      fillWidth: '0%',
+      meta: UNAVAILABLE_VOLUME_META,
+      state: 'unavailable',
+    };
+  }
+
+  const pct = (used / total) * 100;
+  return {
+    available: true,
+    pctText: pct.toFixed(1) + '%',
+    fillWidth: pct + '%',
+    meta: `${Format.bytes(used, 0)} of ${Format.bytes(total, 0)} used`,
+    state: 'measured',
+  };
+}
+
+/**
+ * Decide what the sidebar identity block shows. This application has no user
+ * API and no authentication, so there is no person to name and no operator to
+ * greet: the only true statements available are the environment the server runs
+ * in, and that the application is self-hosted. Everything else is an absence.
+ * @param {object|null} health - the `GET /api/health` response
+ * @returns {{available: boolean, avatar: string, name: string, role: string}}
+ */
+function resolveIdentityDisplay(health) {
+  const env = (health && typeof health === 'object') ? health.env : null;
+
+  if (typeof env === 'string' && env.trim() !== '') {
+    // The avatar stays empty: initials would assert a person who does not exist.
+    return { available: true, avatar: '', name: env, role: 'Self-hosted' };
+  }
+
+  return {
+    available: false,
+    avatar: '',
+    name: UNAVAILABLE_IDENTITY_NAME,
+    role: UNAVAILABLE_IDENTITY_ROLE,
+  };
+}
+
+/* ══════════════════════════════════════════
    GLOBAL DATA FETCHER (API)
    ══════════════════════════════════════════ */
 
 async function loadGlobalData() {
+  // Identity: /api/health is the only endpoint that reports the environment.
+  // A failed call must leave the block honestly unknown, never filled in.
   try {
-    const user = await window.API.get('/user/profile');
-    updateUserUI(user);
+    updateUserUI(await window.API.get('/health'));
   } catch (e) {
-    console.warn('Backend not ready. Using fallback user data.');
-    updateUserUI({ name: 'Linux Admin', role: 'System Operator', initials: 'LA' });
+    console.warn('[Sidebar] environment unavailable:', e?.message || e);
+    updateUserUI(null);
   }
 
+  // Volume card: the summary endpoint is the only source of volume capacity.
+  // It performs a bounded tree walk on every page load; that cost is accepted
+  // rather than worked around with a second endpoint.
   try {
-    const storage = await window.API.get('/storage/quota');
-    updateStorageUI(storage);
+    const summary = await window.API.get('/dashboard/summary');
+    updateStorageUI(summary && summary.storage);
   } catch (e) {
-    updateStorageUI({ used: 342 * 1024 ** 3, total: 500 * 1024 ** 3 });
+    console.warn('[Sidebar] volume usage unavailable:', e?.message || e);
+    updateStorageUI(null);
   }
 }
 
-function updateUserUI(user) {
+/* ══════════════════════════════════════════
+   SIDEBAR RENDERERS (thin DOM wrappers)
+   ══════════════════════════════════════════ */
+
+function updateUserUI(health) {
+  const view = resolveIdentityDisplay(health);
+  const avatarEl = document.querySelector('.user-avatar');
   const nameEl = document.querySelector('.user-name');
   const roleEl = document.querySelector('.user-role');
-  const avatarEl = document.querySelector('.user-avatar');
 
-  if (nameEl) nameEl.textContent = user.name;
-  if (roleEl) roleEl.textContent = user.role;
-  if (avatarEl) avatarEl.textContent = user.initials || user.name.substring(0, 2).toUpperCase();
+  if (avatarEl) avatarEl.textContent = view.avatar;
+  if (nameEl) nameEl.textContent = view.name;
+  if (roleEl) roleEl.textContent = view.role;
 }
 
-function updateStorageUI(data) {
+function updateStorageUI(storage) {
+  const view = resolveStorageDisplay(storage);
   const pctEl = document.querySelector('.storage-pct');
   const fillEl = document.querySelector('.storage-fill');
   const metaEl = document.querySelector('.storage-meta');
 
   if (!pctEl || !fillEl || !metaEl) return;
 
-  const pct = data.total > 0 ? (data.used / data.total) * 100 : 0;
+  pctEl.textContent = view.pctText;
+  fillEl.style.width = view.fillWidth;
+  fillEl.setAttribute('data-state', view.state);
 
-  pctEl.textContent = pct.toFixed(1) + '%';
-  fillEl.style.width = pct + '%';
+  // Distinguishable unavailable style: drop the gradient fill and outline the
+  // empty track instead, so an unmeasured bar cannot be mistaken for a filled
+  // one. Both are cleared when a real reading arrives.
+  fillEl.style.background = view.available ? '' : 'transparent';
+  fillEl.style.boxShadow = view.available ? '' : 'inset 0 0 0 1px var(--border-secondary)';
 
-  const usedStr = Format.bytes(data.used, 0);
-  const totalStr = Format.bytes(data.total, 0);
-  metaEl.textContent = `${usedStr} of ${totalStr} used`;
+  metaEl.textContent = view.meta;
 }
 
 
@@ -952,4 +1048,8 @@ window.AFM = {
   copyToClipboard, Store,
   debounce, throttle, uid, clamp, randBetween, escapeHtml,
   countUp, initScrollReveal,
+  // Sidebar (see the pure resolvers above): page modules reuse these rather
+  // than re-implementing the unavailable-vs-measured distinction.
+  resolveStorageDisplay, updateStorageUI,
+  resolveIdentityDisplay, updateUserUI,
 };

@@ -8,6 +8,7 @@ const path = require('path');
 const config = require('./src/config/env');
 const errorHandler = require('./src/middlewares/errorHandler');
 const fsRoutes = require('./src/routes/fs.routes');
+const dashboardRoutes = require('./src/routes/dashboard.routes');
 
 const app = express();
 
@@ -31,12 +32,13 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/fs', fsRoutes);
 
-// Catch-all for undefined API routes
-app.use('/api', (req, res) => {
-    res.status(404).json({ success: false, error: 'API endpoint not found' });
-});
+// Dashboard API. Mounted BEFORE the /api catch-all below, because that
+// catch-all is a two-argument middleware that never calls next() and so
+// terminates the chain - anything mounted after it would be unreachable.
+app.use('/api/dashboard', dashboardRoutes);
 
-// Catch-all for undefined API routes
+// Catch-all for undefined API routes. Registered exactly once: it never calls
+// next(), so a second copy below it was unreachable dead code.
 app.use('/api', (req, res) => {
     res.status(404).json({ success: false, error: 'API endpoint not found' });
 });
@@ -54,10 +56,15 @@ app.use((req, res, next) => {
 app.use(errorHandler);
 
 /* ─── Boot Server ─── */
-app.listen(config.port, () => {
+// The handle is exported so integration tests can read the bound port and close
+// the listener. Without it every require() leaks a live server that keeps the
+// event loop alive forever. HTTP behaviour is unchanged for normal startup.
+const server = app.listen(config.port, () => {
     console.log(`=========================================`);
     console.log(`🚀 Dimension Server running on port ${config.port}`);
     console.log(`📁 Target Storage Root: ${config.storageRoot}`);
     console.log(`🌍 Environment: ${config.env}`);
     console.log(`=========================================`);
 });
+
+module.exports = server;
