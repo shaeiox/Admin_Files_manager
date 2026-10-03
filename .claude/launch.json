@@ -1,0 +1,28 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "files-smoke",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["D:/Projects/Admin-Files-Manager-fixed/server.js"],
+      "cwd": "temp/smoke",
+      "env": {
+        "STORAGE_ROOT": "C:/Users/eleven/AppData/Local/Temp/claude/D--Projects-Admin-Files-Manager-fixed/e825c9d0-ef49-4a54-89fd-fa277329f1ad/scratchpad/smoke/root",
+        "PORT": "3917"
+      },
+      "port": 3917
+    },
+    {
+      "name": "uploads-smoke",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["D:/Projects/Admin-Files-Manager-fixed/server.js"],
+      "cwd": "temp/uploads-smoke",
+      "env": {
+        "STORAGE_ROOT": "C:/Users/eleven/AppData/Local/Temp/claude/D--Projects-Admin-Files-Manager-fixed/8e2cfda9-45cc-4592-afb8-fc05ea98bdee/scratchpad/uproot",
+        "PORT": "3918",
+        "UPLOAD_MAX_BYTES": "65536"
+      },
+      "port": 3918
+    }
+  ]
+}
