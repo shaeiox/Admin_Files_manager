@@ -6,7 +6,7 @@
   <script src="assets/js/theme.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description"
-    content="Upload manager — drag, drop, and orchestrate file uploads with real-time progress and presets.">
+    content="Upload manager — drop files into a folder of the managed storage and follow each transfer live.">
   <meta name="theme-color" content="#0a0a0a">
   <title>Uploads · Dimension Files Manager</title>
 
@@ -187,16 +187,16 @@
               Upload Manager
             </span>
             <h1 class="page-title">Upload files</h1>
-            <p class="page-subtitle">Drop files, orchestrate parallel transfers, and watch every byte land — with
-              real-time progress, pause & resume.</p>
+            <p class="page-subtitle">Drop files into a folder of the managed storage and follow each transfer live.
+              Pausing stops a transfer; resuming restarts that file from the beginning.</p>
           </div>
 
           <div class="page-actions">
-            <button class="btn btn-ghost btn-sm" id="pauseAll">
+            <button type="button" class="btn btn-ghost btn-sm" id="pauseAll">
               <i data-icon="pause" data-icon-size="15"></i>
               Pause all
             </button>
-            <button class="btn btn-ghost btn-sm" id="resumeAll">
+            <button type="button" class="btn btn-ghost btn-sm" id="resumeAll">
               <i data-icon="play" data-icon-size="15"></i>
               Resume all
             </button>
@@ -206,26 +206,27 @@
         <!-- Upload metrics -->
         <div class="upload-metrics" id="uploadMetrics"></div>
 
-        <!-- Dropzone -->
-        <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Drop files to upload">
+        <!-- Dropzone. Not a button: it contains its own buttons. It stays focusable
+             and opens the file picker on Enter or Space (uploads.js initDropzone). -->
+        <div class="dropzone" id="dropzone" tabindex="0" role="group" aria-labelledby="dzTitle"
+          aria-describedby="dzDesc">
           <div class="dz-icon">
             <i data-icon="uploadCloud" data-icon-size="28"></i>
           </div>
-          <div class="dz-title">
+          <div class="dz-title" id="dzTitle">
             Drop files here or <span class="accent">browse</span>
           </div>
-          <div class="dz-desc">
-            Files upload in parallel with automatic retries, checksum verification, and instant CDN distribution
-            across
-            42 edge points-of-presence.
+          <div class="dz-desc" id="dzDesc">
+            Files dropped anywhere on this page, or chosen here, upload into the destination folder shown below.
+            Press Enter or Space here to choose files.
           </div>
 
           <div class="dz-actions">
-            <button class="btn btn-primary btn-sm" id="browseFiles">
+            <button type="button" class="btn btn-primary btn-sm" id="browseFiles">
               <i data-icon="file" data-icon-size="15"></i>
               Choose files
             </button>
-            <button class="btn btn-ghost btn-sm" id="browseFolder">
+            <button type="button" class="btn btn-ghost btn-sm" id="browseFolder">
               <i data-icon="folder" data-icon-size="15"></i>
               Choose folder
             </button>
@@ -233,20 +234,8 @@
 
           <div class="dz-specs">
             <span class="spec-pill">
-              <i data-icon="package" data-icon-size="12"></i>
-              Max 5 GB per file
-            </span>
-            <span class="spec-pill">
               <i data-icon="zap" data-icon-size="12"></i>
-              Up to 8 parallel
-            </span>
-            <span class="spec-pill">
-              <i data-icon="shield" data-icon-size="12"></i>
-              Auto-encrypted in transit
-            </span>
-            <span class="spec-pill">
-              <i data-icon="refresh" data-icon-size="12"></i>
-              Auto-retry on failure
+              <span id="concurrencyValue">3 parallel transfers</span>
             </span>
           </div>
 
@@ -260,37 +249,51 @@
             <i data-icon="folder" data-icon-size="14"></i>
             Destination
           </div>
-          <span class="dest-path" id="destPath">
-            <i data-icon="folder" data-icon-size="13"></i>
-            /releases/2025
-          </span>
-          <button class="btn btn-subtle btn-sm" id="changeDestination">
+          <!-- Filled by uploads.js from its state; no placeholder path is shown. -->
+          <span class="dest-path" id="destPath"></span>
+          <button type="button" class="btn btn-subtle btn-sm" id="changeDestination" aria-expanded="false"
+            aria-controls="destPicker">
             <i data-icon="edit" data-icon-size="13"></i>
             Change
           </button>
 
+          <!-- One label per option, wrapping the input, its track and its text. -->
           <div class="dest-options">
             <label class="dest-opt">
-              <label class="switch">
+              <span class="switch">
                 <input type="checkbox" data-option="autoStart" checked>
-                <span class="track"></span>
-              </label>
-              Auto-start uploads
+                <span class="track" aria-hidden="true"></span>
+              </span>
+              <span>Auto-start uploads</span>
             </label>
             <label class="dest-opt">
-              <label class="switch">
+              <span class="switch">
                 <input type="checkbox" data-option="overwrite">
-                <span class="track"></span>
-              </label>
-              Overwrite duplicates
+                <span class="track" aria-hidden="true"></span>
+              </span>
+              <span>Replace files with the same name</span>
             </label>
-            <label class="dest-opt">
-              <label class="switch">
-                <input type="checkbox" data-option="preservePath" checked>
-                <span class="track"></span>
-              </label>
-              Preserve folder structure
-            </label>
+          </div>
+
+          <!-- Destination picker: folders from GET /api/fs/tree, or a typed path. -->
+          <div class="dest-picker" id="destPicker" hidden>
+            <div class="dest-picker-field">
+              <label class="field-label" for="destSelect">Choose a folder</label>
+              <select class="input" id="destSelect" aria-describedby="destTreeNote"></select>
+              <p class="dest-hint" id="destTreeNote">Folders up to two levels below the root are listed. Type a path to
+                use a deeper folder.</p>
+            </div>
+            <div class="dest-picker-field">
+              <label class="field-label" for="destInput">Or type a folder path</label>
+              <input class="input" id="destInput" type="text" placeholder="/media/photos" autocomplete="off"
+                spellcheck="false">
+            </div>
+            <p class="dest-msg" id="destMsg" role="status"></p>
+            <div class="dest-picker-actions">
+              <button type="button" class="btn btn-primary btn-sm" id="createDestination" hidden></button>
+              <button type="button" class="btn btn-ghost btn-sm" id="cancelDestination">Cancel</button>
+              <button type="button" class="btn btn-primary btn-sm" id="applyDestination">Use this folder</button>
+            </div>
           </div>
         </div>
 
@@ -298,8 +301,9 @@
         <section class="section" style="margin-top:var(--spacing-32);">
           <div class="section-header">
             <div>
-              <h2 class="section-title">Upload preset</h2>
-              <div class="section-desc">Optimize the transfer for your workload</div>
+              <h2 class="section-title">Parallel transfers</h2>
+              <div class="section-desc">How many files upload at the same time. Transfers already running are not
+                interrupted.</div>
             </div>
           </div>
           <div class="preset-grid" id="presetGrid"></div>
@@ -312,34 +316,44 @@
             <!-- Queue header -->
             <div class="queue-head">
               <div class="queue-title-group">
-                <h3 class="queue-title">Upload queue</h3>
+                <h2 class="queue-title">Upload queue</h2>
                 <div class="queue-stats" id="queueStats"></div>
               </div>
 
-              <div style="display:flex;align-items:center;gap:var(--spacing-8);flex-wrap:wrap;">
-                <button class="btn btn-subtle btn-sm" id="retryFailed">
+              <div class="queue-head-actions">
+                <button type="button" class="btn btn-subtle btn-sm" id="startQueued">
+                  <i data-icon="play" data-icon-size="14"></i>
+                  Start queued
+                </button>
+                <button type="button" class="btn btn-subtle btn-sm" id="retryFailed">
                   <i data-icon="refresh" data-icon-size="14"></i>
                   Retry failed
                 </button>
-                <button class="btn btn-ghost btn-sm" id="clearDone">
+                <button type="button" class="btn btn-ghost btn-sm" id="clearDone">
                   <i data-icon="checkCircle" data-icon-size="14"></i>
                   Clear completed
                 </button>
               </div>
             </div>
 
+            <!-- Screen-reader summary of the queue; throttled by uploads.js. -->
+            <div class="sr-only" id="queueAnnounce" role="status" aria-live="polite"></div>
+
+            <!-- Destinations that could not be used: one notice, not one failure per file. -->
+            <div class="queue-notice" id="queueNotice" hidden></div>
+
             <!-- Global progress -->
             <div class="queue-global" id="queueGlobal" style="display:none;"></div>
 
             <!-- Queue list -->
-            <div class="queue-list" id="queueList"></div>
+            <div class="queue-list" id="queueList" aria-label="Upload queue items"></div>
 
             <!-- Footer -->
             <div class="queue-footer">
-              <div style="font-size:var(--text-caption);color:var(--text-tertiary);">
-                Uploads resume automatically after network interruptions.
+              <div class="queue-footer-note">
+                A transfer interrupted by a network error is marked failed. Retrying restarts it from the beginning.
               </div>
-              <button class="btn btn-danger btn-sm" id="cancelAll">
+              <button type="button" class="btn btn-danger btn-sm" id="cancelAll">
                 <i data-icon="x" data-icon-size="14"></i>
                 Cancel all pending
               </button>
@@ -352,9 +366,9 @@
           <div class="section-header">
             <div>
               <h2 class="section-title">Recently uploaded</h2>
-              <div class="section-desc">Latest completed transfers · from all admins</div>
+              <div class="section-desc">Uploads among the server's most recently recorded activity</div>
             </div>
-            <a class="btn btn-subtle btn-sm" href="files.html">
+            <a class="btn btn-subtle btn-sm" href="files.html?view=recent">
               View all
               <i data-icon="arrowRight" data-icon-size="14"></i>
             </a>
@@ -369,31 +383,18 @@
         <section class="section">
           <div class="card card-accent">
             <div style="display:flex; align-items:flex-start; gap:var(--spacing-20); flex-wrap:wrap;">
-              <div
-                style="width:44px; height:44px; border-radius:var(--radius-ui); background:var(--bg-badge); color:var(--accent-primary); display:grid; place-items:center; border:1px solid rgba(107, 98, 242, 0.25); flex-shrink:0;">
+              <div class="tips-icon" aria-hidden="true">
                 <i data-icon="sparkle" data-icon-size="20"></i>
               </div>
 
-              <div style="flex:1; min-width:260px;">
-                <h3 class="card-title" style="margin-bottom:8px;">Pro tips for large uploads</h3>
-                <div class="numbered-list" style="margin-top:16px;">
-                  <div class="numbered-row">
-                    <div class="numbered-name">Use the "Fast Transfer" preset for batches over 10 GB</div>
-                    <div class="numbered-index">01</div>
-                  </div>
-                  <div class="numbered-row">
-                    <div class="numbered-name">Enable "Optimize Storage" for archives to save up to 40% space</div>
-                    <div class="numbered-index">02</div>
-                  </div>
-                  <div class="numbered-row">
-                    <div class="numbered-name">Drop entire folders — the structure is preserved automatically</div>
-                    <div class="numbered-index">03</div>
-                  </div>
-                  <div class="numbered-row">
-                    <div class="numbered-name">Uploads resume from the last checkpoint if the connection drops</div>
-                    <div class="numbered-index">04</div>
-                  </div>
-                </div>
+              <div class="tips-body">
+                <h2 class="card-title">How uploads behave</h2>
+                <ol class="tips-list">
+                  <li>Choose "Fast" (8 parallel) for many small files, or "One at a time" for a slow or shared connection.</li>
+                  <li>A chosen or dropped folder uploads every file inside it, subfolders included, directly into the destination. Subfolder structure is not recreated.</li>
+                  <li>Without "Replace files with the same name", a file whose name already exists in the destination is refused, never overwritten.</li>
+                  <li>Transfers are not resumable: pausing, or a dropped connection, means that file restarts from the beginning.</li>
+                </ol>
               </div>
             </div>
           </div>

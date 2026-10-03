@@ -25,12 +25,19 @@ const API = (() => {
      * Core fetch wrapper for JSON APIs only.
      * Do NOT use this for binary streams (ZIP / file download).
      *
+     * A rejected Error carries `status` (the HTTP status; 0 when no response
+     * arrived) and, when the server supplied one, `kind` - a machine-readable
+     * failure token. Callers branch on those, never on the message text.
+     *
      * @param {string} endpoint - Path under BASE_URL (e.g. "/fs/list")
-     * @param {RequestInit} options
+     * @param {RequestInit & { silent?: boolean }} options - `silent` suppresses the
+     *   generic error toast, for callers that report the failure themselves.
      * @returns {Promise<any>}
      */
     async function request(endpoint, options = {}) {
         const url = `${BASE_URL}${endpoint}`;
+        const { silent = false, ...fetchOptions } = options;
+        options = fetchOptions;
         const headers = { ...(options.headers || {}) };
 
         // FormData must set its own multipart boundary — never force JSON Content-Type
@@ -65,12 +72,13 @@ const API = (() => {
                     (data && (data.error || data.message)) ||
                     response.statusText ||
                     'Unknown Error';
-                throw new Error(errorMsg);
+                throw failure(errorMsg, response.status, data);
             }
 
             return data;
         } catch (error) {
-            if (window.AFM && window.AFM.Toast) {
+            if (typeof error.status !== 'number') error.status = 0;
+            if (!silent && window.AFM && window.AFM.Toast) {
                 window.AFM.Toast.error(
                     'Network Error',
                     error.message || 'Failed to communicate with server'
@@ -80,14 +88,26 @@ const API = (() => {
         }
     }
 
+    /**
+     * Build a rejected-request Error. `kind` is copied only when the server sent
+     * it as a string, so a missing token stays missing rather than guessed.
+     */
+    function failure(message, status, body) {
+        const error = new Error(message);
+        error.status = status;
+        if (body && typeof body.kind === 'string' && body.kind) error.kind = body.kind;
+        return error;
+    }
+
     /* ══════════════════════════════════════════
        JSON CONVENIENCE METHODS
        ══════════════════════════════════════════ */
 
-    const get = (endpoint) => request(endpoint, { method: 'GET' });
+    const get = (endpoint, opts = {}) => request(endpoint, { ...opts, method: 'GET' });
 
-    const post = (endpoint, body) =>
+    const post = (endpoint, body, opts = {}) =>
         request(endpoint, {
+            ...opts,
             method: 'POST',
             body: body instanceof FormData ? body : JSON.stringify(body),
         });
@@ -147,17 +167,21 @@ const API = (() => {
                 }
 
                 let message = xhr.statusText || 'Upload failed';
+                let parsed = null;
                 try {
-                    const parsed = JSON.parse(xhr.responseText);
+                    parsed = JSON.parse(xhr.responseText);
                     message = parsed.error || parsed.message || message;
                 } catch {
                     if (xhr.responseText) message = xhr.responseText;
                 }
-                reject(new Error(message));
+                // `status` and the server's optional `kind` ride along with the
+                // human-readable message so callers never have to parse prose.
+                reject(failure(message, xhr.status, parsed));
             };
 
-            xhr.onerror = () => reject(new Error('Upload failed due to network error'));
-            xhr.onabort = () => reject(new Error('Upload cancelled'));
+            // No response at all: these kinds are produced here, by the transport.
+            xhr.onerror = () => reject(failure('Upload failed due to network error', 0, { kind: 'network' }));
+            xhr.onabort = () => reject(failure('Upload cancelled', 0, { kind: 'aborted' }));
 
             xhr.send(formData);
         });

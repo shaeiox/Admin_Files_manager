@@ -56,7 +56,9 @@ admin-files-manager/
 │           ├── sidebar.js        # Sidebar collapse + mobile drawer
 │           ├── dashboard.js      # Page module (index.html)
 │           ├── files.js          # Page module (files.html) — see "Files page module" below
-│           ├── uploads.js        # Page module (uploads.html) — queue, progress, presets
+│           ├── uploads.js        # Page module (uploads.html) — queue, progress, presets, destination
+│           │                     #   check/creation, recent uploads from activity; `Uploads.pure` +
+│           │                     #   `Uploads._controller` are test seams
 │           └── settings.js       # Page module (settings.html)
 │
 ├── data/                         # ─── Runtime artifacts — NOT checked in ───
@@ -75,8 +77,11 @@ admin-files-manager/
 │   │   └── MetadataService.dashboard.test.js# activities / top-download ranking inputs
 │   ├── api/
 │   │   ├── dashboard.contract.test.js       # GET /api/dashboard/summary + /health payload shape
-│   │   └── fs.contract.test.js              # /api/fs/* against a live server: upload placement ON DISK,
-│   │                                        #   overwrite/size, listing taxonomy + resilience, star, ZIP, previews
+│   │   ├── fs.contract.test.js              # /api/fs/* against a live server: upload placement ON DISK,
+│   │   │                                    #   overwrite/size, listing taxonomy + resilience, star, ZIP, previews
+│   │   └── upload.surface.test.js           # upload error surface: no stack in any configuration (incl. a
+│   │                                        #   child `node server.js` with NODE_ENV unset), authored reasons
+│   │                                        #   forwarded, generic text for the rest, status per failure class
 │   ├── integration/
 │   │   ├── live-server.test.js              # traversal guard wired into the running app
 │   │   ├── error-disclosure.test.js         # no stack / no path in error bodies
@@ -86,8 +91,10 @@ admin-files-manager/
 │   └── frontend/
 │       ├── app.test.js                      # shared core helpers (panel states, storage display)
 │       ├── dashboard.test.js                # dashboard renderers, no-history guarantees
-│       └── files.test.js                    # files.js in a vm with stub DOM/API: states, navigation, selection,
-│                                            #   a11y semantics, escaping, and source-level guards
+│       ├── files.test.js                    # files.js in a vm with stub DOM/API: states, navigation, selection,
+│       │                                    #   a11y semantics, escaping, and source-level guards
+│       └── uploads.test.js                  # uploads.js in a vm with stub DOM/API/XHR: queue derivations, failure
+│                                            #   kinds, escaping, destination gate, honesty + a11y source guards
 │
 └── docs/                         # ─── Project brain (reference docs, NOT runtime code) ───
     ├── REPO_MAP.md               # ← you are here (this file is the authoritative map)

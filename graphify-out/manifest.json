@@ -30,15 +30,15 @@
     "semantic_hash": ""
   },
   "public/assets/js/api.js": {
-    "mtime": 1791008881.6734529,
-    "seen": 1791011497.270367,
-    "ast_hash": "b85ca45804f7685bc0c07ac8e362e8d9",
-    "semantic_hash": "b85ca45804f7685bc0c07ac8e362e8d9"
+    "mtime": 1791058702.8973198,
+    "seen": 1791059162.6692371,
+    "ast_hash": "266c10529eb5c8094ec9b6d226270ac6",
+    "semantic_hash": ""
   },
   "public/assets/js/app.js": {
-    "mtime": 1791041948.3144708,
-    "seen": 1791045592.6999936,
-    "ast_hash": "b75da611b3bee4e45a2e14dea39805d4",
+    "mtime": 1791058702.9228542,
+    "seen": 1791059162.6692393,
+    "ast_hash": "f8a971b1b545319bc94d07f3f9503f61",
     "semantic_hash": ""
   },
   "public/assets/js/dashboard.js": {
@@ -72,10 +72,10 @@
     "semantic_hash": "b9776caba1756810284ceb30904e446c"
   },
   "public/assets/js/uploads.js": {
-    "mtime": 1791008881.683574,
-    "seen": 1791011497.2703767,
-    "ast_hash": "66343bdf9ef8ad11d07d8eec7ad3d495",
-    "semantic_hash": "66343bdf9ef8ad11d07d8eec7ad3d495"
+    "mtime": 1791058702.7444212,
+    "seen": 1791059162.669253,
+    "ast_hash": "5c9d4aa294438607400caf527816a067",
+    "semantic_hash": ""
   },
   "server.js": {
     "mtime": 1791053699.886225,
@@ -456,9 +456,9 @@
     "semantic_hash": "e6e4bb6d5e8cb3d5282bdb4012b09b5f"
   },
   "AGENTS.md": {
-    "mtime": 1791056471.282012,
-    "seen": 1791056595.960514,
-    "ast_hash": "ffad99c02a92be46b6a27983e339af5c",
+    "mtime": 1791058790.948075,
+    "seen": 1791059162.669443,
+    "ast_hash": "caa3b1c6f52de13ef61954dc91dad1ee",
     "semantic_hash": ""
   },
   "PROJECT_TREE.md": {
@@ -468,15 +468,15 @@
     "semantic_hash": "6f72ba4f8d01347aabdf0261fa963963"
   },
   "docs/CONTRACTS.md": {
-    "mtime": 1791056248.9062154,
-    "seen": 1791056595.960519,
-    "ast_hash": "b363d155dcbf3c4dbaafdf2946005934",
+    "mtime": 1791058790.9451103,
+    "seen": 1791059162.669447,
+    "ast_hash": "30492a3d6b2d7d86bce85bd97699c510",
     "semantic_hash": ""
   },
   "docs/REPO_MAP.md": {
-    "mtime": 1791056380.4233108,
-    "seen": 1791056595.9605212,
-    "ast_hash": "7847f1e1f8d1197f790c85d2644175c9",
+    "mtime": 1791058790.9410622,
+    "seen": 1791059162.6694484,
+    "ast_hash": "ae07f90dc19ff9a57e9c463d7c18b706",
     "semantic_hash": ""
   },
   "docs/STRUCTURE.md": {
@@ -534,9 +534,9 @@
     "semantic_hash": ""
   },
   "public/uploads.html": {
-    "mtime": 1791054542.7828102,
-    "seen": 1791056595.9606373,
-    "ast_hash": "20a8c4c70800d31458bc5c37e413c90b",
+    "mtime": 1791059044.3221219,
+    "seen": 1791059162.6695995,
+    "ast_hash": "4adf2b3911e16117552b6a94f5367d27",
     "semantic_hash": ""
   },
   "src/controllers/dashboard.controller.js": {
@@ -624,9 +624,9 @@
     "semantic_hash": ""
   },
   ".claude/launch.json": {
-    "mtime": 1791055370.811228,
-    "seen": 1791056595.9601943,
-    "ast_hash": "909ee5d6ca7754c7a6c5a0fdcf598d28",
+    "mtime": 1791058835.7624903,
+    "seen": 1791059162.669222,
+    "ast_hash": "c7badaf8ff0b1534e88868cca17af07f",
     "semantic_hash": ""
   },
   "src/controllers/preview.controller.js": {
@@ -948,9 +948,9 @@
     "semantic_hash": ""
   },
   "openspec/changes/upload-pipeline-correctness/tasks.md": {
-    "mtime": 1791052941.8943362,
-    "seen": 1791056595.9606073,
-    "ast_hash": "58c8729002fff1326425a349ef6d96d3",
+    "mtime": 1791059152.1824205,
+    "seen": 1791059162.669571,
+    "ast_hash": "c227ac40397e1c001f758a61ba146e3c",
     "semantic_hash": ""
   },
   "openspec/specs/cross-platform-contract/spec.md": {
@@ -1005,6 +1005,24 @@
     "mtime": 1791054847.7231433,
     "seen": 1791056595.9606278,
     "ast_hash": "00166da2257882d879546a98f12c97c1",
+    "semantic_hash": ""
+  },
+  "test/api/upload.surface.test.js": {
+    "mtime": 1791058824.7376738,
+    "seen": 1791059162.6692996,
+    "ast_hash": "e42e481c7cab41237e56e32e6a1c85f3",
+    "semantic_hash": ""
+  },
+  "test/frontend/uploads.test.js": {
+    "mtime": 1791058824.7366574,
+    "seen": 1791059162.6693082,
+    "ast_hash": "1b77c03b7cbc2009b94c00a76a19d369",
+    "semantic_hash": ""
+  },
+  "docs/decisions/ADR-004-upload-page-integrity.md": {
+    "mtime": 1791058824.7366574,
+    "seen": 1791059162.6694639,
+    "ast_hash": "fb4cd4d39e7f9cd8b606373b21e4a0cb",
     "semantic_hash": ""
   }
 }

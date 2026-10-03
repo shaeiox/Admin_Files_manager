@@ -390,6 +390,42 @@ Errors (static messages, no absolute path): `400` no file / destination missing 
 folder / invalid filename · `403` destination outside the root · `409` name exists (or held by a
 folder) · `413` too large.
 
+Placement semantics are owned by the shared `upload-destination-integrity` capability
+(`openspec/changes/files-page-correctness`); they are not restated here.
+
+#### Failure classes and kinds (consumed by the Upload page)
+
+| Class | Status | Kind the page uses | Where the kind comes from |
+|---|---|---|---|
+| Name collision, `overwrite` not `"true"` | `409` | `conflict` | status |
+| File over `UPLOAD_MAX_BYTES` | `413` | `too-large` | status (message names the limit in bytes) |
+| Destination outside the root / access refused | `403` | `forbidden` | status |
+| Unmapped server failure | `5xx` | `server` | status |
+| No response (connection dropped) | — | `network` | transport (`api.js`) |
+| Aborted by the operator (pause / cancel) | — | `aborted` | transport (`api.js`); never shown as a failure |
+| Rejected name · missing destination · destination not a folder | `400` | *none* | — |
+
+- **The server sends no `kind` field today.** The three `400` classes therefore share one status and
+  are not distinguishable by a machine-readable signal; the page shows the server's own authored
+  message for them rather than guessing. If the error body later carries a string `kind`, `api.js`
+  attaches it to the rejected `Error` (`err.kind`) and it takes precedence over the status. The page
+  never derives a kind from the human-readable message.
+- `api.js` attaches `err.status` (HTTP status; `0` when no response arrived) to every rejected
+  request, and `err.kind` when one is known. Additive: no signature or return shape changed.
+- Kinds are short stable tokens (`^[a-z][a-z-]*$`), never reworded with the message.
+
+#### Destination check and creation (Upload page)
+
+The page checks a destination once before sending anything to it, with
+`GET /api/fs/list?path=<dest>&limit=1`: `200` usable · `404` does not exist · `400` not a folder ·
+`403` access refused · anything else "could not be checked". Items whose destination fails the check
+are **held** under one notice — not failed one by one. A missing destination may be created on the
+operator's request with the existing `POST /api/fs/folder` (non-recursive: a missing parent is a
+`404`). **An upload never creates a directory as a side effect.** If an item later fails with a
+`400`/`403`/`404`, the page re-checks its destination once; if it has become unusable the item carries
+the destination reason and the remaining items for it are held rather than retried blindly. Write
+permission cannot be probed without an upload, so "cannot be written to" is reported from a `403`.
+
 ### POST /api/fs/star
 
 **Body:** `{ "path": "/docs/a.pdf", "starred"?: boolean }` → **`200`**
@@ -457,6 +493,16 @@ All errors are produced by throwing `AppError(message, statusCode)` and are seri
 `src/middlewares/errorHandler.js`. Only `AppError` messages reach the client; no `stack` is sent in
 any environment.
 
+**Error-disclosure rule (every endpoint, not only upload).**
+- No `stack` field in **any** environment — including an unset `NODE_ENV`, which `env.js` still reads
+  as `development`. There is no disclosure switch to set, and none should be added (ADR-004).
+- An authored `AppError` message is forwarded verbatim (it carries no path, errno or system detail).
+- Every other failure gets a fixed generic message **whatever its status**: `"Request could not be
+  processed."` below 500, `"An unexpected error occurred on the server."` at 500+. A framework `400`
+  (e.g. malformed JSON) does not leak its parser text.
+- The server log (`console.error` in `errorHandler`) keeps the full error and its stack, so diagnosis
+  is not lost. Pinned by `test/api/upload.surface.test.js` and `test/integration/error-disclosure.test.js`.
+
 **Exception:** the two Dashboard endpoints do **not** follow this model. They answer `200` with
 per-capability degradation, so a partial failure is expressed in the payload
 (`volumeAvailable: false`, `truncated: true`, empty arrays) rather than in a status code. See
@@ -491,6 +537,7 @@ the client path and doubles as the stable identifier across API and UI. `size` a
 |---|---|---|
 | `API` | `assets/js/api.js` | `get/post/put/del/upload/downloadFile/downloadMultipleFiles/downloadZip`, `BASE_URL` |
 | `Files` | `assets/js/files.js` | Files page; `Files.pure` (renderers/helpers) and `Files._controller` are test seams |
+| `Uploads` | `assets/js/uploads.js` | Upload page; `Uploads.pure` (derivations, row renderer) and `Uploads._controller` are test seams |
 | `AFM` | `assets/js/app.js` | Shared helpers namespace (`Toast`, `Modal`, `Format`, `Icons`, DOM utils) |
 | `Icons` / `icon()` / `hydrateIcons()` | `assets/js/app.js` | Inline SVG system (`<i data-icon="name">`) |
 | `Format` | `assets/js/app.js` | bytes/duration/relative-time/number formatters |
@@ -511,12 +558,36 @@ backed. The old `POST /folders` and `POST /shares` calls are gone — folder cre
 **live** `POST /api/fs/folder`, and the share affordance was removed along with the other fabricated
 UI rather than left as a dangling call.
 
+`uploads.js` is fully backed: `/fs/upload`, `/fs/list` (destination check), `/fs/tree` (folder
+picker), `/fs/folder` (create a missing destination) and `/dashboard/summary` (recent uploads).
+
 `files.js` is fully backed: every call it makes (`/fs/tree`, `/fs/list`, `/fs/folder`,
 `/fs/upload`, `/fs/rename`, `/fs/delete`, `/fs/star`, `/fs/download-zip`, `/fs/download`,
 `/fs/thumbnail/capability`) resolves.
 
 When implementing a gap, add the route/controller, then move it from this list into the endpoint
 table above.
+
+### Upload page: capability claims removed (reversible inventory)
+
+None of these was implemented by the client or the server, so each statement was deleted rather than
+left standing. If a capability is built later, its claim can return with it.
+
+| Removed claim | Where it was | Why |
+|---|---|---|
+| Checksum verification; CDN distribution across "42 edge points-of-presence" | dropzone description | No checksum, no CDN |
+| "Auto-encrypted in transit" | dropzone pill | Transport is whatever the deployment provides; nothing here encrypts |
+| "Auto-retry on failure" / "automatic retries" | dropzone pill + description | Retry is manual (row or bulk action) |
+| "Uploads resume automatically after network interruptions" | queue footer | Transfer is not chunked; an interrupted file restarts from 0 |
+| "Uploads resume from the last checkpoint" | tips | Same |
+| "save up to 40% space"; "Compress & deduplicate before upload"; `compress`/`dedupe` tags | tips, Optimize Storage preset | Nothing compresses or deduplicates; the `compress` flag was never transmitted |
+| "Client-side encryption enabled"; `encrypted`/`verified` tags | Secure Upload preset | Nothing encrypts or verifies |
+| "Preserve folder structure" toggle; "the structure is preserved automatically" | options, tips | The server ignores `preservePath`; a folder's files land flat in the destination |
+| "Max 5 GB per file" pill and the client-side 5 GB pre-check | dropzone | The limit is `UPLOAD_MAX_BYTES`, configurable and not reported to the client; the server's `413` names the limit in effect |
+| "Up to 8 parallel" | dropzone pill | Replaced by the concurrency actually in effect, updated on preset change |
+| "Uploaded today" tile | metrics | No source is scoped to a day; now "Completed since this page opened" |
+| Seven hardcoded "Recently uploaded" files, "from all admins" | recent strip | Now real `upload` activities from `GET /api/dashboard/summary` (no size: activities carry none); no accounts exist |
+| `/releases/2025` destination placeholder | destination strip | The real current destination is rendered from state |
 
 ### File-type taxonomy (shared contract)
 

@@ -149,6 +149,13 @@
 
 .dz-input { display: none; }
 
+/* The zone is focusable and keyboard-activatable, so its focus must be seen. */
+.dropzone:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+  border-color: var(--accent-primary);
+}
+
 /* ══════════════════════════════════════════
    UPLOAD DESTINATION STRIP
    ══════════════════════════════════════════ */
@@ -187,9 +194,12 @@
   font-size: var(--text-caption);
   color: var(--text-primary);
   font-family: 'SF Mono', monospace;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
-.dest-path svg { width: 13px; height: 13px; color: #f59e0b; }
+.dest-path svg { width: 13px; height: 13px; color: #f59e0b; flex-shrink: 0; }
 
 .dest-options {
   display: flex;
@@ -207,6 +217,54 @@
   color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
+}
+
+/* The checkbox is visually hidden inside the switch: draw its focus on the track. */
+.dest-opt .switch input:focus-visible + .track {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.dest-picker {
+  flex-basis: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-12) var(--spacing-16);
+  padding-top: var(--spacing-12);
+  border-top: 1px solid var(--border-secondary);
+}
+
+.dest-picker[hidden],
+.dest-picker [hidden] { display: none; }
+
+.dest-picker-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+  min-width: 0;
+}
+
+.dest-hint {
+  font-size: var(--text-caption);
+  color: var(--text-tertiary);
+}
+
+.dest-msg {
+  grid-column: 1 / -1;
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.dest-msg:empty { display: none; }
+.dest-msg[data-tone="error"] { color: var(--color-error); }
+
+.dest-picker-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-8);
+  flex-wrap: wrap;
 }
 
 /* ══════════════════════════════════════════
@@ -246,6 +304,43 @@
   font-size: var(--text-body);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
+}
+
+.queue-head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  flex-wrap: wrap;
+}
+
+/* One notice per unusable destination, instead of one failed row per file. */
+.queue-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  padding: var(--spacing-12) var(--spacing-20);
+  border-bottom: 1px solid var(--border-secondary);
+  background: var(--color-warning-bg);
+}
+
+.queue-notice[hidden] { display: none; }
+
+.queue-notice-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-10);
+  flex-wrap: wrap;
+  font-size: var(--text-body-sm);
+  color: var(--text-primary);
+}
+
+.queue-notice-ico { color: var(--color-warning); display: inline-flex; padding-top: 2px; }
+.queue-notice-text { flex: 1; min-width: 200px; overflow-wrap: anywhere; }
+
+.queue-notice-actions {
+  display: flex;
+  gap: var(--spacing-6);
+  flex-wrap: wrap;
 }
 
 .queue-stats {
@@ -391,6 +486,13 @@
   min-width: 0;
 }
 
+.qi-state {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  flex-shrink: 0;
+}
+
 .qi-pct {
   font-size: var(--text-caption);
   color: var(--text-secondary);
@@ -452,6 +554,9 @@
 }
 
 .qi-meta .err { color: var(--color-error); }
+.qi-meta .qi-detail { color: var(--text-tertiary); }
+.qi-meta .qi-dest { font-family: 'SF Mono', monospace; overflow-wrap: anywhere; }
+.qg-failed { color: var(--color-error); }
 
 .qi-actions {
   display: flex;
@@ -489,6 +594,13 @@
   border-top: 1px solid var(--border-secondary);
   background: var(--bg-tertiary);
   flex-wrap: wrap;
+}
+
+.queue-footer-note {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-caption);
+  color: var(--text-tertiary);
 }
 
 /* ══════════════════════════════════════════
@@ -601,6 +713,49 @@
   padding-bottom: var(--spacing-8);
   scrollbar-width: thin;
 }
+
+.recent-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-12);
+  flex-wrap: wrap;
+  padding: var(--spacing-16);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-secondary);
+  font-size: var(--text-body-sm);
+  color: var(--text-tertiary);
+  width: 100%;
+}
+
+.recent-empty.is-error { color: var(--color-error); border-color: var(--color-error); }
+
+/* Tips card (was inline styles). */
+.tips-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-ui);
+  background: var(--bg-badge);
+  color: var(--accent-primary);
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(107, 98, 242, 0.25);
+  flex-shrink: 0;
+}
+
+.tips-body { flex: 1; min-width: min(260px, 100%); }
+
+.tips-list {
+  margin: var(--spacing-12) 0 0;
+  padding-left: var(--spacing-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-10);
+  font-size: var(--text-body-sm);
+  color: var(--text-secondary);
+  list-style: decimal-leading-zero;
+}
+
+.tips-list li::marker { color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 
 .recent-card {
   min-width: 168px;
@@ -760,5 +915,7 @@
   .dz-actions .btn { width: 100%; justify-content: center; }
   .qi-icon { display: none; }
   .queue-stats { gap: var(--spacing-10); }
-  .qi-actions .btn-icon:not(.keep-mobile) { display: none; }
+  .queue-item { flex-wrap: wrap; }
+  .qi-actions { margin-left: auto; }
+  .dest-path { flex: 1 1 100%; }
 }

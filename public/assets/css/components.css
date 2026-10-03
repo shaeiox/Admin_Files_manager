@@ -1099,7 +1099,8 @@
   box-shadow: var(--shadow-dropdown);
 }
 
-[data-tip]:hover::after {
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }

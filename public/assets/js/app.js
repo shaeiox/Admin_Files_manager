@@ -302,6 +302,9 @@ function resolveType(filename, isFolder = false) {
 const Toast = (() => {
   let stack = null;
   const EXIT_ANIMATION_MS = 250;
+  // A burst (eight uploads finishing together) must not bury the page: past this
+  // many visible toasts the oldest is dismissed to make room for the newest.
+  const MAX_VISIBLE = 4;
   const activeToasts = new Map();
   let toastCounter = 0;
 
@@ -395,6 +398,9 @@ const Toast = (() => {
 
     container.appendChild(node);
 
+    const visible = [...activeToasts.entries()].filter(([, t]) => t.state !== 'exiting');
+    visible.slice(0, Math.max(0, visible.length + 1 - MAX_VISIBLE)).forEach(([n]) => dismiss(n));
+
     requestAnimationFrame(() => {
       node.dataset.state = 'active';
     });
@@ -423,7 +429,8 @@ const Toast = (() => {
     error: (t, m, d) => show('error', t, m, d),
     warning: (t, m, d) => show('warning', t, m, d),
     info: (t, m, d) => show('info', t, m, d),
-    dismiss
+    dismiss,
+    MAX_VISIBLE,
   };
 })();
 

@@ -27,7 +27,7 @@
 ```bash
 npm run dev      # Start with nodemon (http://localhost:3000)
 npm start        # Start in production mode
-npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 465 tests, exits 0:
+npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 560 tests, exits 0:
                  # services, API contracts (live server), frontend modules in a vm, integration, guardrails.
 ```
 
@@ -137,13 +137,24 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 46
   uses `Promise.all`, so that case is a 500, not a degraded 200. Don't extend this pattern to sources that currently
   fail wholly without deciding which behaviour you want per capability.
 - **Some frontend calls are ahead of the backend.** `settings.js` requests `/api/settings` (GET + PUT) and
-  `/api/settings/action`, none of which exist server-side, so they 404. `dashboard.js`, `app.js` and `files.js` are
-  fully backed — their calls resolve. Don't assume a called endpoint is implemented; verify against `fs.routes.js` and
+  `/api/settings/action`, none of which exist server-side, so they 404. `dashboard.js`, `app.js`, `files.js` and
+  `uploads.js` are fully backed — their calls resolve. Don't assume a called endpoint is implemented; verify against `fs.routes.js` and
   `server.js` first (see "Known gaps" in `docs/CONTRACTS.md`).
 - **The Files page renders only what exists.** No control without a working handler, no success message for an
   operation that did not happen, no fabricated fallback data (an outage is an error state with a retry, never an
   empty folder or a synthetic tree). Source-level tests in `test/frontend/files.test.js` pin this; a removed control
   takes its handler with it. The sidebar is duplicated byte-for-byte on four pages and a test asserts they match.
+
+- **The Upload page invariants** (`uploads.js`, pinned by `test/frontend/uploads.test.js`):
+  - A figure derived from the queue says its scope ("since this page opened"); no tile claims a time period no source
+    provides.
+  - Unknown is rendered unavailable (`—`, via `Format.duration(null)`), never as `0` — e.g. remaining time before a
+    speed has been measured. A computed remaining time is labelled an estimate.
+  - No capability is claimed without server behaviour (the removed-claim inventory is in `docs/CONTRACTS.md`). A
+    preset's tags are derived from the one setting it applies (concurrency).
+  - Every dynamic interpolation goes through `escapeHtml`, including the in-place progress patch.
+  - Every icon-only control has an `aria-label`, renamed when its meaning changes (Pause → Resume).
+  - Failure kinds come from a machine-readable signal (server `kind`, HTTP status, transport), never from message text.
 
 ## When You Change Code
 
