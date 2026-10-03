@@ -158,7 +158,7 @@ const Sidebar = (() => {
       case 'Escape':
         if (isMobile() && isMobileOpen) {
           closeMobile();
-          mobileMenuBtn?.focus();
+          (document.querySelector('.mobile-menu-btn') || mobileMenuBtn)?.focus();
         }
         break;
     }
@@ -210,9 +210,13 @@ const Sidebar = (() => {
       }
     });
 
-    // Mobile menu button
-    mobileMenuBtn?.addEventListener('click', e => {
+    // Mobile menu button. Delegated: the button sits in the topbar, which
+    // router.js replaces on every client-side navigation.
+    document.addEventListener('click', e => {
+      const btn = e.target.closest && e.target.closest('.mobile-menu-btn');
+      if (!btn) return;
       e.preventDefault();
+      mobileMenuBtn = btn;
       if (isMobileOpen) closeMobile();
       else openMobile();
     });

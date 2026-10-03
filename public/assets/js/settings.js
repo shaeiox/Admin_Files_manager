@@ -16,8 +16,21 @@ const Settings = (() => {
     let state = {
         config: {},     // The configuration object fetched from the server
         isDirty: false, // Tracks if any changes have been made
-        isLoading: true
+        isLoading: true,
+        // false once GET /api/settings has failed: the server has no settings store
+        // (the endpoint is a documented gap), so nothing here can be saved and the
+        // page must not claim it was.
+        serverBacked: null,
     };
+
+    // Document/window listeners registered by bindUI, removed by destroy() so a
+    // client-side navigation away from this page leaves nothing behind.
+    let globalListeners = [];
+
+    function listen(target, type, handler) {
+        target.addEventListener(type, handler);
+        globalListeners.push([target, type, handler]);
+    }
 
     /* ══════════════════════════════════════════
        DATA FETCHING & HYDRATION
@@ -25,16 +38,26 @@ const Settings = (() => {
 
     async function loadSettings() {
         try {
-            state.config = await window.API.get('/settings');
+            // silent: a missing endpoint is reported once, in the page, rather than
+            // as an error toast on every visit.
+            state.config = await window.API.get('/settings', { silent: true });
+            state.serverBacked = true;
             hydrateForm();
         } catch (e) {
-            console.warn('[Settings] Failed to fetch settings from API. Using UI fallbacks.');
-            // The HTML inherently contains fallbacks in the markup, 
-            // but in a strict React/Vue environment, we would render from state.
-            // Here, we just let the UI remain as-is if the API is offline.
+            state.serverBacked = false;
+            const notice = $('#settingsNotice');
+            if (notice) notice.hidden = false;
+            if (e && e.status !== 404) {
+                Toast.error('Settings could not be loaded', (e && e.message) || 'Request failed');
+            }
         } finally {
             state.isLoading = false;
         }
+    }
+
+    /** Explain, instead of attempting, a server call that has no endpoint. */
+    function reportNotStored() {
+        Toast.info('Not saved', 'The server has no settings store yet, so changes on this page cannot be saved.');
     }
 
     // Maps the fetched JSON data to the respective DOM inputs
@@ -123,6 +146,10 @@ const Settings = (() => {
     }
 
     async function saveChanges() {
+        if (state.serverBacked === false) {
+            reportNotStored();
+            return;
+        }
         const btn = $('#saveChanges');
         btn.style.pointerEvents = 'none';
         btn.style.opacity = '0.5';
@@ -186,21 +213,21 @@ const Settings = (() => {
         }
 
         // 2. Watch for Form Changes (To show Save Bar)
-        document.addEventListener('change', e => {
+        listen(document, 'change', e => {
             // Don't mark dirty if user is just clicking theme picker or navigation
             if (e.target.closest('.settings-content') && !e.target.closest('.theme-picker')) {
                 markDirty();
             }
         });
 
-        document.addEventListener('input', e => {
+        listen(document, 'input', e => {
             if (e.target.matches('.settings-content input[type="text"], .settings-content textarea') && !e.target.closest('.theme-picker')) {
                 markDirty();
             }
         });
 
         // Prevent navigation if dirty
-        window.addEventListener('beforeunload', e => {
+        listen(window, 'beforeunload', e => {
             if (state.isDirty) {
                 e.preventDefault();
                 e.returnValue = '';
@@ -245,6 +272,10 @@ const Settings = (() => {
                 });
 
                 if (ok) {
+                    if (state.serverBacked === false) {
+                        Toast.info('Not performed', 'The server has no endpoint for this action.');
+                        return;
+                    }
                     try {
                         await window.API.post('/settings/action', { action });
                         Toast.success('Action completed successfully');
@@ -278,11 +309,29 @@ const Settings = (() => {
        ══════════════════════════════════════════ */
 
     function init() {
+        state.isDirty = false;
         bindUI();
         loadSettings();
     }
 
-    return { init };
+    /** Client-side navigation away: drop the document/window listeners. */
+    function destroy() {
+        globalListeners.forEach(([target, type, handler]) => target.removeEventListener(type, handler));
+        globalListeners = [];
+    }
+
+    /** A client-side navigation cannot use beforeunload; ask before dropping edits. */
+    async function beforeLeave() {
+        if (!state.isDirty) return true;
+        return Modal.confirm({
+            title: 'Leave without saving?',
+            message: 'Your unsaved edits on this page will be lost.',
+            confirmText: 'Leave',
+            danger: true,
+        });
+    }
+
+    return { init, destroy, beforeLeave };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {

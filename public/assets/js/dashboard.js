@@ -1001,9 +1001,12 @@ const Dashboard = (() => {
     btn.style.opacity = active ? '0.5' : '1';
   }
 
+  let onQuickClick = null;
+
   function bindActions() {
-    // Quick action tiles (delegated)
-    document.addEventListener('click', async (e) => {
+    // Quick action tiles (delegated). Kept by reference so destroy() can remove it.
+    if (onQuickClick) document.removeEventListener('click', onQuickClick);
+    onQuickClick = async (e) => {
       const tile = e.target.closest('[data-quick]');
       if (!tile) return;
 
@@ -1040,7 +1043,8 @@ const Dashboard = (() => {
           break;
         }
       }
-    });
+    };
+    document.addEventListener('click', onQuickClick);
 
     // Refresh: the summary performs the tree walk, so it runs on demand only.
     const refreshBtn = $('#refreshDashboard');
@@ -1081,8 +1085,16 @@ const Dashboard = (() => {
      EXPORTS
      ══════════════════════════════════════════ */
 
+  /** Client-side navigation away (router.js): stop polling, drop the listener. */
+  function destroy() {
+    stopHealthPolling();
+    if (onQuickClick) document.removeEventListener('click', onQuickClick);
+    onQuickClick = null;
+  }
+
   return {
     init,
+    destroy,
     // Pure helpers, exported so they can be reasoned about without a browser.
     resolvePanelState,
     resolveHealthPanelState,

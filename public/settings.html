@@ -187,10 +187,16 @@
                 Preferences
               </span>
               <h1 class="page-title">Settings</h1>
-              <p class="page-subtitle">Fine-tune your workspace — appearance, storage, security, and integrations.
-                Changes
-                apply instantly.</p>
+              <p class="page-subtitle">Fine-tune your workspace — appearance, storage, security, and integrations.</p>
             </div>
+          </div>
+
+          <!-- Shown by settings.js when the server has no settings endpoint: nothing
+               on this page except the theme is stored, and the page says so. -->
+          <div class="settings-notice" id="settingsNotice" role="status" hidden>
+            <i data-icon="info" data-icon-size="16"></i>
+            <span>Settings are not stored by the server yet. Only the theme applies (it is kept in this
+              browser); other changes on this page are not saved.</span>
           </div>
 
           <!-- Settings layout -->
@@ -1008,141 +1014,9 @@
   <script src="assets/js/api.js" defer></script>
   <script src="assets/js/app.js" defer></script>
   <script src="assets/js/sidebar.js" defer></script>
+  <script src="assets/js/router.js" defer></script>
   <script src="assets/js/settings.js" defer></script>
 
-  <!-- Settings page inline logic -->
-  <script>
-    (function () {
-      'use strict';
-      const { $, $$, Toast, Modal } = window.AFM;
-
-      // Pane switcher
-      $$('.settings-nav-item[data-pane]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const target = btn.getAttribute('data-pane');
-          $$('.settings-nav-item').forEach(b => b.classList.toggle('is-active', b === btn));
-          $$('.settings-pane').forEach(p => {
-            p.classList.toggle('is-active', p.getAttribute('data-pane-content') === target);
-          });
-          // Scroll into view on mobile
-          if (window.innerWidth <= 860) {
-            document.querySelector('.settings-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        });
-      });
-
-      // Deep-link support (?pane=security)
-      const params = new URLSearchParams(location.search);
-      const paneParam = params.get('pane');
-      if (paneParam) {
-        const btn = document.querySelector(`.settings-nav-item[data-pane="${paneParam}"]`);
-        btn?.click();
-      }
-
-      // Save bar visibility on any change
-      const saveBar = $('#saveBar');
-      let dirty = false;
-
-      function markDirty() {
-        if (dirty) return;
-        dirty = true;
-        saveBar?.classList.add('is-visible');
-      }
-
-      function markClean() {
-        dirty = false;
-        saveBar?.classList.remove('is-visible');
-      }
-
-      // Watch inputs
-      document.addEventListener('change', e => {
-        if (e.target.closest('.settings-content') && !e.target.closest('.theme-picker')) {
-          markDirty();
-        }
-      });
-      document.addEventListener('input', e => {
-        if (e.target.matches('.settings-content input[type="text"], .settings-content textarea') && !e.target.closest('.theme-picker')) {
-          markDirty();
-        }
-      });
-
-      // Save / discard
-      $('#saveChanges')?.addEventListener('click', () => {
-        Toast.success('Settings saved', 'Your preferences have been updated');
-        markClean();
-      });
-
-      $('#discardChanges')?.addEventListener('click', async () => {
-        const ok = await Modal.confirm({
-          title: 'Discard changes?',
-          message: 'Your unsaved edits will be lost.',
-          confirmText: 'Discard',
-          danger: true,
-        });
-        if (ok) {
-          markClean();
-          Toast.info('Changes discarded');
-        }
-      });
-
-      // Warn on navigation with unsaved changes
-      window.addEventListener('beforeunload', e => {
-        if (dirty) {
-          e.preventDefault();
-          e.returnValue = '';
-        }
-      });
-
-      // Danger zone actions
-      $$('[data-danger]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const action = btn.getAttribute('data-danger');
-          const configs = {
-            'empty-trash': {
-              title: 'Empty trash permanently?',
-              message: 'Every file in the trash will be permanently deleted. This action cannot be undone.',
-              confirmText: 'Empty trash',
-              onConfirm: () => Toast.success('Trash emptied', 'Files in the trash permanently deleted'),
-            },
-            'revoke-keys': {
-              title: 'Revoke all API keys?',
-              message: 'No API keys exist in this build, so there is nothing to revoke.',
-              confirmText: 'Revoke all',
-              onConfirm: () => Toast.info('No API keys', 'This build has no programmatic-access system.'),
-            },
-            'delete-workspace': {
-              title: 'Delete this workspace?',
-              message: 'This will permanently delete this workspace and every file in it. There is absolutely no recovery from this action.',
-              confirmText: 'Delete forever',
-              onConfirm: () => Toast.error('Workspace scheduled for deletion', 'Contact support within 24h to cancel'),
-            },
-          };
-          const cfg = configs[action];
-          if (!cfg) return;
-          const ok = await Modal.confirm({
-            title: cfg.title,
-            message: cfg.message,
-            confirmText: cfg.confirmText,
-            danger: true,
-          });
-          if (ok) cfg.onConfirm();
-        });
-      });
-
-      // Segmented control demo
-      $$('.segmented').forEach(seg => {
-        seg.addEventListener('click', e => {
-          const btn = e.target.closest('button');
-          if (!btn || !seg.contains(btn)) return;
-          seg.querySelectorAll('button').forEach(b => b.classList.toggle('is-active', b === btn));
-          markDirty();
-        });
-      });
-
-      // Theme picker also marks dirty? — Actually theme changes are instant, no save needed. Skip.
-      // (The theme system already handles persistence directly.)
-    })();
-  </script>
 </body>
 
 </html>

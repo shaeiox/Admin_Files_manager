@@ -610,12 +610,22 @@ const Dropdown = (() => {
 
 const ContextMenu = (() => {
   let node = null;
+  // When the menu last opened. The click that opens a menu is still bubbling
+  // when show() runs, so without this guard it reaches the document listener
+  // below and closes the menu in the same click (the bulk Download menu did).
+  let openedAt = -Infinity;
+
+  /** Close on an outside click, but never on the click that opened the menu. */
+  function onDocumentClick(e) {
+    if (e && typeof e.timeStamp === 'number' && e.timeStamp <= openedAt) return;
+    hide();
+  }
 
   function ensure() {
     if (!node) {
       node = el('div', { class: 'context-menu' });
       document.body.appendChild(node);
-      document.addEventListener('click', hide);
+      document.addEventListener('click', onDocumentClick);
       document.addEventListener('scroll', hide, true);
       window.addEventListener('resize', hide);
       document.addEventListener('keydown', e => e.key === 'Escape' && hide());
@@ -640,6 +650,7 @@ const ContextMenu = (() => {
     }).join('');
 
     menu.classList.add('is-open');
+    openedAt = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
 
     // Position with viewport clamping
     const rect = menu.getBoundingClientRect();
@@ -1023,6 +1034,19 @@ function updateStorageUI(storage) {
    BOOTSTRAP
    ══════════════════════════════════════════ */
 
+/**
+ * Re-apply the per-page chrome after router.js swaps the main area: icons in the
+ * new markup, the active sidebar entry, scroll reveals and keyboard hints. The
+ * document-level listeners installed by initApp are delegated and stay valid.
+ */
+function refreshChrome(root = document) {
+  hydrateIcons(root);
+  markActiveNav();
+  initScrollReveal();
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  $$('.kbd-mod').forEach(k => k.textContent = isMac ? '⌘' : 'Ctrl');
+}
+
 function initApp() {
   hydrateIcons();
   Dropdown.init();
@@ -1053,7 +1077,7 @@ window.AFM = {
   Format, FileTypes, resolveType,
   Toast, Modal, Dropdown, ContextMenu,
   copyToClipboard, Store,
-  debounce, throttle, uid, clamp, randBetween, escapeHtml,
+  debounce, throttle, uid, clamp, randBetween, escapeHtml, refreshChrome,
   countUp, initScrollReveal,
   // Sidebar (see the pure resolvers above): page modules reuse these rather
   // than re-implementing the unavailable-vs-measured distinction.

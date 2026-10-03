@@ -746,3 +746,20 @@
   .save-bar-actions { width: 100%; }
   .save-bar-actions .btn { flex: 1; justify-content: center; }
 }
+
+/* Shown when the server has no settings store: says so above the panes. */
+.settings-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-10);
+  margin-bottom: var(--spacing-20);
+  padding: var(--spacing-12) var(--spacing-16);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-card);
+  background: var(--bg-badge);
+  color: var(--text-secondary);
+  font-size: var(--text-body-sm);
+}
+
+.settings-notice[hidden] { display: none; }
+.settings-notice svg { flex-shrink: 0; margin-top: 2px; color: var(--accent-primary); }

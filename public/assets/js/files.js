@@ -58,6 +58,34 @@ const Files = (() => {
   const SORT_DEFAULT_DIR = { name: 'asc', size: 'desc', modified: 'desc', downloads: 'desc' };
   const DEFAULT_SORT = { key: 'name', dir: 'asc' };
 
+  /*
+   * List-view columns. The table uses a fixed layout, so a long name never
+   * reflows its neighbours: every cell truncates within its own column, and the
+   * operator resizes columns like a spreadsheet (drag the header edge, or focus
+   * it and use the arrow keys). `width: null` on Name means "fill what is left"
+   * until the operator gives it a width. Widths persist per browser.
+   */
+  const COLUMNS = [
+    { key: 'check', width: 44, fixed: true },
+    { key: 'name', width: null, min: 140, label: 'Name' },
+    { key: 'size', width: 110, min: 60, label: 'Size' },
+    { key: 'type', width: 130, min: 60, label: 'Type' },
+    { key: 'downloads', width: 110, min: 60, label: 'Downloads' },
+    { key: 'modified', width: 150, min: 80, label: 'Modified' },
+    { key: 'actions', width: 96, fixed: true },
+  ];
+  const COLUMN_MAX = 1200;
+  const NAME_FILL_MIN = 200;   // the least an unsized Name column may shrink to
+  const COLUMN_STEP = 16;      // arrow key; Shift multiplies by 4
+  const COLUMN_STORE_KEY = 'files-col-widths';
+  // Mirrors the media queries in files.css that hide columns; the table's
+  // minimum width must not count a column the stylesheet has hidden.
+  const COLUMN_BREAKPOINTS = [
+    { max: 1024, hide: ['type', 'downloads'] },
+    { max: 860, hide: ['type', 'downloads', 'modified'] },
+    { max: 560, hide: ['type', 'downloads', 'modified', 'size'] },
+  ];
+
   /** Filter chips, in display order. `other` is shown only when it has members. */
   const TYPE_CHIPS = [
     { key: 'all', label: 'All', icon: 'layers' },
@@ -123,7 +151,62 @@ const Files = (() => {
       page: 1,
       perPage: 20,
       currentPath: '/',
+      colWidths: {},            // operator-set list column widths (px), see COLUMNS
     }, overrides);
+  }
+
+  const columnDef = key => COLUMNS.find(c => c.key === key) || null;
+  const isResizable = key => { const c = columnDef(key); return !!c && !c.fixed; };
+
+  function clampColumnWidth(key, width) {
+    const c = columnDef(key);
+    const n = Math.round(Number(width));
+    if (!c || !Number.isFinite(n)) return null;
+    return Math.min(COLUMN_MAX, Math.max(c.min || 40, n));
+  }
+
+  /** Only finite widths for resizable columns survive; anything else is dropped. */
+  function sanitizeColumnWidths(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (const c of COLUMNS) {
+      if (c.fixed || !Object.prototype.hasOwnProperty.call(raw, c.key)) continue;
+      const w = clampColumnWidth(c.key, raw[c.key]);
+      if (w !== null) out[c.key] = w;
+    }
+    return out;
+  }
+
+  /** The width in effect: the operator's, else the default (null = Name fills). */
+  function columnWidth(widths, key) {
+    if (widths && Object.prototype.hasOwnProperty.call(widths, key)) return widths[key];
+    const c = columnDef(key);
+    return c ? c.width : null;
+  }
+
+  /**
+   * Stylesheet text for the current widths. Written into one <style> element
+   * rather than inline styles. With Name unsized the table fills the panel and
+   * never shrinks below its columns; once Name has a width the table is exactly
+   * the sum of its columns (the panel scrolls sideways if it is wider).
+   */
+  function columnWidthsCss(widths) {
+    const rules = COLUMNS.map(c => {
+      const w = columnWidth(widths, c.key);
+      return `.files-table col.col-${c.key} { width: ${w == null ? 'auto' : `${w}px`}; }`;
+    });
+    const nameWidth = columnWidth(widths, 'name');
+    const tableRule = (hidden) => {
+      const sum = COLUMNS
+        .filter(c => !hidden.includes(c.key))
+        .reduce((total, c) => total + (c.key === 'name' ? (nameWidth == null ? NAME_FILL_MIN : nameWidth) : columnWidth(widths, c.key)), 0);
+      return nameWidth == null
+        ? `.files-table { width: 100%; min-width: ${sum}px; }`
+        : `.files-table { width: ${sum}px; min-width: 0; }`;
+    };
+    rules.push(tableRule([]));
+    for (const bp of COLUMN_BREAKPOINTS) rules.push(`@media (max-width: ${bp.max}px) { ${tableRule(bp.hide)} }`);
+    return rules.join('\n');
   }
 
   function joinPath(dir, name) {
@@ -424,6 +507,15 @@ const Files = (() => {
       }).join('');
   }
 
+  function resizerHtml(state, key, label) {
+    const c = columnDef(key);
+    const w = columnWidth(state.colWidths, key);
+    const value = w == null ? 'aria-valuetext="Fills the remaining width"' : `aria-valuenow="${w}"`;
+    return `<span class="col-resizer" data-resize="${key}" role="separator" aria-orientation="vertical" tabindex="0"
+      aria-label="Resize ${label} column" ${value} aria-valuemin="${c.min}" aria-valuemax="${COLUMN_MAX}"
+      title="Drag to resize. Arrow keys resize, Delete resets."></span>`;
+  }
+
   function sortHeader(state, key, label, cls = '') {
     const sorted = state.sort.key === key;
     const ariaSort = sorted ? (state.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
@@ -433,8 +525,9 @@ const Files = (() => {
       <th scope="col" class="sortable${sorted ? ` is-sorted ${state.sort.dir}` : ''}${cls ? ` ${cls}` : ''}" aria-sort="${ariaSort}">
         <button type="button" class="sort-btn" data-sort="${key}"
           aria-label="${label}${sorted ? `, sorted ${dirWord}` : ''}. Sort ${next}.">
-          ${label}<span class="sort-ind" aria-hidden="true">${icon('chevronUp', 12)}</span>
+          <span class="sort-label">${label}</span><span class="sort-ind" aria-hidden="true">${icon('chevronUp', 12)}</span>
         </button>
+        ${isResizable(key) ? resizerHtml(state, key, label) : ''}
       </th>`;
   }
 
@@ -493,6 +586,7 @@ const Files = (() => {
     return `
       <div class="files-table-wrap">
         <table class="files-table" role="grid" aria-label="Files in ${esc(state.currentPath)}">
+          <colgroup>${COLUMNS.map(c => `<col class="col-${c.key}">`).join('')}</colgroup>
           <thead>
             <tr>
               <th scope="col" class="col-check">
@@ -503,7 +597,7 @@ const Files = (() => {
               </th>
               ${sortHeader(state, 'name', 'Name', 'col-name')}
               ${sortHeader(state, 'size', 'Size', 'col-size')}
-              <th scope="col" class="col-type">Type</th>
+              <th scope="col" class="col-type"><span class="th-label">Type</span>${resizerHtml(state, 'type', 'Type')}</th>
               ${sortHeader(state, 'downloads', 'Downloads', 'col-downloads')}
               ${sortHeader(state, 'modified', 'Modified', 'col-modified')}
               <th scope="col" class="col-actions"><span class="sr-only">Actions</span></th>
@@ -1784,7 +1878,114 @@ const Files = (() => {
     return cols > 0 ? cols : entries.length;
   }
 
+  /* ── column resizing ── */
+
+  let widthSheet = null;
+  let resizeDrag = null;
+
+  function applyColumnWidths() {
+    if (!document.createElement || !document.head) return;
+    if (!widthSheet) {
+      widthSheet = document.createElement('style');
+      widthSheet.id = 'filesColumnWidths';
+      document.head.appendChild(widthSheet);
+    }
+    widthSheet.textContent = columnWidthsCss(state.colWidths);
+  }
+
+  function syncResizerValue(key) {
+    const handle = document.querySelector && document.querySelector(`[data-resize="${key}"]`);
+    if (!handle) return;
+    const w = columnWidth(state.colWidths, key);
+    if (w == null) {
+      handle.removeAttribute('aria-valuenow');
+      handle.setAttribute('aria-valuetext', 'Fills the remaining width');
+    } else {
+      handle.removeAttribute('aria-valuetext');
+      handle.setAttribute('aria-valuenow', String(w));
+    }
+  }
+
+  function setColumnWidth(key, width, { persist = true } = {}) {
+    const w = clampColumnWidth(key, width);
+    if (w === null || !isResizable(key)) return;
+    state.colWidths = { ...state.colWidths, [key]: w };
+    applyColumnWidths();
+    syncResizerValue(key);
+    if (persist) Store.set(COLUMN_STORE_KEY, state.colWidths);
+  }
+
+  function resetColumnWidth(key) {
+    if (!isResizable(key)) return;
+    const next = { ...state.colWidths };
+    delete next[key];
+    state.colWidths = next;
+    applyColumnWidths();
+    syncResizerValue(key);
+    Store.set(COLUMN_STORE_KEY, state.colWidths);
+  }
+
+  /** The rendered width, for a column whose width is "fill" until first resized. */
+  function measuredWidth(handle, key) {
+    const th = handle && handle.closest ? handle.closest('th') : null;
+    const rect = th && th.getBoundingClientRect ? th.getBoundingClientRect() : null;
+    return rect && rect.width ? rect.width : (columnWidth(state.colWidths, key) || NAME_FILL_MIN);
+  }
+
+  function onResizePointerDown(e) {
+    const handle = e.target && e.target.closest ? e.target.closest('[data-resize]') : null;
+    if (!handle || (e.button !== undefined && e.button !== 0)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const key = handle.getAttribute('data-resize');
+    resizeDrag = { key, handle, startX: e.clientX, start: measuredWidth(handle, key) };
+    if (handle.setPointerCapture && e.pointerId !== undefined) handle.setPointerCapture(e.pointerId);
+    handle.classList.add('is-dragging');
+    handle.addEventListener('pointermove', onResizePointerMove);
+    handle.addEventListener('pointerup', onResizePointerEnd);
+    handle.addEventListener('pointercancel', onResizePointerEnd);
+  }
+
+  function onResizePointerMove(e) {
+    if (!resizeDrag) return;
+    setColumnWidth(resizeDrag.key, resizeDrag.start + (e.clientX - resizeDrag.startX), { persist: false });
+  }
+
+  function onResizePointerEnd() {
+    if (!resizeDrag) return;
+    const { handle } = resizeDrag;
+    handle.classList.remove('is-dragging');
+    handle.removeEventListener('pointermove', onResizePointerMove);
+    handle.removeEventListener('pointerup', onResizePointerEnd);
+    handle.removeEventListener('pointercancel', onResizePointerEnd);
+    resizeDrag = null;
+    Store.set(COLUMN_STORE_KEY, state.colWidths);
+  }
+
+  function onResizeKeydown(e, handle) {
+    const key = handle.getAttribute('data-resize');
+    const step = e.shiftKey ? COLUMN_STEP * 4 : COLUMN_STEP;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      e.stopPropagation();
+      setColumnWidth(key, measuredWidth(handle, key) + (e.key === 'ArrowRight' ? step : -step));
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      e.stopPropagation();
+      resetColumnWidth(key);
+    }
+  }
+
+  function onContainerDblClick(e) {
+    const handle = e.target && e.target.closest ? e.target.closest('[data-resize]') : null;
+    if (!handle) return;
+    e.preventDefault();
+    resetColumnWidth(handle.getAttribute('data-resize'));
+  }
+
   function onContainerKeydown(e) {
+    const resizer = e.target && e.target.closest ? e.target.closest('[data-resize]') : null;
+    if (resizer) return onResizeKeydown(e, resizer);
     const entry = e.target && e.target.closest ? e.target.closest('[data-entry]') : null;
     if (!entry) return;
     const id = entry.getAttribute('data-id');
@@ -1955,24 +2156,32 @@ const Files = (() => {
     if (input) input.click();
   }
 
+  /** window/document listeners, removed by destroy() on client-side navigation. */
+  let globalListeners = [];
+
+  function listenGlobal(target, type, handler, options) {
+    target.addEventListener(type, handler, options);
+    globalListeners.push([target, type, handler, options]);
+  }
+
   function initDragDrop() {
     const overlay = $('#dropOverlay');
     if (!overlay) return;
     let dragDepth = 0;
     const carriesFiles = e => !!(e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files'));
 
-    window.addEventListener('dragenter', e => {
+    listenGlobal(window, 'dragenter', e => {
       if (!carriesFiles(e)) return;
       dragDepth++;
       overlay.classList.add('is-active');
     });
-    window.addEventListener('dragleave', e => {
+    listenGlobal(window, 'dragleave', e => {
       if (!carriesFiles(e)) return;
       dragDepth = Math.max(0, dragDepth - 1);
       if (dragDepth === 0) overlay.classList.remove('is-active');
     });
-    window.addEventListener('dragover', e => { if (carriesFiles(e)) e.preventDefault(); });
-    window.addEventListener('drop', e => {
+    listenGlobal(window, 'dragover', e => { if (carriesFiles(e)) e.preventDefault(); });
+    listenGlobal(window, 'drop', e => {
       if (!carriesFiles(e)) return;
       e.preventDefault();
       dragDepth = 0;
@@ -2010,6 +2219,8 @@ const Files = (() => {
     bind('#filesContainer', 'click', onContainerClick);
     bind('#filesContainer', 'change', onContainerChange);
     bind('#filesContainer', 'keydown', onContainerKeydown);
+    bind('#filesContainer', 'pointerdown', onResizePointerDown);
+    bind('#filesContainer', 'dblclick', onContainerDblClick);
     bind('#filesContainer', 'focusin', onContainerFocusIn);
     bind('#filesContainer', 'contextmenu', onContainerContextMenu);
     bind('#filesContainer', 'error', onPreviewError, true);
@@ -2056,7 +2267,7 @@ const Files = (() => {
     bind('#fileDrawer', 'keydown', trapDrawerFocus);
     bind('#drawerClose', 'click', closeDrawer);
     bind('#drawerBackdrop', 'click', closeDrawer);
-    document.addEventListener('keydown', onEscape, true);
+    listenGlobal(document, 'keydown', onEscape, true);
 
     bind('#uploadTray', 'click', e => {
       const cancel = e.target.closest && e.target.closest('[data-upload-cancel]');
@@ -2077,7 +2288,9 @@ const Files = (() => {
     state = createState({
       view: Store.get('files-view', 'list') === 'grid' ? 'grid' : 'list',
       perPage: PAGE_SIZES.includes(Store.get('files-per-page', 20)) ? Store.get('files-per-page', 20) : 20,
+      colWidths: sanitizeColumnWidths(Store.get(COLUMN_STORE_KEY, {})),
     });
+    applyColumnWidths();
     initExpansion(state);
     applyLibraryView(resolveLibraryView(window.location && window.location.search));
 
@@ -2093,8 +2306,23 @@ const Files = (() => {
     loadFiles();
   }
 
+  /**
+   * Client-side navigation away (router.js). Uploads already in flight keep
+   * running; only page-scoped listeners, timers and the width sheet go.
+   */
+  function destroy() {
+    globalListeners.forEach(([target, type, handler, options]) => target.removeEventListener(type, handler, options));
+    globalListeners = [];
+    cancelPendingSearch();
+    onResizePointerEnd();
+    if (widthSheet && widthSheet.remove) widthSheet.remove();
+    widthSheet = null;
+    if (document.body && document.body.classList) document.body.classList.remove('has-bulk-bar');
+  }
+
   return {
     init,
+    destroy,
     // Pure helpers and renderers, exercised by test/frontend/files.test.js.
     pure: {
       TREE_DEPTH, STAGGER_STEPS, PAGE_SIZES, LIBRARY_VIEWS, TYPE_CHIPS,
@@ -2105,6 +2333,7 @@ const Files = (() => {
       renderTreeHtml, renderBreadcrumbHtml, renderChipsHtml, renderListHtml, renderGridHtml,
       renderFooterHtml, renderSkeletonHtml, renderEmptyHtml, renderErrorHtml, renderDrawerHtml,
       renderDrawerFooterHtml,
+      COLUMNS, sanitizeColumnWidths, clampColumnWidth, columnWidth, columnWidthsCss,
     },
     // Controller seam for the same suite: drives the real handlers against a stub DOM.
     _controller: {
@@ -2114,6 +2343,7 @@ const Files = (() => {
       setSelected, selectAllOnPage, toggleSort, setFilter, setPage, toggleTreeNode,
       onTreeClick, onBreadcrumbClick, onContainerClick, onContainerKeydown, onDrawerClick, onSearchInput,
       syncAfterMutation, cancelPendingSearch, runUploads, handleDrop, openBulkDownloadMenu,
+      setColumnWidth, resetColumnWidth, onResizeKeydown, onContainerDblClick,
     },
   };
 })();

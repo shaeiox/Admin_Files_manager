@@ -441,6 +441,11 @@ const Uploads = (() => {
     paintDrag();
   }
 
+  function onDragEnd() {
+    drag.reset();
+    paintDrag();
+  }
+
   function onDrop(e) {
     e.preventDefault();
     drag.reset();
@@ -520,7 +525,7 @@ const Uploads = (() => {
     window.addEventListener('dragover', onDragOver);
     window.addEventListener('dragleave', onDragLeave);
     window.addEventListener('drop', onDrop);
-    window.addEventListener('dragend', () => { drag.reset(); paintDrag(); });
+    window.addEventListener('dragend', onDragEnd);
   }
 
   /* ══════════════════════════════════════════
@@ -1488,8 +1493,25 @@ const Uploads = (() => {
     verifyDestination(state.destination);
   }
 
+  /**
+   * Client-side navigation away (router.js). The queue and any transfers in
+   * flight are kept: they continue in the background and are shown again when
+   * the page is revisited. Only the page-wide drop handlers go.
+   */
+  function destroy() {
+    window.removeEventListener('dragenter', onDragEnter);
+    window.removeEventListener('dragover', onDragOver);
+    window.removeEventListener('dragleave', onDragLeave);
+    window.removeEventListener('drop', onDrop);
+    window.removeEventListener('dragend', onDragEnd);
+    drag.reset();
+    metricWrap = null;
+    metricNodes = null;
+  }
+
   return {
     init,
+    destroy,
     presets,
     DEFAULT_PRESET,
     DEFAULT_OPTIONS,

@@ -263,7 +263,13 @@ const Theme = (() => {
     return () => { listeners = listeners.filter(f => f !== fn); };
   }
 
-  return { init, toggle, set, get, isDark, onChange };
+  /** Re-sync toggle and picker state onto markup swapped in by router.js. */
+  function refresh() {
+    updateToggles(current);
+    updatePickerCards(current);
+  }
+
+  return { init, toggle, set, get, isDark, onChange, refresh };
 })();
 
 

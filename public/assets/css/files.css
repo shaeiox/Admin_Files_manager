@@ -172,12 +172,73 @@ body[data-page="files"] {
   backdrop-filter: blur(6px);
 }
 
+/* Fixed layout: column widths come from <colgroup> (set by files.js), never from
+   content, so a long name cannot squeeze its neighbours into wrapping. */
 .files-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
-.files-table .col-name { min-width: 200px; }
+.files-table td.col-name { overflow: hidden; }
+
+.files-table td.col-size,
+.files-table td.col-type,
+.files-table td.col-downloads,
+.files-table td.col-modified {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.files-table td.col-type .tag {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+/* Header labels truncate; the resize handle sits on the header's right edge. */
+.files-table thead th { white-space: nowrap; }
+.files-table thead .sort-btn { max-width: 100%; overflow: hidden; }
+.files-table thead .sort-label,
+.files-table thead .th-label { overflow: hidden; text-overflow: ellipsis; }
+
+.col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 1;
+}
+
+.col-resizer::after {
+  content: '';
+  position: absolute;
+  top: 22%;
+  bottom: 22%;
+  right: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--border-hover);
+  opacity: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+}
+
+.files-table thead th:hover .col-resizer::after { opacity: 1; }
+
+.col-resizer:focus-visible { outline: none; }
+.col-resizer:focus-visible::after,
+.col-resizer.is-dragging::after {
+  opacity: 1;
+  top: 10%;
+  bottom: 10%;
+  background: var(--accent-primary);
+}
 
 .files-table thead th {
   position: sticky;
@@ -264,14 +325,8 @@ body[data-page="files"] {
 
 .star-mark svg { width: 12px; height: 12px; fill: currentColor; }
 
-.col-check { width: 44px; }
-.col-size { width: 100px; }
-.col-type { width: 130px; }
 
 .files-table .tag { white-space: nowrap; }
-.col-downloads { width: 110px; }
-.col-modified { width: 140px; }
-.col-actions { width: 60px; }
 
 /* ── File name cell ── */
 .fname-cell {
