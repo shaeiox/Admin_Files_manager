@@ -6,7 +6,7 @@
   <script src="assets/js/theme.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description"
-    content="Manage your Dimension Files Manager preferences, storage, API keys, integrations, and appearance.">
+    content="Manage your Dimension Files Manager workspace preferences and appearance.">
   <meta name="theme-color" content="#0a0a0a">
   <title>Settings · Dimension Files Manager</title>
 
@@ -135,7 +135,9 @@
          ══════════════════════════════════════════ -->
       <main class="main-area">
 
-        <!-- Topbar -->
+        <!-- Topbar. The "Search settings…" field that used to live here was
+             removed: nothing filtered the page, so it read and changed nothing.
+             The search box on the other three pages is unaffected. -->
         <header class="topbar">
           <div class="topbar-left">
             <button class="mobile-menu-btn" aria-label="Open menu">
@@ -146,18 +148,6 @@
               <span class="breadcrumb-sep"><i data-icon="chevronRight" data-icon-size="14"></i></span>
               <span class="breadcrumb-item is-current">Settings</span>
             </nav>
-          </div>
-
-          <div class="topbar-center">
-            <div class="search-field">
-              <i data-icon="search" data-icon-size="16" class="search-icon"></i>
-              <input id="globalSearch" class="search-input" type="search" placeholder="Search settings…"
-                aria-label="Search">
-              <div class="search-kbd">
-                <span class="kbd kbd-mod">⌘</span>
-                <span class="kbd">K</span>
-              </div>
-            </div>
           </div>
 
           <div class="topbar-right">
@@ -186,22 +176,26 @@
                 Preferences
               </span>
               <h1 class="page-title">Settings</h1>
-              <p class="page-subtitle">Fine-tune your workspace — appearance, storage, security, and integrations.</p>
+              <p class="page-subtitle">Change how Dimension looks and where new files land. Everything here is stored
+                on the server.</p>
             </div>
           </div>
 
-          <!-- Shown by settings.js when the server has no settings endpoint: nothing
-               on this page except the theme is stored, and the page says so. -->
+          <!-- Shown by settings.js only when the settings store cannot be reached.
+               Settings normally live on the server (GET/PUT /api/settings); the theme
+               is the one exception, kept in this browser by theme.js. -->
           <div class="settings-notice" id="settingsNotice" role="status" hidden>
             <i data-icon="info" data-icon-size="16"></i>
-            <span>Settings are not stored by the server yet. Only the theme applies (it is kept in this
-              browser); other changes on this page are not saved.</span>
+            <span>Settings are normally stored on the server, but the settings store cannot be reached right
+              now, so changes cannot be saved. The theme still applies — it is kept in this browser.</span>
           </div>
 
           <!-- Settings layout -->
           <div class="settings-layout">
 
-            <!-- Side navigation -->
+            <!-- Side navigation. Every entry here has a pane in the markup below;
+                 a section whose capability does not exist carries an explicit
+                 unavailable note rather than controls that do nothing. -->
             <nav class="settings-nav" aria-label="Settings sections">
               <div class="settings-nav-label">Workspace</div>
               <button class="settings-nav-item is-active" data-pane="general">
@@ -212,12 +206,12 @@
                 <i data-icon="sun" data-icon-size="16"></i>
                 Appearance
               </button>
+
+              <div class="settings-nav-label" style="margin-top:12px;">In this build</div>
               <button class="settings-nav-item" data-pane="storage">
                 <i data-icon="hardDrive" data-icon-size="16"></i>
                 Storage
               </button>
-
-              <div class="settings-nav-label" style="margin-top:12px;">Access</div>
               <button class="settings-nav-item" data-pane="security">
                 <i data-icon="shield" data-icon-size="16"></i>
                 Security
@@ -225,20 +219,6 @@
               <button class="settings-nav-item" data-pane="api">
                 <i data-icon="key" data-icon-size="16"></i>
                 API Keys
-              </button>
-              <button class="settings-nav-item" data-pane="integrations">
-                <i data-icon="package" data-icon-size="16"></i>
-                Integrations
-              </button>
-
-              <div class="settings-nav-label" style="margin-top:12px;">Account</div>
-              <button class="settings-nav-item" data-pane="notifications">
-                <i data-icon="bell" data-icon-size="16"></i>
-                Notifications
-              </button>
-              <button class="settings-nav-item" data-pane="danger">
-                <i data-icon="alert" data-icon-size="16"></i>
-                Danger Zone
               </button>
             </nav>
 
@@ -256,127 +236,60 @@
                       <i data-icon="user" data-icon-size="18"></i>
                       Workspace profile
                     </div>
-                    <div class="sg-desc">Public information about your Dimension workspace.</div>
+                    <div class="sg-desc">The name this workspace is known by across the app.</div>
                   </div>
                   <div class="sg-body">
                     <div class="setting-row">
                       <div class="setting-info">
                         <div class="setting-name">Workspace name</div>
-                        <div class="setting-hint">Shown in the sidebar and shared file links.</div>
+                        <div class="setting-hint">Shown as the brand in the sidebar. Leave empty to keep the
+                          default name.</div>
                       </div>
                       <div class="setting-control">
-                        <input class="input" type="text" value="Dimension HQ">
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Workspace URL</div>
-                        <div class="setting-hint">The base URL for all shared download links.</div>
-                      </div>
-                      <div class="setting-control">
-                        <input class="input" type="text" value="dl.dimension.io">
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Default language</div>
-                        <div class="setting-hint">Interface language for all admins.</div>
-                      </div>
-                      <div class="setting-control">
-                        <select class="select">
-                          <option>English (US)</option>
-                          <option>English (UK)</option>
-                          <option>Français</option>
-                          <option>Deutsch</option>
-                          <option>日本語</option>
-                          <option>Português (BR)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Time zone</div>
-                        <div class="setting-hint">All timestamps display in this zone.</div>
-                      </div>
-                      <div class="setting-control">
-                        <select class="select">
-                          <option>UTC</option>
-                          <option>America/New_York</option>
-                          <option>America/Los_Angeles</option>
-                          <option>Europe/London</option>
-                          <option>Europe/Berlin</option>
-                          <option>Asia/Tokyo</option>
-                        </select>
+                        <!-- name matches the settings key (general.workspaceName); the
+                             module hydrates and extracts exactly the keys named here. -->
+                        <input class="input" type="text" name="workspaceName" maxlength="60"
+                          placeholder="Dimension" aria-label="Workspace name">
                       </div>
                     </div>
                   </div>
                 </div>
 
+                <!--
+                  The General pane used to carry a base-URL field, language and
+                  timezone selects and three switches (auto-organize by type,
+                  auto-generate thumbnails, deduplication). None of them had a
+                  consumer anywhere in the codebase, no backend key existed for
+                  them, and each one asserted a capability the upload pipeline does
+                  not have. They are removed rather than persisted as no-ops.
+                -->
                 <div class="settings-group">
                   <div class="sg-head">
                     <div class="sg-title">
                       <i data-icon="folder" data-icon-size="18"></i>
-                      Default folder behavior
+                      Uploads
                     </div>
-                    <div class="sg-desc">Rules that apply to newly uploaded files.</div>
+                    <div class="sg-desc">Upload defaults kept by the server.</div>
                   </div>
                   <div class="sg-body">
                     <div class="setting-row">
                       <div class="setting-info">
+                        <!--
+                          Stored and validated by the server, but no page reads it
+                          yet: uploads.js does not consume this key (task 5.4 is
+                          gated on upload-pipeline-correctness archiving). The copy
+                          states that plainly instead of claiming the Uploads page
+                          starts here, which it does not.
+                        -->
                         <div class="setting-name">Default upload folder</div>
-                        <div class="setting-hint">Where files land when no destination is set.</div>
+                        <div class="setting-hint">Stored on the server as a path from the storage root, but not applied
+                          yet: the Uploads page still opens at “/”.</div>
                       </div>
                       <div class="setting-control">
-                        <input class="input" type="text" value="/inbox">
+                        <input class="input" type="text" name="defaultUploadFolder" placeholder="/"
+                          aria-label="Default upload folder">
                       </div>
                     </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Auto-organize by type</div>
-                        <div class="setting-hint">Sort uploads into subfolders based on file type (images/, videos/,
-                          etc.).</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch">
-                          <input type="checkbox" checked>
-                          <span class="track"></span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Auto-generate thumbnails</div>
-                        <div class="setting-hint">Create previews for images and videos on upload.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch">
-                          <input type="checkbox" checked>
-                          <span class="track"></span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Deduplication</div>
-                        <div class="setting-hint">Detect identical files by hash and link instead of storing duplicates.
-                        </div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch">
-                          <input type="checkbox" checked>
-                          <span class="track"></span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="sg-footer">
-                    <div class="sg-footer-note">Changes to organization rules apply to future uploads only.</div>
                   </div>
                 </div>
               </div>
@@ -449,66 +362,44 @@
                       </div>
                     </button>
                   </div>
+
+                  <div class="sg-footer">
+                    <div class="sg-footer-note">The theme is kept in this browser by the theme controller, not on
+                      the server.</div>
+                  </div>
                 </div>
 
+                <!--
+                  The Interface density segmented control, the reduce-motion
+                  switch and the show-thumbnails switch were removed: no CSS
+                  variable, class or attribute in this repository reads a density,
+                  motion or thumbnail preference, so all three were controls that
+                  changed nothing. They return only together with the hooks they
+                  would drive.
+                -->
                 <div class="settings-group">
                   <div class="sg-head">
                     <div class="sg-title">
-                      <i data-icon="sliders" data-icon-size="18"></i>
-                      Interface density
+                      <i data-icon="grid" data-icon-size="18"></i>
+                      File browser
                     </div>
-                    <div class="sg-desc">Adjust how much breathing room the layout uses.</div>
+                    <div class="sg-desc">How All Files opens.</div>
                   </div>
                   <div class="sg-body">
                     <div class="setting-row">
                       <div class="setting-info">
-                        <div class="setting-name">Density</div>
-                        <div class="setting-hint">Comfortable is the design's native rhythm.</div>
-                      </div>
-                      <div class="setting-control">
-                        <div class="segmented">
-                          <button>Compact</button>
-                          <button class="is-active">Comfortable</button>
-                          <button>Spacious</button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Reduce motion</div>
-                        <div class="setting-hint">Disable subtle animations and transitions.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch">
-                          <input type="checkbox">
-                          <span class="track"></span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Show file thumbnails</div>
-                        <div class="setting-hint">Display preview images in list and grid views.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch">
-                          <input type="checkbox" checked>
-                          <span class="track"></span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
                         <div class="setting-name">Default view</div>
-                        <div class="setting-hint">The layout used when opening the file browser.</div>
+                        <div class="setting-hint">The layout a fresh visit to All Files opens in. Once you pick a
+                          view on that page it is remembered there, and this setting waits until you change
+                          it again here.</div>
                       </div>
                       <div class="setting-control">
-                        <div class="segmented">
-                          <button class="is-active">List</button>
-                          <button>Grid</button>
+                        <!-- A <button> cannot carry a name attribute, so the key
+                             lives on the group and each option's value in
+                             data-value. settings.js reads exactly this pair. -->
+                        <div class="segmented" data-name="defaultView" role="group" aria-label="Default view">
+                          <button type="button" data-value="list" class="is-active" aria-pressed="true">List</button>
+                          <button type="button" data-value="grid" aria-pressed="false">Grid</button>
                         </div>
                       </div>
                     </div>
@@ -540,10 +431,10 @@
                     string was removed during Phase 6.
 
                     There is no quota system, no storage tiering, and no handler bound to
-                    this panel (settings.js references none of it), so no honest per-category
-                    figure exists here. Rather than substitute a different invented number,
-                    the panel states the figure is unavailable and points at the Dashboard,
-                    which does report real volume usage.
+                    this panel, so no honest per-category figure exists here. Rather than
+                    substitute a different invented number, the panel states the figure is
+                    unavailable and points at the Dashboard, which does report real volume
+                    usage.
                   -->
                   <div class="quota-panel">
                     <div class="setting-hint">
@@ -554,29 +445,11 @@
                   </div>
                 </div>
 
-                <div class="settings-group">
-                  <div class="sg-head">
-                    <div class="sg-title">
-                      <i data-icon="clock" data-icon-size="18"></i>
-                      Retention & lifecycle
-                    </div>
-                    <div class="sg-desc">Automate cleanup and tier transitions.</div>
-                  </div>
-                  <div class="sg-body">
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Auto-purge temp folder</div>
-                        <div class="setting-hint">Clear /temp weekly to reclaim space.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch">
-                          <input type="checkbox" checked>
-                          <span class="track"></span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <!--
+                  The "Retention & lifecycle" group (an auto-purge switch for /temp)
+                  was removed: there is no scheduler, no retention setting and no
+                  server-side field for one. Nothing cleans /temp on a schedule here.
+                -->
               </div>
 
               <!-- ══════════════════════
@@ -584,116 +457,45 @@
                  ══════════════════════ -->
               <div class="settings-pane" data-pane-content="security">
 
+                <!--
+                  Security.
+
+                  This pane previously listed a "Two-factor authentication —
+                  Enabled" badge with a Manage button, a single-sign-on Configure
+                  button, a session-timeout select, a checked-and-disabled
+                  "Encryption at rest — AES-256" switch, a checked "Virus scanning
+                  — ClamAV" switch, a password-protected-links switch and a
+                  watermarking switch.
+
+                  There is no authentication anywhere in this application (the API is
+                  unauthenticated by a recorded decision, ADR-003), no encryption at
+                  rest, no antivirus, no sessions and no share links. Every one of
+                  those controls read as real state and none of it existed, so the
+                  whole pane is replaced by the statement below — the same pattern as
+                  the quota panel and the API keys note. The controls return only
+                  alongside an authentication subsystem.
+                -->
                 <div class="settings-group">
                   <div class="sg-head">
                     <div class="sg-title">
                       <i data-icon="lock" data-icon-size="18"></i>
-                      Authentication
+                      Security
                     </div>
-                    <div class="sg-desc">Protect admin access with strong authentication.</div>
+                    <div class="sg-desc">What this build does and does not protect.</div>
                   </div>
                   <div class="sg-body">
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">
-                          Two-factor authentication
-                          <span class="badge badge-success">Enabled</span>
-                        </div>
-                        <div class="setting-hint">Require a second factor when signing in.</div>
-                      </div>
-                      <div class="setting-control">
-                        <button class="btn btn-ghost btn-sm">Manage</button>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Single sign-on (SSO)</div>
-                        <div class="setting-hint">Connect Okta, Azure AD, or Google Workspace.</div>
-                      </div>
-                      <div class="setting-control">
-                        <button class="btn btn-ghost btn-sm">Configure</button>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Session timeout</div>
-                        <div class="setting-hint">Automatically sign out inactive sessions.</div>
-                      </div>
-                      <div class="setting-control">
-                        <select class="select">
-                          <option>15 min</option>
-                          <option>1 hour</option>
-                          <option selected>8 hours</option>
-                          <option>24 hours</option>
-                          <option>Never</option>
-                        </select>
-                      </div>
+                    <div class="setting-hint">
+                      No authentication or security subsystem exists in this build. There
+                      are no accounts, passwords, sessions, single sign-on, two-factor
+                      steps, encryption at rest, virus scanning or password-protected
+                      links, so there is nothing here to configure — and no status here
+                      to report. Anyone who can reach this server has full access to
+                      every file in it.
                     </div>
                   </div>
-                </div>
 
-                <div class="settings-group">
-                  <div class="sg-head">
-                    <div class="sg-title">
-                      <i data-icon="shield" data-icon-size="18"></i>
-                      File protection
-                    </div>
-                    <div class="sg-desc">Security policies applied to all files.</div>
-                  </div>
-                  <div class="sg-body">
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Encryption at rest</div>
-                        <div class="setting-hint">AES-256 encryption for all stored files.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch">
-                          <input type="checkbox" checked disabled>
-                          <span class="track"></span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Virus scanning</div>
-                        <div class="setting-hint">Scan uploads against ClamAV signature database.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch">
-                          <input type="checkbox" checked>
-                          <span class="track"></span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Password-protected links</div>
-                        <div class="setting-hint">Require a password for all new share links by default.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch">
-                          <input type="checkbox">
-                          <span class="track"></span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Download watermarking</div>
-                        <div class="setting-hint">Add invisible watermarks to downloaded documents.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch">
-                          <input type="checkbox">
-                          <span class="track"></span>
-                        </label>
-                      </div>
-                    </div>
+                  <div class="sg-footer">
+                    <div class="sg-footer-note">Security controls are unavailable in this build.</div>
                   </div>
                 </div>
               </div>
@@ -734,255 +536,70 @@
 
                   <div class="sg-footer">
                     <div class="sg-footer-note">API keys are unavailable in this build.</div>
-
                   </div>
                 </div>
 
-                <div class="settings-group">
-                  <div class="sg-head">
-                    <div class="sg-title">
-                      <i data-icon="globe" data-icon-size="18"></i>
-                      Webhooks
-                    </div>
-                    <div class="sg-desc">Notify external systems when file events occur.</div>
-                  </div>
-                  <div class="sg-body">
-                    <div class="setting-row is-stacked">
-                      <div class="setting-info">
-                        <div class="setting-name">Webhook endpoint URL</div>
-                        <div class="setting-hint">POST events to this HTTPS endpoint.</div>
-                      </div>
-                      <div class="setting-control is-wide">
-                        <input class="input" type="text" placeholder="https://your-app.com/webhooks/dimension">
-                      </div>
-                    </div>
+                <!--
+                  Webhooks and integrations.
 
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Trigger events</div>
-                        <div class="setting-hint">Which file operations should fire a webhook.</div>
-                      </div>
-                      <div class="setting-control">
-                        <div class="swatch-row">
-                          <span class="tag">upload.completed</span>
-                          <span class="tag">file.deleted</span>
-                          <span class="tag">share.created</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- ══════════════════════
-                 PANE: INTEGRATIONS
-                 ══════════════════════ -->
-              <div class="settings-pane" data-pane-content="integrations">
-
+                  The webhook group (endpoint URL field, upload.completed /
+                  file.deleted / share.created trigger tags) is removed: no event bus
+                  and no outbound request exist in this codebase. The integrations
+                  grid — six cards asserting that two cloud providers were
+                  "Connected", that another was "Not connected" and that a chat
+                  service read "Not configured" — is removed with its Connect/Manage
+                  buttons, which had no handler at all. The single row below is the
+                  honest residue: no third-party service is connected, none can be,
+                  and no connection status is stored anywhere.
+                -->
                 <div class="settings-group">
                   <div class="sg-head">
                     <div class="sg-title">
                       <i data-icon="package" data-icon-size="18"></i>
-                      Connected services
+                      External services
                     </div>
-                    <div class="sg-desc">Sync files with external cloud providers and productivity tools.</div>
-                  </div>
-
-                  <div class="integration-grid">
-                    <div class="integration-card">
-                      <div class="integration-ico" style="color:#4285F4"><i data-icon="cloud" data-icon-size="17"></i>
-                      </div>
-                      <div class="integration-body">
-                        <div class="integration-name">Google Drive</div>
-                        <div class="integration-status connected"><span class="dot"></span> Connected</div>
-                      </div>
-                      <button class="btn btn-ghost btn-sm">Manage</button>
-                    </div>
-
-                    <div class="integration-card">
-                      <div class="integration-ico" style="color:#0061FF"><i data-icon="cloud" data-icon-size="17"></i>
-                      </div>
-                      <div class="integration-body">
-                        <div class="integration-name">Dropbox</div>
-                        <div class="integration-status connected"><span class="dot"></span> Connected</div>
-                      </div>
-                      <button class="btn btn-ghost btn-sm">Manage</button>
-                    </div>
-
-                    <div class="integration-card">
-                      <div class="integration-ico"><i data-icon="fileText" data-icon-size="17"></i></div>
-                      <div class="integration-body">
-                        <div class="integration-name">Notion</div>
-                        <div class="integration-status"><span class="dot"></span> Not connected</div>
-                      </div>
-                      <button class="btn btn-primary btn-sm">Connect</button>
-                    </div>
-
-                    <div class="integration-card">
-                      <div class="integration-ico" style="color:#4A154B"><i data-icon="mail" data-icon-size="17"></i>
-                      </div>
-                      <div class="integration-body">
-                        <div class="integration-name">Slack</div>
-                        <div class="integration-status"><span class="dot"></span> Not configured</div>
-                      </div>
-                      <button class="btn btn-ghost btn-sm">Manage</button>
-                    </div>
-
-                    <div class="integration-card">
-                      <div class="integration-ico"><i data-icon="database" data-icon-size="17"></i></div>
-                      <div class="integration-body">
-                        <div class="integration-name">Amazon S3</div>
-                        <div class="integration-status"><span class="dot"></span> Not connected</div>
-                      </div>
-                      <button class="btn btn-primary btn-sm">Connect</button>
-                    </div>
-
-                    <div class="integration-card">
-                      <div class="integration-ico"><i data-icon="code" data-icon-size="17"></i></div>
-                      <div class="integration-body">
-                        <div class="integration-name">GitHub</div>
-                        <div class="integration-status"><span class="dot"></span> Not connected</div>
-                      </div>
-                      <button class="btn btn-primary btn-sm">Connect</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- ══════════════════════
-                 PANE: NOTIFICATIONS
-                 ══════════════════════ -->
-              <div class="settings-pane" data-pane-content="notifications">
-
-                <div class="settings-group">
-                  <div class="sg-head">
-                    <div class="sg-title">
-                      <i data-icon="bell" data-icon-size="18"></i>
-                      Notification preferences
-                    </div>
-                    <div class="sg-desc">Choose which events reach you and where.</div>
+                    <div class="sg-desc">Cloud storage, sync and notification integrations.</div>
                   </div>
                   <div class="sg-body">
                     <div class="setting-row">
                       <div class="setting-info">
-                        <div class="setting-name">Upload complete</div>
-                        <div class="setting-hint">Notify when a large upload finishes.</div>
+                        <div class="setting-name">Third-party services</div>
+                        <div class="setting-hint">This build has no integration subsystem: no service is
+                          connected, none can be connected from this page, and no connection state is
+                          stored.</div>
                       </div>
                       <div class="setting-control">
-                        <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+                        <span class="badge">Not configured</span>
                       </div>
                     </div>
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Storage 80% full</div>
-                        <div class="setting-hint">Alert when workspace storage nears capacity.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
-                      </div>
-                    </div>
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Failed uploads</div>
-                        <div class="setting-hint">Notify when a file fails after all retries.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
-                      </div>
-                    </div>
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">New share links</div>
-                        <div class="setting-hint">When another admin creates a public share.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch"><input type="checkbox"><span class="track"></span></label>
-                      </div>
-                    </div>
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Weekly summary email</div>
-                        <div class="setting-hint">A digest of activity delivered every Monday.</div>
-                      </div>
-                      <div class="setting-control">
-                        <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
-                      </div>
-                    </div>
+                  </div>
+
+                  <div class="sg-footer">
+                    <div class="sg-footer-note">Integrations are unavailable in this build.</div>
                   </div>
                 </div>
               </div>
 
-              <!-- ══════════════════════
-                 PANE: DANGER ZONE
-                 ══════════════════════ -->
-              <div class="settings-pane" data-pane-content="danger">
+              <!--
+                Removed panes: Integrations, Notifications and Danger Zone.
 
-                <div class="settings-group danger-zone">
-                  <div class="sg-head">
-                    <div class="sg-title">
-                      <i data-icon="alert" data-icon-size="18"></i>
-                      Danger zone
-                    </div>
-                    <div class="sg-desc">These actions are permanent and cannot be undone. Please proceed with care.
-                    </div>
-                  </div>
-                  <div class="sg-body">
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Empty trash</div>
-                        <div class="setting-hint">Permanently delete every file currently in the trash.</div>
-                      </div>
-                      <div class="setting-control">
-                        <button class="btn btn-danger btn-sm" data-danger="empty-trash">
-                          <i data-icon="trash" data-icon-size="14"></i>
-                          Empty trash
-                        </button>
-                      </div>
-                    </div>
+                Integrations: six cards with fabricated connection states and six
+                Connect/Manage buttons with no handler.
+                Notifications: five toggles for channels (in-page events, storage
+                warnings, upload failures, share links, a weekly digest email) that
+                do not exist. The bell in the topbar is not this pane — it opens the
+                shared activity panel (AFM.Notifications) and is untouched.
+                Danger Zone: "Empty trash" for a trash that does not exist (deletion
+                is permanent by design), "Revoke all API keys" for keys that cannot
+                be issued, plus ownership transfer and workspace deletion — none of
+                which has a server action, and which would be an unauthenticated
+                destroy-everything endpoint if they did. Its confirm dialog also named
+                a "Linux disk", which is wrong for this cross-platform application.
 
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Revoke all API keys</div>
-                        <div class="setting-hint">Immediately invalidate all API keys. Any integration using them will
-                          stop working.</div>
-                      </div>
-                      <div class="setting-control">
-                        <button class="btn btn-danger btn-sm" data-danger="revoke-keys">
-                          <i data-icon="key" data-icon-size="14"></i>
-                          Revoke all
-                        </button>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Transfer workspace ownership</div>
-                        <div class="setting-hint">Move ownership to another administrator. You'll be demoted to admin.
-                        </div>
-                      </div>
-                      <div class="setting-control">
-                        <button class="btn btn-danger btn-sm">
-                          <i data-icon="users" data-icon-size="14"></i>
-                          Transfer
-                        </button>
-                      </div>
-                    </div>
-
-                    <div class="setting-row">
-                      <div class="setting-info">
-                        <div class="setting-name">Delete workspace</div>
-                        <div class="setting-hint">Permanently delete this workspace and all of its files. There is no recovery.</div>
-                      </div>
-                      <div class="setting-control">
-                        <button class="btn btn-danger btn-sm" data-danger="delete-workspace">
-                          <i data-icon="trash" data-icon-size="14"></i>
-                          Delete workspace
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                Each pane is gone with its nav entry rather than stubbed: a page that
+                lists an action it cannot perform is worse than a page that admits the
+                capability does not exist.
+              -->
 
             </div>
           </div>

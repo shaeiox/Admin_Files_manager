@@ -991,6 +991,14 @@ async function loadGlobalData() {
     console.warn('[Sidebar] volume usage unavailable:', e?.message || e);
     updateStorageUI(null);
   }
+
+  // Workspace name: the settings store is optional. The read is silent, and
+  // any failure leaves the static brand text untouched — no toast, no
+  // console line, no state change.
+  try {
+    const settings = await window.API.get('/settings', { silent: true });
+    applyWorkspaceName(settings?.general?.workspaceName);
+  } catch { /* the static markup default stands */ }
 }
 
 /* ══════════════════════════════════════════
@@ -1027,6 +1035,27 @@ function updateStorageUI(storage) {
   fillEl.style.boxShadow = view.available ? '' : 'inset 0 0 0 1px var(--border-secondary)';
 
   metaEl.textContent = view.meta;
+}
+
+/**
+ * The static brand text the four pages ship in their sidebar markup. An unset
+ * workspace name restores exactly this default, so the brand never goes blank
+ * and never invents a name.
+ */
+const DEFAULT_WORKSPACE_NAME = 'Dimension';
+
+/**
+ * Apply the operator-configured workspace name to the shared sidebar brand.
+ * A pure textContent write: the sidebar markup itself is never edited (the
+ * four pages' sidebars stay byte-identical) and textContent cannot inject
+ * markup. Called from loadGlobalData() on every page and from the Settings
+ * page after a successful save, so a rename shows without a reload.
+ */
+function applyWorkspaceName(name) {
+  const brandEl = document.querySelector('.brand-name');
+  if (!brandEl) return;
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+  brandEl.textContent = trimmed || DEFAULT_WORKSPACE_NAME;
 }
 
 
@@ -1083,4 +1112,5 @@ window.AFM = {
   // than re-implementing the unavailable-vs-measured distinction.
   resolveStorageDisplay, updateStorageUI,
   resolveIdentityDisplay, updateUserUI,
+  applyWorkspaceName,
 };

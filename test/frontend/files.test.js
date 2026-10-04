@@ -141,12 +141,14 @@ const TREE = [{
 
 /**
  * Load files.js against a stub page. `routes` maps a request prefix to a
- * response (or an Error to reject with, or a function of the url).
+ * response (or an Error to reject with, or a function of the url). `store`
+ * seeds AFM.Store, so a test can stand in for a value the operator already
+ * chose (and `page.store` is the live map, for a choice made mid-request).
  */
-function loadFiles({ routes = {}, location = '' } = {}) {
+function loadFiles({ routes = {}, location = '', store = {} } = {}) {
   const doc = makeDocument();
   const timers = [];
-  const calls = { get: [], post: [], put: [], del: [], downloadFile: [], downloadMultipleFiles: [], downloadZip: [], upload: [] };
+  const calls = { get: [], getRequests: [], post: [], put: [], del: [], downloadFile: [], downloadMultipleFiles: [], downloadZip: [], upload: [] };
   const toasts = [];
   const menus = [];
   const copies = [];
@@ -183,7 +185,7 @@ function loadFiles({ routes = {}, location = '' } = {}) {
   const el = (sel) => (els[sel] ||= new FakeEl(doc, sel));
   for (const sel of ['#filesContainer', '#folderTree', '#breadcrumb', '#filterChips', '#filesSearch', '#bulkBar',
     '#fileDrawer', '#drawerBackdrop', '#filesStatus', '#selectAll', '#pageTitle', '#pageSubtitle', '#sortDropdown',
-    '#sortLabel', '#sortTrigger', '.app-shell', '#uploadTray', '#hiddenFileInput']) el(sel);
+    '#sortLabel', '#sortTrigger', '#viewToggle', '.app-shell', '#uploadTray', '#hiddenFileInput']) el(sel);
   const drawer = el('#fileDrawer');
   drawer.children['.drawer-body'] = new FakeEl(doc, '.drawer-body');
   drawer.children['.drawer-footer'] = new FakeEl(doc, '.drawer-footer');
@@ -208,11 +210,14 @@ function loadFiles({ routes = {}, location = '' } = {}) {
   AFM.ContextMenu = { show: (x, y, items) => menus.push({ x, y, items }), hide() {} };
   AFM.Dropdown = { closeAll() {} };
   AFM.copyToClipboard = (text) => { copies.push(text); return Promise.resolve(true); };
-  AFM.Store = { get: (k, f) => f, set() {} };
+  AFM.Store = {
+    get: (k, f) => (Object.prototype.hasOwnProperty.call(store, k) ? store[k] : f),
+    set(k, v) { store[k] = v; },
+  };
 
   sandbox.API = {
     BASE_URL: '/api',
-    get: (url) => { calls.get.push(url); return respond(url); },
+    get: (url, opts) => { calls.get.push(url); calls.getRequests.push({ url, opts }); return respond(url); },
     post: (url, body) => { calls.post.push({ url, body }); return respond(`POST ${url}`); },
     put: (url, body) => { calls.put.push({ url, body }); return respond(`PUT ${url}`); },
     del: (url, body) => { calls.del.push({ url, body }); return respond(`DELETE ${url}`); },
@@ -227,6 +232,7 @@ function loadFiles({ routes = {}, location = '' } = {}) {
 
   return {
     Files, pure: Files.pure, c: Files._controller, els, doc, calls, toasts, menus, copies, modal, timers,
+    store,
     state: () => Files._controller.getState(),
     flushTimers() {
       const pending = timers.filter(t => !t.cancelled && !t.ran);
@@ -251,9 +257,24 @@ const LISTING = {
   counts: { all: 4, folder: 2, image: 1, video: 0, document: 0, audio: 0, archive: 0, code: 1, other: 0 },
 };
 
+/** The requests every booted page answers. */
+const PAGE_ROUTES = {
+  '/fs/list': LISTING,
+  '/fs/tree': TREE,
+  '/fs/thumbnail/capability': { available: false, formats: [], maxSize: 512 },
+};
+
 /** A page booted with the standard listing and tree. */
 async function booted(extraRoutes = {}) {
-  const page = loadFiles({ routes: { '/fs/list': LISTING, '/fs/tree': TREE, '/fs/thumbnail/capability': { available: false, formats: [], maxSize: 512 }, ...extraRoutes } });
+  const page = loadFiles({ routes: { ...PAGE_ROUTES, ...extraRoutes } });
+  page.Files.init();
+  await settleAll();
+  return page;
+}
+
+/** The same boot with a pre-seeded Store, i.e. a value the operator already chose. */
+async function bootedWith(extraRoutes = {}, store = {}) {
+  const page = loadFiles({ routes: { ...PAGE_ROUTES, ...extraRoutes }, store });
   page.Files.init();
   await settleAll();
   return page;
@@ -1229,6 +1250,109 @@ describe('filesystem-derived strings are escaped everywhere they are rendered', 
     });
     assert.ok(checked > 10, `the scan found the interpolation sites (${checked})`);
     assert.deepEqual(offenders, []);
+  });
+});
+
+/* ══════════════════════════════════════════
+   DEFAULT VIEW — the settings consumer (silent, and only a default)
+   ══════════════════════════════════════════ */
+
+describe('appearance.defaultView sets the fresh-visit listing layout', () => {
+  const GRID = { general: { workspaceName: null, defaultUploadFolder: null }, appearance: { defaultView: 'grid' } };
+  const LIST = { general: { workspaceName: null, defaultUploadFolder: null }, appearance: { defaultView: 'list' } };
+
+  const settingsReads = (page) => page.calls.getRequests.filter(r => r.url === '/settings');
+  const renderedIn = (page, view) => {
+    const out = html(page, '#filesContainer');
+    return view === 'grid' ? /class="file-card/.test(out) && !out.includes('<table class="files-table"')
+      : out.includes('<table class="files-table"');
+  };
+
+  /** Click the real view toggle: the handler bindEvents registered, not a re-implementation. */
+  function toggleTo(page, view) {
+    const btn = { getAttribute: k => (k === 'data-view' ? view : null) };
+    btn.closest = sel => (sel === '[data-view]' ? btn : null);
+    for (const handler of page.els['#viewToggle'].listeners.click) handler(event(btn));
+  }
+
+  test('the settings read is silent, so an outage cannot raise a toast', async () => {
+    const page = await booted({ '/settings': GRID });
+    assert.equal(settingsReads(page).length, 1, 'one read on init');
+    assert.deepEqual(plain(settingsReads(page)[0].opts), { silent: true }, 'silent, no error toast from the reader');
+  });
+
+  test('a configured grid opens the listing in grid', async () => {
+    const page = await booted({ '/settings': GRID });
+    assert.equal(page.state().view, 'grid');
+    assert.ok(renderedIn(page, 'grid'), 'cards, not the table');
+  });
+
+  test('a configured list is the same layout the page has always opened in', async () => {
+    const page = await booted({ '/settings': LIST });
+    assert.equal(page.state().view, 'list');
+    assert.ok(renderedIn(page, 'list'), 'the table');
+  });
+
+  test('unset, unreachable and out-of-enum values leave the current default alone', async () => {
+    const cases = {
+      'unset (null)': { appearance: { defaultView: null } },
+      'no appearance section': { general: { workspaceName: 'Ops' } },
+      'a bare object': {},
+      'outside the enum': { appearance: { defaultView: 'cards' } },
+      'a wrong type': { appearance: { defaultView: 7 } },
+      'the unreachable store': new Error('settings down'),
+    };
+    for (const [label, settings] of Object.entries(cases)) {
+      const page = await booted({ '/settings': settings });
+      assert.equal(page.state().view, 'list', label);
+      assert.ok(renderedIn(page, 'list'), `${label}: the listing still renders as a table`);
+      assert.deepEqual(page.toasts, [], `${label}: nothing is shown to the operator`);
+      assert.equal(page.state().error, null, `${label}: the page itself is unaffected`);
+      assert.match(html(page, '#filesContainer'), /data-entry/, `${label}: the listing loaded`);
+    }
+  });
+
+  test('a persisted choice beats the setting, in both directions', async () => {
+    const choseGrid = await bootedWith({ '/settings': LIST }, { 'files-view': 'grid' });
+    assert.equal(choseGrid.state().view, 'grid', 'a saved grid survives a setting that says list');
+
+    const choseList = await bootedWith({ '/settings': GRID }, { 'files-view': 'list' });
+    assert.equal(choseList.state().view, 'list', 'a saved list survives a setting that says grid');
+    assert.ok(renderedIn(choseList, 'list'));
+  });
+
+  test('a stored value outside the two layouts is not a choice; the setting decides', async () => {
+    const page = await bootedWith({ '/settings': GRID }, { 'files-view': 'table' });
+    assert.equal(page.state().view, 'grid', 'junk in the store is not an operator choice');
+  });
+
+  test('a choice made while the read is in flight still wins', async () => {
+    // No stored choice when the read is issued; the operator picks grid before it
+    // resolves. A setting applied from that stale premise would undo the click.
+    const routes = { ...PAGE_ROUTES };
+    const page = loadFiles({ routes });
+    routes['/settings'] = () => { toggleTo(page, 'grid'); return LIST; };
+    page.Files.init();
+    await settleAll();
+    assert.equal(page.state().view, 'grid', 'the choice made mid-read beats the setting');
+    assert.ok(renderedIn(page, 'grid'), 'and the listing shows it');
+    assert.equal(page.store['files-view'], 'grid', 'the click persisted it, as any toggle does');
+  });
+
+  test('the setting is a default, not a stick: a later toggle is the operator\'s', async () => {
+    const page = await booted({ '/settings': GRID });
+    assert.equal(page.state().view, 'grid', 'the setting opened the page in grid');
+    toggleTo(page, 'list');
+    assert.equal(page.state().view, 'list');
+    assert.ok(renderedIn(page, 'list'), 'the toggle re-rendered the table');
+    assert.equal(page.store['files-view'], 'list', 'persisted like any other choice');
+  });
+
+  test('one silent read per init, and it is a read of the settings document', async () => {
+    const page = await booted({ '/settings': GRID });
+    assert.equal((page.calls.get.filter(u => u === '/settings')).length, 1);
+    assert.doesNotMatch(FILES_SRC, /\bfetch\(/, 'the page goes through window.API, never fetch');
+    assert.doesNotMatch(FILES_SRC, /API\.put\('\/settings|API\.post\('\/settings/, 'the Files page never writes settings');
   });
 });
 

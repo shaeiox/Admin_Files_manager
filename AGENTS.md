@@ -17,7 +17,7 @@
 | Validation | Custom (`src/utils/validators.js`) | No Zod/Joi — validate via `validateFileName` / `validateClientPath` |
 | Uploads | Multer 2.x (`diskStorage`, via `UploadService`) | Streams to a hidden staging file inside `STORAGE_ROOT`, then moved into place; never buffer into memory |
 | Archiving | Archiver 8.x | ZIP streams are piped, never collected in memory |
-| Persistence | JSON file via `MetadataService` | Atomic temp-file-then-rename writes; singleton instance |
+| Persistence | JSON files via `MetadataService` / `SettingsService` | Atomic temp-file-then-rename writes; singleton instances; `data/*.json` is git-ignored |
 | Frontend | Vanilla JS + CSS (no bundler) | Modules attach to `window` (`window.API`, `window.AFM.*`); `<script>` tag load order matters. `router.js` navigates between the four pages without a reload (ADR-005) |
 | Logging | Morgan (`dev` format) | Errors also logged via `console.error` in `errorHandler` |
 | Dev tooling | Nodemon | Ignores `data/*` and `public/*` |
@@ -27,7 +27,7 @@
 ```bash
 npm run dev      # Start with nodemon (http://localhost:3000)
 npm start        # Start in production mode
-npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 594 tests, exits 0:
+npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 708 tests, exits 0:
                  # services, API contracts (live server), frontend modules in a vm, integration, guardrails.
 ```
 
@@ -35,10 +35,12 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 59
 - **Required env:** `STORAGE_ROOT` (absolute path). The server refuses to boot without it
   (`src/config/env.js` calls `process.exit(1)`). Optional: `PORT` (default `3000`),
   `UPLOAD_MAX_BYTES` (positive integer bytes, default 5 GiB; read by `UploadService`).
-- **Tests never touch the real metadata store.** `MetadataService` resolves `data/metadata.json` from
-  `process.cwd()`, and test files run in parallel processes, so every suite that boots the server
-  points `MetadataService.dbPath` at a temp file before requiring `server.js` (see
-  `test/api/fs.contract.test.js`). Two suites writing the real store once corrupted it.
+- **Tests never touch the real stores.** `MetadataService` resolves `data/metadata.json` and
+  `SettingsService` resolves `data/settings.json` from `process.cwd()`, and test files run in parallel
+  processes, so every suite that boots the server points `MetadataService.dbPath` (and, if it touches
+  settings, `SettingsService.dbPath` **and its in-memory cache**) at a temp file before requiring
+  `server.js` (see `test/api/fs.contract.test.js`, `test/api/settings.contract.test.js`). Two suites
+  writing the real store once corrupted it.
 - Health check: `GET /api/health`.
 
 ## Architecture Rules (non-negotiable)
@@ -46,7 +48,7 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 59
 1. **Layered flow:** `routes → controllers → services → fs`.
    - Controllers parse/validate input and format responses.
    - Services own all filesystem access (`FileSystemService`, `MetadataService`, `PathService`,
-     `UploadService`, `PreviewService`).
+     `UploadService`, `PreviewService`) and every store file (`SettingsService`).
    - Never register filesystem calls directly in `routes`; never bypass services from controllers.
 2. **The path boundary is `PathService`.** Every client-supplied path must pass
    `PathService.resolveSecurePath()` (traversal guard) before touching disk. The API surface speaks
@@ -69,7 +71,8 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 59
    - **Read-only aggregate** endpoints return a **bare top-level shape** with no envelope. `GET /api/fs/tree` returns a bare
      array (`[rootNode]`); `GET /api/fs/list` returns a bare object (`{ items, total, counts }`); `GET /api/dashboard/summary`
      returns a bare object; `GET /api/dashboard/health` returns a bare array; `GET /api/fs/thumbnail/capability` returns a
-     bare object. The dashboard endpoints follow that existing precedent — they are not an exception to it.
+     bare object; `GET /api/settings` returns the bare settings document. The dashboard endpoints follow that existing
+     precedent — they are not an exception to it.
    - **Errors** always use `{ success: false, error: string }`, serialized by the global `errorHandler`.
 
    Match the row you are imitating, and document the shape in `docs/CONTRACTS.md` in the same change.
@@ -142,11 +145,19 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 59
   rendering. **Metadata is the exception:** `MetadataService._read` throws for a corrupt/unreadable store and `getSummary`
   uses `Promise.all`, so that case is a 500, not a degraded 200. Don't extend this pattern to sources that currently
   fail wholly without deciding which behaviour you want per capability.
-- **Some frontend calls are ahead of the backend.** `settings.js` requests `/api/settings`, which does not exist
-  server-side, so it 404s; the page then shows a notice that settings are not stored and does not send the PUT or the
-  danger-zone POST. Only the theme setting takes effect (kept in the browser). `dashboard.js`, `app.js`, `files.js` and
-  `uploads.js` are fully backed — their calls resolve. Don't assume a called endpoint is implemented; verify against `fs.routes.js` and
-  `server.js` first (see "Known gaps" in `docs/CONTRACTS.md`).
+- **Settings persist in a real store; the theme does not.** `SettingsService` keeps a JSON document at
+  `data/settings.json` behind `GET`/`PUT /api/settings` (bare read, enveloped validated full replace;
+  ADR-006). The Settings page persists exactly three keys — `general.workspaceName` (sidebar brand,
+  applied at runtime by `applyWorkspaceName` in `app.js`), `general.defaultUploadFolder` (validated
+  and stored, but **not yet read by any page**) and `appearance.defaultView` (the Files page's default
+  layout). **The theme stays browser-local** in `theme.js`: it is the one preference deliberately
+  absent from the document, and the page says so.
+  Every control on that page either persists through that store or has been **removed** — there is no
+  third option, and a control with no consumer is not a setting. Don't add a key to the document
+  without a consumer that changes real behaviour. `dashboard.js`, `app.js`, `files.js`, `uploads.js`
+  and `settings.js` are all fully backed; verify a called endpoint against `fs.routes.js`,
+  `dashboard.routes.js`, `settings.routes.js` and `server.js` before assuming it 404s (see "Known
+  gaps" in `docs/CONTRACTS.md`, which is currently empty).
 - **The Files page renders only what exists.** No control without a working handler, no success message for an
   operation that did not happen, no fabricated fallback data (an outage is an error state with a retry, never an
   empty folder or a synthetic tree). Source-level tests in `test/frontend/files.test.js` pin this; a removed control

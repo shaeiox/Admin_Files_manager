@@ -24,10 +24,13 @@
   | `DELETE /api/fs/delete` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
   | `POST /api/fs/star` | write | `{ success, data }` |
   | `GET /api/fs/thumbnail/capability` | read | `{ available, formats, maxSize }` — bare object |
+  | `GET /api/settings` | read | the settings document — **bare object**, no `success` field |
+  | `PUT /api/settings` | write | `{ success, settings }` |
 
-  (Verified against every `res.json` call in `fs.controller.js`, `preview.controller.js` and
-  `dashboard.controller.js`. `GET /api/fs/download`, `POST /api/fs/download-zip` and a successful
-  `GET /api/fs/thumbnail` are streams/bytes and return no JSON body.)
+  (Verified against every `res.json` call in `fs.controller.js`, `preview.controller.js`,
+  `dashboard.controller.js` and `settings.controller.js`. `GET /api/fs/download`,
+  `POST /api/fs/download-zip` and a successful `GET /api/fs/thumbnail` are streams/bytes and return
+  no JSON body.)
 - **Error:** any status with `{ "success": false, "error": "human-readable message" }`. Never a
   `stack`, in any environment: `errorHandler` forwards only `AppError` messages (authored static
   strings, no absolute path) and masks everything else.
@@ -46,9 +49,15 @@
 
 These are recorded decisions, not oversights, and none of them is closed:
 
-- **The API is unauthenticated.** Every endpoint below, including upload, rename, delete and star,
-  answers any caller. This is the current design for a trusted, single-operator host.
-  **Authentication is required before the service is exposed beyond localhost** — a follow-up change.
+- **The API is unauthenticated.** Every endpoint below, including upload, rename, delete, star and
+  `PUT /api/settings`, answers any caller. This is the current design for a trusted, single-operator
+  host. **Authentication is required before the service is exposed beyond localhost** — a follow-up
+  change.
+- **Combined with open CORS, a write endpoint is a write endpoint.** Because any origin is admitted
+  and nothing authenticates, `PUT /api/settings` (like every other mutating route) can be called by
+  any web page the operator visits. That is why `data/settings.json` is constrained to non-secret
+  preference values and **no credential may ever be stored in it** (ADR-006) — and why no
+  destructive settings endpoint exists at all.
 - **Cross-origin access is open.** `server.js` mounts `cors()` with its defaults, which allow any
   origin. Combined with the absence of authentication, **any web page the operator visits can call
   every mutating endpoint.** Recorded at the same severity as the missing authentication.
@@ -65,6 +74,8 @@ These are recorded decisions, not oversights, and none of them is closed:
 | GET | `/api/health` | ✅ live | Boot/env check — **unchanged by the dashboard work**, byte-identical payload |
 | GET | `/api/dashboard/summary` | ✅ live | Read-only aggregate; bare object, `200` with per-capability degradation |
 | GET | `/api/dashboard/health` | ✅ live | Read-only aggregate; bare array of runtime metric objects |
+| GET | `/api/settings` | ✅ live | Read-only aggregate; **bare** settings document, no envelope |
+| PUT | `/api/settings` | ✅ live | Strict validated **full replace**; `400` on any unknown key or bad value |
 | GET | `/api/fs/tree` | ✅ live | Sidebar tree, exactly 2 levels below the root |
 | GET | `/api/fs/list` | ✅ live | Directory listing, filter/sort/paginate, `starredOnly` |
 | GET | `/api/fs/download` | ✅ live | Stream single file attachment |
@@ -476,18 +487,138 @@ posts a hidden form targeted at a hidden iframe, so the page never navigates). �
 - A directory becomes a recursive folder entry under its own name. Download counters increment for
   files only.
 
+### GET /api/settings → `200`
+
+Read-only aggregate over the operator settings document. **Bare object, no envelope** (see
+*Conventions → Success shape*): a client reads `settings.general.workspaceName` directly — there is
+no `success` field and nothing to unwrap.
+
+```json
+{
+  "general": { "workspaceName": null, "defaultUploadFolder": null },
+  "appearance": { "defaultView": null }
+}
+```
+
+That is the **complete schema**, and it is exactly these three keys — there is no `version` field,
+no free-form section, no theme key, and no room for anything else.
+
+| Field | Type | Nullable | Meaning |
+|---|---|---|---|
+| `general.workspaceName` | `string` | yes — `null` is the explicit *unset* state | Rendered as the sidebar brand text (`app.js`). ≤ 60 characters after trimming. |
+| `general.defaultUploadFolder` | `string` | yes — `null` is unset | A **client path** (POSIX, rooted at `/`). Validated and stored; **not yet read by any page** — the Uploads page still starts at `/` |
+| `appearance.defaultView` | `string` | yes — `null` is unset | `"list"` \| `"grid"` — the layout a *fresh* visit to All Files opens in. |
+
+- **A missing store bootstraps itself on first read.** `SettingsService._read` sees `ENOENT`,
+  creates `data/` (recursive `mkdir` **before** the write — the ordering rule `MetadataService._init`
+  documents), writes the document above, and serves it from the in-memory cache. There is no setup
+  step, no migration and no seed fixture.
+- **`null` is the unset state, not a missing value.** Every key is always present. A consumer that
+  receives `null` falls back to its own default — that is why the three fields are nullable rather
+  than absent, and why a falsy value is never rendered as `""` or `"undefined"`.
+- **Values are client paths, never host paths.** `defaultUploadFolder` is stored verbatim as sent;
+  the settings layer does not resolve it (see `PUT /api/settings`).
+- **One disk read per process:** the document is cached in memory after the first read, so the three
+  silent frontend consumers below cost nothing but a cache hit.
+- **A corrupt or unreadable store fails the whole request with `500`** —
+  `AppError('Settings store could not be read', 500)` from `SettingsService._read`, serialized by
+  `errorHandler` as `{ "success": false, "error": … }`. This is a **deliberate per-capability
+  choice, not the degraded-200 dashboard pattern**: substituting defaults would silently discard real
+  operator configuration, and the file is small and hand-repairable. Do not extend the degradation
+  pattern to this store without a decision of its own. See ADR-006.
+
+**Consumers.** Every read of this endpoint is **silent** (`api.js` `{ silent: true }`) and every
+consumer degrades independently: a store failure changes that one enhancement and nothing else, and
+never raises a toast for the settings read alone.
+
+| Consumer | Reads | Effect | Unset / unreachable |
+|---|---|---|---|
+| `app.js` — `loadGlobalData()` → `applyWorkspaceName()` | `general.workspaceName` | Writes `.brand-name` `textContent` in the shared sidebar on **all four pages**. Pure text write; the sidebar markup is never edited, so the four sidebars stay byte-identical. | The static markup default (`Dimension`) stands; no toast, no console line. |
+| `files.js` — `applyDefaultViewSetting()` | `appearance.defaultView` | Sets the initial list/grid layout of a **fresh** visit to All Files. Suppressed by an explicit view choice, which that page persists as `Store 'files-view'` — checked both before and after the read. | The page's existing default; no toast, no console line. |
+| `settings.js` — `loadSettings()` | the whole document | Hydrates the form (every control named in `settings.html` has a `name`/`data-name` matching its key). | The on-page notice is shown and **Save/Discard explain instead of writing**. |
+
+`general.defaultUploadFolder` is validated and persisted but has **no consumer yet** — the Uploads
+page still starts at `/`. Do not describe it as prefilling the destination until a page reads it.
+
+### PUT /api/settings → `200`
+
+**Strict, validated full replace** — not a merge, not a patch. The body must be the *complete*
+document; validation happens in `SettingsService.replace()` **before** any write, so a rejected
+payload leaves the stored file byte-identical.
+
+**Body:**
+```json
+{
+  "general": { "workspaceName": "Acme", "defaultUploadFolder": "/incoming" },
+  "appearance": { "defaultView": "grid" }
+}
+```
+
+→ **`200`**
+```json
+{
+  "success": true,
+  "settings": {
+    "general": { "workspaceName": "Acme", "defaultUploadFolder": "/incoming" },
+    "appearance": { "defaultView": "grid" }
+  }
+}
+```
+
+`settings` is the **persisted, normalized** document, so a client never has to reimplement the
+trim / `""`→`null` rules to learn what was actually stored.
+
+| Rule | Accepted | Refusal (`400 { success: false, error }`) |
+|---|---|---|
+| Top level | exactly `general` and `appearance` | any other section → `Unknown settings section "…"` |
+| `general` | object carrying exactly `workspaceName` and `defaultUploadFolder`, **both present** | missing key → `Missing setting "general.…"`; extra key → `Unknown setting "general.…"` |
+| `general.workspaceName` | `null`, or a string of at most **60 characters after trimming**; `""` / whitespace-only normalizes to `null` | non-string (except `null`), or > 60 chars |
+| `general.defaultUploadFolder` | `null`, or a **client path**: passes `validateClientPath`, starts with `/`, contains no `\`, and **every segment** passes `validateFileName` | host-absolute path, `..`, dot segments, control or Windows-illegal characters, empty string, > 4096 chars |
+| `appearance` | object carrying exactly `defaultView`, present | missing key → `Missing setting "appearance.…"`; extra key → `Unknown setting "appearance.…"` |
+| `appearance.defaultView` | `null`, `"list"`, `"grid"` | anything else |
+| Whole body | a JSON **object** | absent body, array, string, number |
+
+- **Unknown keys are rejected, never silently stripped.** Stripping would hide client drift behind a
+  successful-looking full replace: a client still sending a removed pane would get a `200` and drop
+  the values it sent.
+- **A malformed JSON body is a client `400`, not a server `500`** — the body parser's own error
+  status is honoured and its parser text is replaced by the generic `errorHandler` message.
+- **A rejected write leaves the store byte-identical** — validation precedes the write, and the write
+  itself is **atomic** (temp file + `rename`), so no partially written document is ever observable at
+  `data/settings.json`.
+- **`defaultUploadFolder` is validated but never resolved.** The settings layer imports no
+  `PathService` and touches no filesystem object other than the store file; resolution through the
+  secure path boundary happens at the point of use, exactly like every other client path.
+- **No credential may ever be added to this document** (ADR-006). It is unauthenticated over HTTP and
+  world-readable on disk like `data/metadata.json`; its contents are operator-preference values only.
+
+**There is deliberately no `POST /api/settings/action`** — nor a `DELETE`, nor a reset endpoint. The
+Settings page holds no destructive control, and adding an unauthenticated destructive endpoint is
+out of scope by design (ADR-003, ADR-006). Any other method or sub-path under `/api/settings` falls
+through to the `/api` catch-all:
+
+```json
+{ "success": false, "error": "API endpoint not found" }   // 404
+```
+
+**Mount order (load-bearing).** `app.use('/api/settings', settingsRoutes)` sits in `server.js`
+**after** `/api/dashboard` and **before** the `/api` 404 catch-all — that catch-all is a
+two-argument middleware which never calls `next()`, so a mount placed after it is permanently
+unreachable and `GET /api/settings` would answer `404` even though the router exists. Pinned by
+`test/api/settings.contract.test.js`.
+
 ## Error Model
 
 | Status | Meaning | Typical triggers |
 |---|---|---|
-| `400` | Invalid input | Bad name/path, no file, non-directory for readDir/download, empty batch |
+| `400` | Invalid input | Bad name/path, no file, non-directory for readDir/download, empty batch, **any invalid `PUT /api/settings` payload (unknown key, missing key, wrong type, out-of-enum, over-long, bad client path)** |
 | `403` | Forbidden | Path traversal attempt; storage-root deletion; OS permission denial (`EACCES`/`EPERM`) |
 | `404` | Not found | Missing item/parent, `ENOENT` |
 | `409` | Conflict | Create/rename/upload collides with an existing item |
 | `413` | Too large | Upload over `UPLOAD_MAX_BYTES`; preview source over 50 MiB |
 | `415` | Unsupported | Preview requested for a non-image or a folder |
 | `422` | Unprocessable | Preview could not be decoded |
-| `500` | Server error | Unmapped fs error. Message masked to a generic string |
+| `500` | Server error | Unmapped fs error. Message masked to a generic string. Also raised explicitly by a **corrupt or uninitializable `data/settings.json`** (`SettingsService` → static authored message) |
 
 All errors are produced by throwing `AppError(message, statusCode)` and are serialized centrally by
 `src/middlewares/errorHandler.js`. Only `AppError` messages reach the client; no `stack` is sent in
@@ -525,6 +656,28 @@ per-capability degradation, so a partial failure is expressed in the payload
 - `activities` capped at 50 entries. Keys in `downloads` / entries in `starred` are client paths;
   they are migrated on rename and removed on delete (best-effort).
 
+### `data/settings.json` (SettingsService)
+
+```json
+{
+  "general": { "workspaceName": null, "defaultUploadFolder": null },
+  "appearance": { "defaultView": null }
+}
+```
+
+- **A separate store from the metadata DB** — settings are not new keys in `data/metadata.json`, and
+  `MetadataService` is untouched by the settings work.
+- Written atomically (temp file + rename); cached in memory (singleton instance); created with the
+  defaults above on the first read of a missing file (`data/` is created first).
+- **Client values only.** `defaultUploadFolder` is a client path, validated by `validateClientPath` +
+  per-segment `validateFileName`; the settings layer never resolves it to a host path and no absolute
+  OS path is ever written or returned.
+- **No credential, token or key may ever live here** (ADR-006): the file is unauthenticated over HTTP
+  and world-readable on disk, same exposure class as `data/metadata.json`.
+- A corrupt/unparseable file is **not** repaired or defaulted: `_read` throws `AppError(500)` and the
+  request fails wholly (ADR-006).
+- Git-ignored by the existing `data/*.json` rule.
+
 ### File item (API + frontend)
 
 `{ id, name, path, isFolder, type, size, modified, downloads, starred, status }` — `id === path` is
@@ -538,13 +691,13 @@ the client path and doubles as the stable identifier across API and UI. `size` a
 | `API` | `assets/js/api.js` | `get/post/put/del/upload/downloadFile/downloadMultipleFiles/downloadZip`, `BASE_URL` |
 | `Files` | `assets/js/files.js` | Files page; `Files.pure` (renderers/helpers) and `Files._controller` are test seams |
 | `Uploads` | `assets/js/uploads.js` | Upload page; `Uploads.pure` (derivations, row renderer) and `Uploads._controller` are test seams |
-| `AFM` | `assets/js/app.js` | Shared helpers namespace (`Toast`, `Modal`, `Format`, `Icons`, DOM utils) |
+| `AFM` | `assets/js/app.js` | Shared helpers namespace (`Toast`, `Modal`, `Format`, `Icons`, DOM utils, `applyWorkspaceName`) |
 | `Icons` / `icon()` / `hydrateIcons()` | `assets/js/app.js` | Inline SVG system (`<i data-icon="name">`) |
 | `Format` | `assets/js/app.js` | bytes/duration/relative-time/number formatters |
 | `Toast`, `Modal`, `Dropdown`, `ContextMenu` | `assets/js/app.js` | UI primitives |
 | `theme.js` | self-contained | Applies `[data-theme]` before paint; no dependencies. `Theme.refresh()` re-syncs swapped-in toggles |
 | `Router` | `assets/js/router.js` | Client-side navigation between the four pages (`navigate`, `resolve`); see below |
-| `Dashboard`, `Settings` | `assets/js/dashboard.js`, `assets/js/settings.js` | Page modules |
+| `Dashboard`, `Settings` | `assets/js/dashboard.js`, `assets/js/settings.js` | Page modules. `Settings` reads and writes the live `GET`/`PUT /api/settings` store; the theme picker is **not** its concern |
 | `AFM.Notifications` | `assets/js/notifications.js` | Shared bell panel: opens on the topbar bell, renders the real `GET /api/dashboard/summary` activity feed with loading/empty/unavailable states, closes on Escape/outside click/navigation. No unread dot is rendered (the feed has no read/unread signal) |
 
 #### Page-module contract (client-side navigation, ADR-005)
@@ -566,13 +719,23 @@ and must keep using delegated `document` listeners for controls that live in the
 
 ### Known gaps: frontend calls without a backend
 
-Some UI modules call endpoints that **do not exist** on the server yet (they hit the `/api`
-404 catch-all):
+**This list is empty.** Every call a frontend module makes today resolves against a documented
+endpoint in the table above. Do not add an entry for a call that exists — verify against
+`fs.routes.js`, `dashboard.routes.js`, `settings.routes.js` and `server.js` first; when a gap is
+closed, **delete** its bullet here in the same change that adds the endpoint.
 
-- `settings.js` → `GET /settings` (requested `silent`). A failure shows an on-page notice that
-  settings are not stored; Save and the danger-zone actions then explain that they cannot run
-  instead of sending `PUT /settings` / `POST /settings/action`. No error toast for the 404.
-- `app.js` → `GET /user/profile`, `GET /storage/quota`
+**Removed from this list:**
+
+- `settings.js → GET /settings` — closed: `GET`/`PUT /api/settings` are live (documented above);
+  `settings.js` reads and writes the store, and the on-page notice now appears only when the store
+  genuinely cannot be reached.
+- `app.js → GET /user/profile, GET /storage/quota` — **this entry was itself stale and has been
+  deleted.** Neither path has ever existed. `loadGlobalData()` calls **`/api/health`** (the sidebar
+  identity/env block, `{success, message, env}`) and **`/api/dashboard/summary`** (the sidebar volume
+  card — the only source of capacity), plus one **silent** `/api/settings` read for the workspace
+  brand. All three are live; when `/health` or `/dashboard/summary` fails the block renders as
+  explicitly *unavailable* rather than a fabricated identity or capacity, and the `/settings` read
+  fails silently.
 
 **No Dashboard endpoint is in this list any more.** `GET /dashboard/summary` and
 `GET /dashboard/health` are live and documented above; `dashboard.js` and `app.js` are fully
@@ -585,10 +748,9 @@ picker), `/fs/folder` (create a missing destination) and `/dashboard/summary` (r
 
 `files.js` is fully backed: every call it makes (`/fs/tree`, `/fs/list`, `/fs/folder`,
 `/fs/upload`, `/fs/rename`, `/fs/delete`, `/fs/star`, `/fs/download-zip`, `/fs/download`,
-`/fs/thumbnail/capability`) resolves.
+`/fs/thumbnail/capability`, and the silent `/settings` default-view read) resolves.
 
-When implementing a gap, add the route/controller, then move it from this list into the endpoint
-table above.
+`settings.js` is fully backed: `/settings` (read) and `/settings` (write).
 
 ### Upload page: capability claims removed (reversible inventory)
 
@@ -610,6 +772,65 @@ left standing. If a capability is built later, its claim can return with it.
 | "Uploaded today" tile | metrics | No source is scoped to a day; now "Completed since this page opened" |
 | Seven hardcoded "Recently uploaded" files, "from all admins" | recent strip | Now real `upload` activities from `GET /api/dashboard/summary` (no size: activities carry none); no accounts exist |
 | `/releases/2025` destination placeholder | destination strip | The real current destination is rendered from state |
+
+### Settings page: capability claims removed (reversible inventory)
+
+The Settings page used to render six panes of enterprise configuration and asserted server-side facts
+that were false. Every entry below was **deleted or replaced with an explicit unavailable note**,
+following the quota-panel / API-keys precedent: remove the affordance, or state plainly that the
+capability does not exist. Nothing here is implemented by the client or the server, so nothing here
+is persisted — the surviving document has exactly three keys (see `GET /api/settings`).
+
+**What survives:** `general.workspaceName` (sidebar brand), `general.defaultUploadFolder` (stored,
+not yet consumed), `appearance.defaultView` (Files default layout), and the theme picker, which is
+**browser-local** by design (`theme.js`) and says so on the page.
+
+| Removed claim / control | Where it was | Why |
+|---|---|---|
+| "Two-factor authentication — **Enabled**" badge + its **Manage** button | Security pane → Authentication group | There is **no authentication anywhere** in this application (ADR-003); the badge asserted a state that could not exist, and the button had no handler |
+| Single-sign-on **Configure** button ("Okta, Azure AD, Google Workspace") | Security pane → Authentication group | No accounts and no SSO; nothing to configure |
+| **Session timeout** select (15 min … Never) | Security pane → Authentication group | No sessions exist to expire |
+| "Encryption at rest — **AES-256**" switch (checked **and disabled**) | Security pane → File protection group | Nothing encrypts; `STORAGE_ROOT` holds plaintext. A checked, disabled switch reads as enforced policy |
+| "Virus scanning — **ClamAV**" switch (checked) | Security pane → File protection group | No scanner is installed or invoked |
+| **Password-protected links** switch | Security pane → File protection group | No share links exist — the share affordance was removed earlier for the same reason |
+| **Download watermarking** switch | Security pane → File protection group | Nothing watermarks any document |
+| Integration **"Connected" / "Not connected" / "Not configured"** cards (Google Drive, Dropbox, Notion, Slack, Amazon S3, GitHub) | Integrations pane (pane + nav entry removed) | No integration subsystem and **no stored connection state anywhere** — the statuses were fabricated |
+| Six integration **Connect / Manage** buttons | Integrations pane | No handler existed for any of them. Replaced by one honest "Not configured" row under the API Keys pane |
+| **Webhook endpoint URL** field | API Keys pane → Webhooks group | No event bus and no outbound HTTP request exists in this codebase |
+| **Trigger-event tags** (`upload.completed`, `file.deleted`, `share.created`) | API Keys pane → Webhooks group | Same — no event is ever dispatched |
+| Five **notification toggles** (upload complete, storage 80% full, failed uploads, new share links, weekly summary email) | Notifications pane (pane + nav entry removed) | No notification subsystem and no mail transport. **The topbar bell is not this pane** — it opens the shared activity panel (`AFM.Notifications`) and is untouched |
+| **"Retention & lifecycle"** group + **"Auto-purge temp folder"** switch (checked, "clear `/temp` weekly") | Storage pane | No scheduler, no retention setting and no server-side field for one; nothing cleans `/temp` on a schedule |
+| **Interface density** segmented control (Compact / Comfortable / Spacious) | Appearance pane | No CSS variable, class or attribute reads a density preference — verified absent |
+| **Reduce motion** switch | Appearance pane | No motion hook exists; nothing reads such a preference |
+| **Show file thumbnails** switch | Appearance pane | No per-page thumbnail attribute exists, and preview availability is a fixed server capability (`GET /api/fs/thumbnail/capability`), not an operator preference |
+| **Auto-organize by type** switch (checked) | General pane | The upload pipeline has no organiser; files land flat in the destination |
+| **Auto-generate thumbnails** switch (checked) | General pane | No thumbnail is generated at upload time; previews are on-demand and no transformer is installed |
+| **Deduplication** switch (checked, "detect identical files by hash") | General pane | Nothing hashes or deduplicates |
+| **Default language** select (6 locales) | General pane | No i18n layer — every string in the SPA is English |
+| **Time zone** select (6 zones, "all timestamps display in this zone") | General pane | No formatter reads a timezone; timestamps render from the browser's own locale |
+| **Workspace URL** field (prefilled `dl.dimension.io`) + "shown in shared file links" | General pane | There is no public base URL and no share links; the app is served from the origin it is reached at |
+| **"Empty trash"** (`data-danger="empty-trash"`) | Danger Zone pane (removed) | **There is no trash** — deletion is permanent by design (`fs.rm`, no recycle bin) |
+| **"Revoke all API keys"** (`data-danger="revoke-keys"`) | Danger Zone pane (removed) | Self-contradictory: the API Keys pane on the same page truthfully states that no keys can be issued |
+| **"Transfer workspace ownership"** → the **Transfer** button | Danger Zone pane (removed) | No accounts or ownership primitives; it had not even a `data-danger` attribute, so unlike its neighbours it had **no handler at all** — not even the confirm / "Not performed" path |
+| **"Delete workspace"** (`data-danger="delete-workspace"`) | Danger Zone pane (removed) | Would be an **unauthenticated destroy-everything endpoint** on a service with no authentication (ADR-003) |
+| "…permanently deleted from the **Linux disk**" | Danger Zone confirm dialog (`settings.js`) | Factually wrong: this application is cross-platform (Windows included). Any future destructive copy names permanence without naming a platform |
+| **"Search settings…"** topbar input (`#globalSearch`) + its ⌘K hint | `settings.html` topbar (this page only) | Nothing filtered the page — `globalSearch` appeared exactly once in the codebase, in the ⌘K focus shortcut, so typing in it did nothing. The search box on the other three pages is unaffected |
+| "Manage your … preferences, storage, API keys, **integrations**, and appearance" | `<meta name="description">` | Reworded to the settings that actually exist |
+
+**Honest residue kept in place of the removed groups** (the same pattern as the quota panel and the
+API keys note): the Storage pane states the quota breakdown is unavailable and points at the
+Dashboard; the Security pane states that no authentication or security subsystem exists; the API
+Keys pane states that no keys are issued and no third-party service is connected. Nothing renders
+"enabled" without a working handler, and no status asserts server state that does not exist. The
+Integrations, Notifications and Danger Zone panes were removed **together with their nav entries**
+rather than stubbed; `?pane=<removed>` silently falls through to General, which is what the markup
+opens on.
+
+A live-server scan in `test/integration/live-server.test.js` refuses a list of these strings on
+`/settings.html` (`ClamAV`, `AES-256`, `Two-factor`, `Google Drive`, `Dropbox`, `Slack`,
+`webhook`, `Empty trash`, `Revoke all`, `Transfer`, `Delete workspace`, `Linux disk`, `Auto-purge`,
+`Deduplication`, `Auto-organize`), scoped to that one page because "Transfer" is honest copy
+elsewhere.
 
 ### File-type taxonomy (shared contract)
 

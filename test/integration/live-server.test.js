@@ -328,6 +328,25 @@ describe('every served page is honest and functional', () => {
         });
     }
 
+    // Capability claims the Settings page used to make for subsystems this build
+    // does not have. Scoped to /settings.html on purpose: "Transfer" is honest
+    // copy on the Uploads page ("follow each transfer live"), so a cross-page
+    // scan for it would report a false positive there.
+    const SETTINGS_FORBIDDEN = [
+        'ClamAV', 'AES-256', 'Two-factor', 'Google Drive', 'Dropbox', 'Slack',
+        'webhook', 'Empty trash', 'Revoke all', 'Transfer', 'Delete workspace',
+        'Linux disk', 'Auto-purge', 'Deduplication', 'Auto-organize',
+    ];
+
+    test('GET /settings.html serves with no fabricated capability', async () => {
+        const res = await call('GET', '/settings.html');
+
+        assert.equal(res.status, 200, '/settings.html did not serve');
+        const rendered = res.body.replace(/<!--[\s\S]*?-->/g, '');
+        const found = SETTINGS_FORBIDDEN.filter((f) => rendered.includes(f));
+        assert.deepEqual(found, [], '/settings.html still claims capabilities this build does not have');
+    });
+
     test('every script the dashboard page references actually parses', async () => {
         const page = (await call('GET', '/')).body;
         const sources = [...page.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]);
@@ -338,6 +357,22 @@ describe('every served page is honest and functional', () => {
             const file = path.join(__dirname, '..', '..', 'public', src.replace(/^\/+/, ''));
             assert.ok(fs.existsSync(file), `${src} is referenced but missing`);
             // A syntax error would kill the page silently.
+            assert.doesNotThrow(
+                () => execFileSync(process.execPath, ['--check', file], { stdio: 'pipe' }),
+                `${src} does not parse`
+            );
+        }
+    });
+
+    test('every script the settings page references actually parses', async () => {
+        const page = (await call('GET', '/settings.html')).body;
+        const sources = [...page.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]);
+
+        assert.ok(sources.length > 0, 'the page references scripts');
+
+        for (const src of sources) {
+            const file = path.join(__dirname, '..', '..', 'public', src.replace(/^\/+/, ''));
+            assert.ok(fs.existsSync(file), `${src} is referenced but missing`);
             assert.doesNotThrow(
                 () => execFileSync(process.execPath, ['--check', file], { stdio: 'pipe' }),
                 `${src} does not parse`

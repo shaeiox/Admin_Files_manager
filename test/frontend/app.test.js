@@ -64,6 +64,20 @@ function sidebarNodes() {
     });
 }
 
+/** Just the brand node: the runtime seam applyWorkspaceName() writes into. */
+function brandNodes(text = 'Dimension') {
+    const brand = stubElement();
+    brand.textContent = text;
+    return mountSidebar({ '.brand-name': brand });
+}
+
+/** The source text of one top-level function, used by the source-level seams. */
+function functionSource(name) {
+    const start = APP_SOURCE.indexOf(name);
+    assert.notEqual(start, -1, `${name} exists in app.js`);
+    return APP_SOURCE.slice(start, APP_SOURCE.indexOf('\n}', start));
+}
+
 /** Everything the volume card would put on screen for one resolved view. */
 function renderedVolume(view) {
     return [view.pctText, view.fillWidth, view.meta].join(' | ');
@@ -331,6 +345,63 @@ describe('updateUserUI - sidebar identity', () => {
 });
 
 /* ══════════════════════════════════════════
+   SEAM 5 - the workspace name in the shared brand
+   ══════════════════════════════════════════ */
+
+describe('applyWorkspaceName - a configured name, or the markup default', () => {
+    test('a configured name replaces the static brand text', () => {
+        const nodes = brandNodes();
+        AFM.applyWorkspaceName('Northwind Media');
+        assert.equal(nodes['.brand-name'].textContent, 'Northwind Media');
+    });
+
+    test('surrounding whitespace is trimmed rather than rendered', () => {
+        const nodes = brandNodes();
+        AFM.applyWorkspaceName('  Ops  \n');
+        assert.equal(nodes['.brand-name'].textContent, 'Ops');
+    });
+
+    test('the name is written as text, never as markup', () => {
+        // The brand lives in operator-reachable text; textContent cannot inject
+        // nodes, and the sidebar markup itself is never rewritten.
+        const nodes = brandNodes();
+        AFM.applyWorkspaceName('<img src=x onerror=alert(1)>');
+        assert.equal(nodes['.brand-name'].textContent, '<img src=x onerror=alert(1)>', 'kept verbatim, as text');
+        assert.equal(nodes['.brand-name'].innerHTML, undefined, 'no markup written into the node');
+        assert.equal(nodes['.brand-name'].outerHTML, undefined, 'the node is not replaced');
+    });
+
+    test('unset, empty and non-string values restore the static markup default', () => {
+        // Every "no name" shape ends in the same place, so a cleared setting
+        // cannot leave a previous name on screen.
+        for (const unset of [undefined, null, '', '   ', '\n\t', false, 0, {}, []]) {
+            const nodes = brandNodes();
+            AFM.applyWorkspaceName('Northwind Media');   // a live rename first
+            AFM.applyWorkspaceName(unset);               // then the setting is unset
+            assert.equal(nodes['.brand-name'].textContent, 'Dimension',
+                `default restored for ${JSON.stringify(unset) ?? 'undefined'}`);
+        }
+    });
+
+    test('a page without the brand block does not throw', () => {
+        mountSidebar({ '.storage-pct': stubElement() });
+        assert.doesNotThrow(() => AFM.applyWorkspaceName('Ops'));
+        assert.doesNotThrow(() => AFM.applyWorkspaceName(null));
+    });
+
+    test('the restored default is the text the four pages actually ship', () => {
+        // The fallback is only honest if it is the brand the markup contains -
+        // a constant that drifts from the pages is a different invention.
+        for (const page of ['index.html', 'files.html', 'uploads.html', 'settings.html']) {
+            const src = fs.readFileSync(path.join(__dirname, '..', '..', 'public', page), 'utf8');
+            const brand = src.match(/<span class="brand-name">([^<]*)<\/span>/);
+            assert.ok(brand, `${page} ships a .brand-name span`);
+            assert.equal(brand[1], 'Dimension', `${page} ships the default applyWorkspaceName restores`);
+        }
+    });
+});
+
+/* ══════════════════════════════════════════
    SEAM 3 + SEAM 4 - wiring and exports
    ══════════════════════════════════════════ */
 
@@ -355,6 +426,31 @@ describe('seam 3 - the sidebar reads endpoints that exist', () => {
         assert.ok(APP_SOURCE.includes("window.API.get('/dashboard/summary')"), 'summary drives the volume card');
     });
 
+    test('the workspace name is read from /settings, silently, after the other reads', () => {
+        assert.equal((APP_SOURCE.match(/window\.API\.get\('\/settings'/g) || []).length, 1,
+            'one settings read, not one per consumer');
+        assert.ok(APP_SOURCE.includes("window.API.get('/settings', { silent: true })"), 'the read is silent');
+        const body = functionSource('async function loadGlobalData');
+        assert.ok(body.indexOf('/settings') > body.indexOf('/dashboard/summary'),
+            'the brand is applied after the existing fetches');
+    });
+
+    test('a settings failure cannot escape loadGlobalData or raise anything', () => {
+        const body = functionSource('async function loadGlobalData');
+        const settingsBlock = body.slice(body.indexOf('const settings = await'));
+        assert.match(settingsBlock, /\} catch \{/, 'the read carries its own try/catch');
+        assert.doesNotMatch(settingsBlock, /Toast\.|console\./,
+            'an unreachable store shows nothing and logs nothing');
+        assert.doesNotMatch(body, /Toast\./, 'no sidebar read raises a toast');
+    });
+
+    test('the brand helper writes textContent and nothing else', () => {
+        const body = functionSource('function applyWorkspaceName');
+        assert.match(body, /\.brand-name/, 'it addresses the shipped brand span');
+        assert.match(body, /brandEl\.textContent = /, 'one text write');
+        assert.doesNotMatch(body, /innerHTML|outerHTML|insertAdjacentHTML|\.html\b/, 'no markup writes');
+    });
+
     test('no bare fetch() call was introduced', () => {
         assert.ok(!/\bfetch\(/.test(APP_SOURCE), 'all requests go through window.API');
     });
@@ -364,6 +460,10 @@ describe('seam 4 - helpers are exported for reuse', () => {
     test('window.AFM exposes both sidebar helpers', () => {
         assert.equal(typeof AFM.updateStorageUI, 'function');
         assert.equal(typeof AFM.updateUserUI, 'function');
+    });
+
+    test('window.AFM exposes the brand helper the Settings page calls after a save', () => {
+        assert.equal(typeof AFM.applyWorkspaceName, 'function');
     });
 
     test('the exported helpers are the DOM wrappers the sidebar itself calls', () => {

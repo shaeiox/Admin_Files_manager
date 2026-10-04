@@ -9,6 +9,7 @@ const config = require('./src/config/env');
 const errorHandler = require('./src/middlewares/errorHandler');
 const fsRoutes = require('./src/routes/fs.routes');
 const dashboardRoutes = require('./src/routes/dashboard.routes');
+const settingsRoutes = require('./src/routes/settings.routes');
 
 const app = express();
 
@@ -36,6 +37,13 @@ app.use('/api/fs', fsRoutes);
 // catch-all is a two-argument middleware that never calls next() and so
 // terminates the chain - anything mounted after it would be unreachable.
 app.use('/api/dashboard', dashboardRoutes);
+
+// Settings store (settings-page-correctness). Mounted in the same window as the
+// dashboard router - AFTER it and BEFORE the /api catch-all - because that
+// catch-all is a two-argument middleware that never calls next(), so a mount
+// placed after it would be permanently unreachable and GET /api/settings would
+// answer 404 even though the router exists.
+app.use('/api/settings', settingsRoutes);
 
 // Catch-all for undefined API routes. Registered exactly once: it never calls
 // next(), so a second copy below it was unreachable dead code.

@@ -386,8 +386,18 @@ describe('settings page', () => {
 
   test('the notice ships hidden and states what is and is not stored', () => {
     const notice = SETTINGS_HTML.match(/<div class="settings-notice" id="settingsNotice"[^>]*>[\s\S]*?<\/div>/)[0];
+    // The copy is wrapped across lines in the markup; compare it as one sentence.
+    const words = notice.replace(/\s+/g, ' ');
     assert.match(notice, /\bhidden\b/);
-    assert.match(notice, /not stored by the server/);
+    // Settings ARE stored server-side (GET/PUT /api/settings). The notice means
+    // the store is unreachable, not that persistence does not exist — and the
+    // theme is the one browser-local exception.
+    assert.match(words, /normally stored on the server/);
+    assert.match(words, /cannot be reached right now/);
+    assert.match(words, /cannot be saved/);
+    assert.match(words, /theme still applies/i);
+    assert.doesNotMatch(SETTINGS_HTML, /not stored by the server/,
+      'that claim is false now: the store exists, it is simply unreachable');
     assert.doesNotMatch(SETTINGS_HTML, /Changes\s+apply instantly/, 'no claim that edits take effect');
   });
 });
