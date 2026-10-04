@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# scripts/git-hooks/post-receive - deploy on push to the deployment branch.
+#
+# Install into the BARE repository (see docs/DEPLOYMENT.md, "Trigger"):
+#   cp scripts/git-hooks/post-receive    <bare>.git/hooks/post-receive
+#   cp scripts/trigger-deploy.sh         <bare>.git/hooks/trigger-deploy.sh
+#   git -C <bare>.git config dimension.deployTarget  deploy@files-host
+#   git -C <bare>.git config dimension.deployBranch  master          # default
+#   git -C <bare>.git config dimension.sshOpts       "-i <path-to-deploy-key>"
+#
+# A post-receive hook cannot reject a push - the push has already landed. It
+# gates the DEPLOYMENT: the host runs the full suite on the release before
+# activating it (deploy.sh, D12), so a commit whose suite fails reaches the
+# remote and deploys nowhere. That is sufficient while one machine pushes
+# (production-cicd-readiness D8, task 0.5); with several, use a pre-receive gate.
+#
+# Overlapping pushes are serialised on the host (flock), and a stale commit
+# cannot replace a newer active release (commit-time check in deploy.sh).
+
+set -uo pipefail
+
+hook_dir="$(cd "$(dirname "$0")" && pwd)"
+target="$(git config --get dimension.deployTarget || true)"
+branch="$(git config --get dimension.deployBranch || echo master)"
+export SSH_OPTS="$(git config --get dimension.sshOpts || true)"
+
+zero='0000000000000000000000000000000000000000'
+while read -r old new ref; do
+    [[ "$ref" == "refs/heads/$branch" ]] || { echo "[deploy] $ref is not the deployment branch ($branch): nothing deployed."; continue; }
+    [[ "$new" == "$zero" ]] && { echo "[deploy] $ref deleted: nothing deployed."; continue; }
+    if [[ -z "$target" ]]; then
+        echo "[deploy] dimension.deployTarget is not configured: nothing deployed."
+        continue
+    fi
+    echo "[deploy] Deploying ${new:0:12} from $ref to $target ..."
+    if bash "$hook_dir/trigger-deploy.sh" "$target" "$new"; then
+        echo "[deploy] ${new:0:12}: deployed."
+    else
+        rc=$?
+        echo "[deploy] ${new:0:12}: NOT deployed (exit $rc). The push itself was accepted; see DEPLOY_OUTCOME above."
+    fi
+done
+exit 0

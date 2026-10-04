@@ -4,6 +4,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 const AppError = require('../utils/AppError');
+const { resolveDataDir } = require('../config/dataDir');
 const { validateSettingsPayload } = require('../utils/validators');
 
 /**
@@ -43,7 +44,8 @@ function defaultSettings() {
 class SettingsService {
     constructor() {
         // Absolute path to the JSON settings file
-        this.dbPath = path.join(process.cwd(), 'data', 'settings.json');
+        // Under AFM_DATA_DIR (default <cwd>/data) - outside every release in production.
+        this.dbPath = path.join(resolveDataDir(), 'settings.json');
         this.cache = null; // In-memory cache to avoid excessive disk reads
     }
 
@@ -62,6 +64,8 @@ class SettingsService {
         try {
             await fs.mkdir(path.dirname(this.dbPath), { recursive: true });
             await this._write(defaultSettings());
+            // First run is logged so it is distinguishable from a later outage in the journal.
+            console.log(`[store] First run: initialised an empty settings store at ${this.dbPath}`);
         } catch (error) {
             const wrapped = new AppError('Settings store could not be initialized', 500);
             wrapped.cause = error;

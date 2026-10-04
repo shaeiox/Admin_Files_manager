@@ -12,7 +12,9 @@ yarn-error.log
 Thumbs.db
 
 # Application Data (Do not track actual server data/metadata)
-data/*.json
+# Everything under data/ except the placeholder: store documents, their temp
+# files, recovery copies (*.corrupt-backup) and a local storage root (data/storage/).
+data/*
 !data/.gitkeep
 
 # Storage / Downloads (If testing locally)

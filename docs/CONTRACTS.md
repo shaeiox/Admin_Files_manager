@@ -925,3 +925,35 @@ Two breakdowns, two contracts — never cross-asserted:
 
 Effect of the reconciliation on the Dashboard: files previously counted as `other` (e.g. `.ts`,
 `.md`, `.bmp`) now fall into their real category, so the donut's slices shift. Recorded in ADR-003.
+
+## Deployment contract (ADR-008)
+
+Additive section (production-cicd-readiness). The operator runbook is `docs/DEPLOYMENT.md`.
+
+- **Configuration contract.** Required: `STORAGE_ROOT`, an absolute, existing, readable and
+  traversable directory, never created by the service. `AFM_DATA_DIR` is also required when
+  `NODE_ENV=production`; elsewhere it defaults to `<cwd>/data`. Optional: `PORT` (`3000`),
+  `NODE_ENV` (`development`), and `UPLOAD_MAX_BYTES` (a positive integer, default 5 GiB). All are
+  validated by `config.validateStartup()` in `server.js` **before** `listen`. An unusable value exits
+  with `FATAL CONFIGURATION ERROR: <variable> …` and is never a per-request failure. Values are read
+  once at startup, and the process environment wins over `.env` (`dotenv` never overrides a set
+  variable). The template is `.env.example`.
+- **Persistence guarantees.** `metadata.json` and `settings.json` resolve under `AFM_DATA_DIR`
+  (`src/config/dataDir.js`), not the release's working directory. Activation, rollback and pruning
+  cannot change them or `STORAGE_ROOT`. A first-run store creation is logged as
+  `[store] First run: initialised an empty … store at …`. A corrupt store still fails wholly with a
+  `500` (unchanged).
+- **Activation gate.** A release becomes live only after `npm test` passes **in the release**. It is
+  live only while `GET /api/v1/health` answers `"success":true` and `"apiVersion":1` within 60 s of a
+  restart. `apiVersion` is therefore load-bearing for deployment: changing it without updating
+  `EXPECT_API_VERSION` in `deploy.sh` causes every deploy to roll back.
+- **Release and rollback model.** Releases are immutable `releases/<UTC-stamp>-<sha12>` directories
+  behind an atomically renamed `current` symlink, with a `previous` symlink for single-command
+  rollback and a retention cap of 5 (active and previous always kept). Each deploy reports
+  `DEPLOY_OUTCOME` as `success`, `pre-activation-failed`, `rolled-back`, `rollback-failed` or
+  `superseded`.
+- **Shutdown.** `SIGTERM`/`SIGINT` stops new connections, drains in-flight requests, and force-exits
+  after 30 s. This is ordered below systemd's 45 s and nginx's 600 s.
+- **Exposure is unchanged.** The API is still unauthenticated, CORS still admits any origin, CSP is
+  still disabled, and the app still binds every interface. The host firewall is a compensating
+  control only (ADR-003, ADR-008).

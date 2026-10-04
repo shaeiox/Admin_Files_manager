@@ -1,0 +1,62 @@
+# scripts/systemd/dimension.service - Dimension Files Manager under systemd.
+# Install: sudo install -m 0644 scripts/systemd/dimension.service /etc/systemd/system/dimension.service
+#          sudo systemctl daemon-reload && sudo systemctl enable --now dimension
+# (production-cicd-readiness D4, D5; docs/DEPLOYMENT.md)
+
+[Unit]
+Description=Dimension Files Manager (Express API + static SPA)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Unprivileged, non-login identity (useradd --system --shell /usr/sbin/nologin --no-create-home dimension).
+User=dimension
+Group=dimension
+
+# The active release. deploy.sh swaps this symlink atomically and restarts the unit.
+# The stores no longer depend on it (AFM_DATA_DIR), but the process is still
+# expected to run from the release it was activated from.
+WorkingDirectory=/opt/dimension/current
+
+# Out-of-band configuration, outside every release; mode 0640 root:dimension.
+# Values here win over any .env (dotenv never overrides a set variable).
+EnvironmentFile=/etc/dimension/dimension.env
+Environment=NODE_ENV=production
+
+ExecStart=/usr/bin/node server.js
+
+# Crash recovery without fighting a deliberate stop (`systemctl stop` is not a failure).
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+# Graceful stop, ORDERED against the application and the proxy (D5):
+#   server.js SHUTDOWN_GRACE_MS   30 s  -> the application exits first
+#   TimeoutStopSec                45 s  -> longer, or systemd SIGKILLs a draining process
+#   nginx proxy_read_timeout     600 s  -> longer still, or the proxy severs a live request
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=45s
+
+# Output goes to the journal: `journalctl -u dimension` (the app has no log file of its own).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dimension
+
+# Least privilege. The release tree is read-only to this identity by ownership; the
+# store and storage root are the only writable paths.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dimension /srv/dimension/storage
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

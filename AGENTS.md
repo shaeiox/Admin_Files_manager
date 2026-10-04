@@ -33,11 +33,15 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 77
 ```
 
 - No lint/format/build/typecheck tooling is configured. Do not invent commands.
-- **Required env:** `STORAGE_ROOT` (absolute path). The server refuses to boot without it
-  (`src/config/env.js` calls `process.exit(1)`). Optional: `PORT` (default `3000`),
+- **Required env:** `STORAGE_ROOT` (absolute, existing directory). The server refuses to boot without a
+  usable one: `config.validateStartup()` runs in `server.js` before `listen` and exits on a missing,
+  relative, foreign-platform or non-existent root, a malformed `UPLOAD_MAX_BYTES`, or production without
+  `AFM_DATA_DIR`. `src/config/env.js` itself never exits at require time — service suites load it with
+  string-only roots, and an exit there once made the suite depend on a developer `.env`. Store location:
+  `AFM_DATA_DIR` (default `<cwd>/data`; required when `NODE_ENV=production`). Optional: `PORT` (default `3000`),
   `UPLOAD_MAX_BYTES` (positive integer bytes, default 5 GiB; read by `UploadService`).
-- **Tests never touch the real stores.** `MetadataService` resolves `data/metadata.json` and
-  `SettingsService` resolves `data/settings.json` from `process.cwd()`, and test files run in parallel
+- **Tests never touch the real stores.** `MetadataService` resolves `metadata.json` and
+  `SettingsService` resolves `settings.json` under `AFM_DATA_DIR` (default `<cwd>/data`), and test files run in parallel
   processes, so every suite that boots the server points `MetadataService.dbPath` (and, if it touches
   settings, `SettingsService.dbPath` **and its in-memory cache**) at a temp file before requiring
   `server.js` (see `test/api/fs.contract.test.js`, `test/api/settings.contract.test.js`). Two suites
@@ -119,8 +123,15 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 77
   path-consuming code path goes through it. Deletion of the storage root is explicitly blocked.
 - **Do not run in read-only environments** without `STORAGE_ROOT` being writable; writes are
   expected to fail at runtime otherwise.
-- **Do not commit:** `.env` (contains secrets; ignored by `.gitignore` — ADR-001 follow-up closed in ADR-003, but a
-  file that was already tracked must also be removed from the index with `git rm --cached .env`),
+- **Deployment is a contract (ADR-008, `docs/DEPLOYMENT.md`).** Releases are immutable directories built from an
+  allow-list `git archive` of one commit; production config lives only in `/etc/dimension/dimension.env`, the stores
+  only under `AFM_DATA_DIR`, never inside a release. `GET /api/v1/health`'s `apiVersion` is the activation gate in
+  `scripts/deploy.sh` (`EXPECT_API_VERSION`) — change them together. The suite must stay hermetic: it runs inside
+  every release with no `.env` and only production dependencies, so a test may not depend on a local `.env` or a dev
+  package. Scripts are invoked as `bash <path>` and stay LF (`.gitattributes`). The shutdown grace (30 s) <
+  `TimeoutStopSec` (45 s) < nginx timeouts (600 s) ordering is load-bearing.
+- **Do not commit:** `.env` (ignored by `.gitignore`, and since production-cicd-readiness actually untracked — a rule
+  does nothing for a file already in the index, which is how it was committed 4×; the template is `.env.example`),
   `data/*.json` (runtime metadata), `download/`, `temp/` (scratch; ignored and never discovered by `npm test`).
 - **Multipart field order is load-bearing for uploads.** Send `destination` and `overwrite` BEFORE `file`:
   multer resolves the destination when the first file chunk arrives. `UploadService` stages bytes in a

@@ -9,12 +9,24 @@ admin-files-manager/
 ├── server.js                     # ⭐ ENTRY POINT — Express app assembly + boot
 ├── package.json                  # Scripts & dependencies (CommonJS); `test` is scoped to test/**/*.test.js
 ├── nodemon.json                  # Dev reload ignores data/*, public/*
-├── .env                          # PORT, STORAGE_ROOT, optional UPLOAD_MAX_BYTES — git-ignored, never commit
+├── .env                          # local dev config — git-ignored AND untracked; never commit (template: .env.example)
+├── .env.example                  # every supported variable, required/optional, defaults; secret- and host-free
+├── .nvmrc                        # pinned Node (24.15.0); package.json `engines` is >=24 <25
+├── .gitattributes                # eol=lf for *.sh, *.service, *.conf, scripts/git-hooks/* ONLY (they break on Linux as CRLF)
+├── scripts/                      # ─── Deployment artifacts (ADR-008; runbook docs/DEPLOYMENT.md) ───
+│   ├── README.md                 # CI/CD guide: push → gate → activate → health → rollback; outcomes, commands
+│   ├── deploy.sh                 # HOST side: unpack → validate → npm ci --omit=dev → npm test → atomic switch →
+│   │                             #   restart → /api/v1/health gate → auto-rollback → prune; `rollback`, `status`, `ssh`
+│   ├── trigger-deploy.sh         # REPO side: allow-list `git archive` of one commit, shipped over one SSH session
+│   ├── git-hooks/post-receive    # bare-repo trigger: deploys pushes to the deployment branch (gates deploy, not push)
+│   ├── systemd/dimension.service # unit: unprivileged identity, EnvironmentFile, TimeoutStopSec 45s, journal
+│   └── nginx/dimension.conf      # TLS proxy: body ceiling 6g (> app limit), 600s timeouts, streaming, no SPA fallback
 ├── temp/                         # Scratch (git-ignored; never discovered by npm test)
 │
 ├── src/                          # ─── Backend ───
 │   ├── config/
-│   │   └── env.js                # Env loader + boot-time guard (exits if STORAGE_ROOT missing)
+│   │   ├── env.js                # Env loader + validateStartup() (run by server.js before listen; never exits on require)
+│   │   └── dataDir.js            # Store base directory: AFM_DATA_DIR or <cwd>/data (side-effect free)
 │   ├── routes/
 │   │   ├── api.js                # THE assembly: health + fs + dashboard + settings, mounted by server.js
 │   │   │                         #   at /api/v1 (contract) and /api (alias) — one router, no copies (ADR-007)
@@ -128,7 +140,8 @@ admin-files-manager/
 │
 └── docs/                         # ─── Project brain (reference docs, NOT runtime code) ───
     ├── REPO_MAP.md               # ← you are here (this file is the authoritative map)
-    ├── CONTRACTS.md              # API + data schemas
+    ├── CONTRACTS.md              # API + data schemas (+ deployment contract)
+    ├── DEPLOYMENT.md             # Operator runbook: host layout, config table, install, deploy, rollback, logs
     ├── architecture.md           # Frontend-era deep-dive. Read its §0 "Status" first:
     │                             # design-system sections are current, "mock data" ones are not
     ├── STRUCTURE.md              # ⚠ Outdated frontend-era map (see AGENTS.md stale-tree guard)
@@ -144,9 +157,12 @@ admin-files-manager/
         ├── ADR-006-settings-store-and-scope.md # data/settings.json (JSON over XML), persist-only-what-works,
         │                                        #   strict whitelist + full replace, corrupt → 500,
         │                                        #   no credentials, danger zone deferred behind auth
-        └── ADR-007-api-versioning-and-boundary.md # /api/v1 as a mount prefix, one assembly mounted twice,
-                                                 #   alias retained (removal gated on auth), configurable
-                                                 #   API.BASE_URL, kind reserved, taxonomy endpoint deferred
+        ├── ADR-007-api-versioning-and-boundary.md # /api/v1 as a mount prefix, one assembly mounted twice,
+        │                                        #   alias retained (removal gated on auth), configurable
+        │                                        #   API.BASE_URL, kind reserved, taxonomy endpoint deferred
+        └── ADR-008-production-deployment.md     # systemd (no Docker, with the test), AFM_DATA_DIR, startup
+                                                 #   validation, graceful shutdown, host-side suite gate,
+                                                 #   allow-list artifact, post-receive trigger, exposure still gated
 ```
 
 ## Entry Points
@@ -154,7 +170,8 @@ admin-files-manager/
 | Entry | Trigger | What it does |
 |---|---|---|
 | `server.js` | `npm start` / `npm run dev` | Builds middleware chain (helmet → cors → json → urlencoded → morgan → static), then mounts the `src/routes/api.js` assembly (`/health`, `/fs`, `/dashboard`, `/settings`) at `/api/v1` and `/api` in one registration, adds the API 404 catch-all, HTML fallback for SPA, global `errorHandler`, listens on `config.port` |
-| `src/config/env.js` | Imported first by `server.js` | Loads `.env`, hard-exits if `STORAGE_ROOT` is unset |
+| `src/config/env.js` | Imported first by `server.js` | Loads `.env` (never overriding a set variable) and exposes `validateStartup()`, which `server.js` runs before `listen`: an unusable `STORAGE_ROOT` / `AFM_DATA_DIR` / `UPLOAD_MAX_BYTES` exits 1 with a named reason. `server.js` also drains on `SIGTERM`/`SIGINT` (30 s grace) |
+| `scripts/deploy.sh` | `bash /opt/dimension/bin/deploy.sh <deploy / receive / rollback / status>` on the host | The release mechanism — see `docs/DEPLOYMENT.md` |
 | `public/index.html` | Browser GET `/` | Dashboard; other pages are sibling HTML files |
 | `test/**/*.test.js` | `npm test` (`node --test "test/**/*.test.js"`) | Zero-dependency `node:test` suites; discovery is scoped to `test/`, so a scratch `*.test.js` elsewhere cannot break the suite. Every server-booting suite points `MetadataService.dbPath` at a temp file — parallel test processes must never write the real `data/metadata.json` — and every suite that touches the settings store also repoints `SettingsService.dbPath` and clears its cache before requiring `server.js` |
 
