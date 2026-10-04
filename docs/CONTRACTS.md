@@ -545,6 +545,7 @@ the client path and doubles as the stable identifier across API and UI. `size` a
 | `theme.js` | self-contained | Applies `[data-theme]` before paint; no dependencies. `Theme.refresh()` re-syncs swapped-in toggles |
 | `Router` | `assets/js/router.js` | Client-side navigation between the four pages (`navigate`, `resolve`); see below |
 | `Dashboard`, `Settings` | `assets/js/dashboard.js`, `assets/js/settings.js` | Page modules |
+| `AFM.Notifications` | `assets/js/notifications.js` | Shared bell panel: opens on the topbar bell, renders the real `GET /api/dashboard/summary` activity feed with loading/empty/unavailable states, closes on Escape/outside click/navigation. No unread dot is rendered (the feed has no read/unread signal) |
 
 #### Page-module contract (client-side navigation, ADR-005)
 

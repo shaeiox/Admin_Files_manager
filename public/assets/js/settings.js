@@ -312,6 +312,7 @@ const Settings = (() => {
         state.isDirty = false;
         bindUI();
         loadSettings();
+        if (window.AFM && AFM.Notifications) AFM.Notifications.bindTopbarBell();
     }
 
     /** Client-side navigation away: drop the document/window listeners. */

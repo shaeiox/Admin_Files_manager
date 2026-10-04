@@ -165,9 +165,8 @@
               <span class="icon-sun"><i data-icon="sun" data-icon-size="12"></i></span>
               <span class="icon-moon"><i data-icon="moon" data-icon-size="12"></i></span>
             </button>
-            <button class="btn-icon" data-tip="Notifications" aria-label="Notifications">
+            <button class="btn-icon" data-tip="Notifications" data-tip-pos="bottom" aria-label="Notifications" aria-expanded="false" aria-controls="notifPanel">
               <i data-icon="bell" data-icon-size="16"></i>
-              <span class="notif-dot"></span>
             </button>
             <a class="btn btn-primary btn-sm" href="uploads.html">
               <i data-icon="plus" data-icon-size="15"></i>
@@ -768,9 +767,6 @@
                           <span class="tag">upload.completed</span>
                           <span class="tag">file.deleted</span>
                           <span class="tag">share.created</span>
-                          <button class="btn-icon btn-icon-sm" data-tip="Add event">
-                            <i data-icon="plus" data-icon-size="13"></i>
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -827,7 +823,7 @@
                       </div>
                       <div class="integration-body">
                         <div class="integration-name">Slack</div>
-                        <div class="integration-status connected"><span class="dot"></span> Notifications on</div>
+                        <div class="integration-status"><span class="dot"></span> Not configured</div>
                       </div>
                       <button class="btn btn-ghost btn-sm">Manage</button>
                     </div>
@@ -1015,6 +1011,7 @@
   <script src="assets/js/app.js" defer></script>
   <script src="assets/js/sidebar.js" defer></script>
   <script src="assets/js/router.js" defer></script>
+  <script src="assets/js/notifications.js" defer></script>
   <script src="assets/js/settings.js" defer></script>
 
 </body>

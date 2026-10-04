@@ -94,6 +94,7 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 59
    the content security policy is disabled, so `AFM.escapeHtml` at render time is the only layer.
    `Modal.prompt` / `Modal.confirm` insert their `title`, `message` and `value` as raw HTML — escape
    what you pass them. `test/integration/escaping.test.js` and `test/frontend/files.test.js` enforce it.
+10a. **Tooltips follow placement rules.** The default `[data-tip]::after` opens *above* the control, which clips against the viewport for anything in the sticky topbar or the `top: 0` drawer, and clips inside `overflow: auto` containers (file table, queue list, drawer body). Every such control carries an explicit `data-tip-pos` (`bottom` for topbar/drawer-header/row/queue actions; `left` for the tree button; right-edge bars keep the default because a `bottom` tip would clip there). `test/frontend/tooltips.test.js` pins the audited set. The notification bell on Uploads/Settings opens the shared `AFM.Notifications` panel — never a one-off handler.
 
 ## Hard Constraints & Red Lines
 

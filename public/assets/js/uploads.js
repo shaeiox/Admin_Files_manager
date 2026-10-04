@@ -331,7 +331,7 @@ const Uploads = (() => {
   }
 
   function actionButton(act, iconName, label, name, id) {
-    return `<button type="button" class="btn-icon btn-icon-sm" data-act="${act}" data-id="${id}" data-tip="${label}" aria-label="${label}: ${name}">${icon(iconName, 15)}</button>`;
+    return `<button type="button" class="btn-icon btn-icon-sm" data-act="${act}" data-id="${id}" data-tip="${label}" data-tip-pos="bottom" aria-label="${label}: ${name}">${icon(iconName, 15)}</button>`;
   }
 
   function renderItemHTML(item) {
@@ -1491,6 +1491,7 @@ const Uploads = (() => {
     renderRecent();
     loadRecent();
     verifyDestination(state.destination);
+    if (window.AFM && AFM.Notifications) AFM.Notifications.bindTopbarBell();
   }
 
   /**

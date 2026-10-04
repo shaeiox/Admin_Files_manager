@@ -186,19 +186,6 @@
   height: 15px;
 }
 
-/* Notification dot on icon button */
-.btn-icon .notif-dot {
-  position: absolute;
-  top: 7px;
-  right: 8px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent-primary);
-  border: 2px solid var(--bg-topbar);
-  box-shadow: 0 0 8px var(--accent-primary);
-}
-
 /* ── Button Group ── */
 .btn-group {
   display: inline-flex;
@@ -1022,6 +1009,70 @@
 .toast-close svg { width: 14px; height: 14px; }
 
 /* ══════════════════════════════════════════
+   NOTIFICATIONS PANEL (shared bell dropdown)
+   ══════════════════════════════════════════ */
+
+.notif-panel {
+  position: fixed;
+  z-index: var(--z-dropdown);
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dropdown);
+  max-height: 420px;
+  overflow-y: auto;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.notif-panel.is-open { opacity: 1; transform: translateY(0); }
+.notif-panel:focus { outline: none; }
+
+.notif-panel-header {
+  padding: var(--spacing-12) var(--spacing-16);
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.notif-panel-header h3 {
+  margin: 0;
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.notif-panel-body { padding: var(--spacing-6); }
+
+.notif-item {
+  padding: var(--spacing-8) var(--spacing-10);
+  border-radius: var(--radius-sm);
+}
+
+.notif-item:hover { background: var(--bg-hover); }
+
+.notif-item-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.notif-item-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.notif-empty {
+  padding: var(--spacing-16);
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.notif-retry { margin: 0 var(--spacing-16) var(--spacing-12); }
+
+/* ══════════════════════════════════════════
    PROGRESS
    ══════════════════════════════════════════ */
 
@@ -1092,6 +1143,9 @@
   padding: var(--spacing-6) var(--spacing-10);
   border-radius: var(--radius-sm);
   white-space: nowrap;
+  max-width: min(280px, 90vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
   opacity: 0;
   pointer-events: none;
   z-index: var(--z-tooltip);
@@ -1129,6 +1183,19 @@
 [data-tip][data-tip-pos="bottom"]:hover::after,
 [data-tip][data-tip-pos="bottom"]:focus-visible::after {
   transform: translateX(-50%) translateY(0);
+}
+
+/* data-tip-pos="right" opens beside the control, on its right. */
+[data-tip][data-tip-pos="right"]::after {
+  bottom: auto;
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%) translateX(-4px);
+}
+
+[data-tip][data-tip-pos="right"]:hover::after,
+[data-tip][data-tip-pos="right"]:focus-visible::after {
+  transform: translateY(-50%) translateX(0);
 }
 
 /* ══════════════════════════════════════════

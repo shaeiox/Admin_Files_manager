@@ -576,8 +576,8 @@ const Files = (() => {
           <td class="col-modified"><span class="mono-num mono-sm" title="${esc(Format.dateTime(f.modified))}">${esc(Format.relative(f.modified))}</span></td>
           <td class="col-actions">
             <div class="row-actions">
-              ${f.isFolder ? '' : `<button type="button" class="btn-icon btn-icon-sm" data-act="download" data-id="${id}" tabindex="${tab}" data-tip="Download" aria-label="Download ${name}">${icon('download', 15)}</button>`}
-              <button type="button" class="btn-icon btn-icon-sm" data-act="more" data-id="${id}" tabindex="${tab}" data-tip="More" aria-label="More actions for ${name}">${icon('moreHorizontal', 15)}</button>
+              ${f.isFolder ? '' : `<button type="button" class="btn-icon btn-icon-sm" data-act="download" data-id="${id}" tabindex="${tab}" data-tip="Download" data-tip-pos="bottom" aria-label="Download ${name}">${icon('download', 15)}</button>`}
+              <button type="button" class="btn-icon btn-icon-sm" data-act="more" data-id="${id}" tabindex="${tab}" data-tip="More" data-tip-pos="bottom" aria-label="More actions for ${name}">${icon('moreHorizontal', 15)}</button>
             </div>
           </td>
         </tr>`;
@@ -627,7 +627,7 @@ const Files = (() => {
               </label>
             </div>
             <div class="file-card-menu">
-              <button type="button" class="btn-icon btn-icon-sm" data-act="more" data-id="${id}" tabindex="${tab}" aria-label="More actions for ${name}">${icon('moreHorizontal', 15)}</button>
+              <button type="button" class="btn-icon btn-icon-sm" data-act="more" data-id="${id}" tabindex="${tab}" data-tip="More" data-tip-pos="bottom" aria-label="More actions for ${name}">${icon('moreHorizontal', 15)}</button>
             </div>
             ${renderThumbHtml(f, 'card')}
             <div class="file-card-info">
@@ -798,7 +798,7 @@ const Files = (() => {
           <dt class="meta-key">Location</dt>
           <dd class="meta-val meta-path">
             <span class="meta-path-text">${esc(file.path)}</span>
-            <button type="button" class="btn-icon btn-icon-sm" data-drawer-act="copy-path" aria-label="Copy location" data-tip="Copy location">${icon('copy', 14)}</button>
+            <button type="button" class="btn-icon btn-icon-sm" data-drawer-act="copy-path" aria-label="Copy location" data-tip="Copy location" data-tip-pos="bottom">${icon('copy', 14)}</button>
           </dd>
         </div>
         <div class="meta-row">
@@ -918,6 +918,35 @@ const Files = (() => {
     } catch {
       previewCapability = { available: false, formats: [], maxSize: 0 };
     }
+  }
+
+  /**
+   * Server-side default listing layout (Settings → appearance.defaultView),
+   * applied on a fresh visit only. An explicit operator choice always wins:
+   * the view toggle persists it as Store 'files-view', so any value found
+   * there — including one written while this read is in flight — suppresses
+   * the setting. The read is silent by contract: an unset value or an
+   * unreachable store changes nothing and shows nothing, and the layout
+   * keeps the same default it has always had.
+   */
+  async function applyDefaultViewSetting() {
+    const hasExplicitChoice = () => {
+      const v = Store.get('files-view', null);
+      return v === 'list' || v === 'grid';
+    };
+    if (hasExplicitChoice()) return;
+    let settings;
+    try {
+      settings = await window.API.get('/settings', { silent: true });
+    } catch {
+      return; // no toast, no console line: the current default stands
+    }
+    if (hasExplicitChoice()) return;
+    const view = settings && settings.appearance ? settings.appearance.defaultView : null;
+    if (view !== 'list' && view !== 'grid') return;
+    if (view === state.view) return;
+    state.view = view;
+    renderView();
   }
 
   /* ══════════════════════════════════════════
@@ -2302,6 +2331,7 @@ const Files = (() => {
     syncSearchInput();
 
     loadPreviewCapability().then(() => { if (!state.loading) renderView(); });
+    applyDefaultViewSetting();
     loadTree();
     loadFiles();
   }

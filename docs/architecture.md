@@ -357,7 +357,7 @@ Modifiers: `.card-hover`, `.card-flush`, `.card-sm`, `.card-accent` (adds violet
 | Modal | `.modal-backdrop` > `.modal` | `.is-open` triggers reveal |
 | Toast | `.toast-stack` > `.toast.<type>` | Auto-dismiss, hover pauses |
 | Dropdown | `.dropdown` > `.dropdown-menu` | Toggled by `[data-dropdown="id"]` |
-| Tooltip | `[data-tip="text"]` | Pure CSS, positioned above |
+| Tooltip | `[data-tip="text"]` | Pure CSS; default opens above, `data-tip-pos="bottom|left|right"` flips it for viewport/scroll-container contexts (topbar, drawer, rows use it) |
 | Context menu | `.context-menu` | Programmatic (see `AFM.ContextMenu`) |
 | Drawer | `.drawer` | Slides in from right, `.is-open` |
 | Drop overlay | `.drop-overlay` | Full-screen drag/drop hint |

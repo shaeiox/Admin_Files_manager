@@ -126,6 +126,7 @@ const Router = (() => {
     AFM.ContextMenu?.hide();
     AFM.Dropdown?.closeAll();
     AFM.Modal?.closeAll();
+    AFM.Notifications?.close();
   }
 
   function swap(doc) {
