@@ -153,8 +153,11 @@ async function getList(req, res, next) {
                 skipped++;
                 return null;
             }
-            const meta = await MetadataService.getFileMeta(itemClientPath);
             const isFolder = stats.isDirectory;
+            const folderStats = isFolder
+                ? await FileSystemService.getTreeStats(itemClientPath)
+                : null;
+            const meta = await MetadataService.getFileMeta(itemClientPath);
 
             return {
                 id: itemClientPath,
@@ -164,9 +167,14 @@ async function getList(req, res, next) {
                 // The classification the type filter compares against - shipped so
                 // the UI badge cannot disagree with the chip that filters it.
                 type: isFolder ? 'folder' : classifyFile(item.name),
-                // A directory's st_size is 4096 on ext4 and 0 on NTFS: neither is a
-                // measurement of its contents, so it is reported as unavailable.
-                size: isFolder ? null : stats.size,
+                // Directory entry sizes are platform metadata, not content sizes.
+                // Only expose a recursive total when the bounded walk completed.
+                size: isFolder
+                    ? (folderStats.truncated || folderStats.inaccessible > 0 ? null : folderStats.treeBytes)
+                    : stats.size,
+                sizeAvailable: isFolder
+                    ? !(folderStats.truncated || folderStats.inaccessible > 0)
+                    : true,
                 modified: stats.modified,
                 downloads: isFolder ? null : meta.downloads,
                 starred: meta.starred,

@@ -502,10 +502,11 @@ function withDirectorySize(realGetStats, dirSize) {
 }
 
 describe('GET /api/fs/list - resilience', () => {
-    test('a directory entry reports size null, never the filesystem directory size', async () => {
+    test('a directory entry reports recursive content size, never the filesystem directory size', async () => {
         const res = await getJson('/api/fs/list?path=/tax');
         const folder = res.items.find((i) => i.isFolder);
-        assert.equal(folder.size, null);
+        assert.equal(folder.sizeAvailable, true);
+        assert.equal(folder.size, 0);
     });
 
     test('the payload is identical whether the filesystem reports 0 or 4096 for a directory', async () => {

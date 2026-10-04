@@ -24,9 +24,9 @@
     "semantic_hash": "cd679acdaf4b7d999f5512b735faeb08"
   },
   "package.json": {
-    "mtime": 1791060952.6862013,
-    "seen": 1791088819.50578,
-    "ast_hash": "ddaaaaaec4a2565ef03303d0f0f5d374",
+    "mtime": 1791101704.6508408,
+    "seen": 1791102762.8234253,
+    "ast_hash": "f77b0845d7e3b36a3101df3d8e083d03",
     "semantic_hash": ""
   },
   "public/assets/js/api.js": {
@@ -78,9 +78,9 @@
     "semantic_hash": ""
   },
   "server.js": {
-    "mtime": 1791099864.2297823,
-    "seen": 1791100128.6561904,
-    "ast_hash": "d70ed6cbb924706c040be981076c12d5",
+    "mtime": 1791101702.9888704,
+    "seen": 1791102762.8234718,
+    "ast_hash": "fbe8ece948e215990cc25d4ecef7dd7c",
     "semantic_hash": ""
   },
   "skills-lock.json": {
@@ -90,10 +90,10 @@
     "semantic_hash": ""
   },
   "src/config/env.js": {
-    "mtime": 1791060952.72819,
-    "seen": 1791088819.505804,
-    "ast_hash": "c4b22bc2851676230527575a40ad7940",
-    "semantic_hash": "c4b22bc2851676230527575a40ad7940"
+    "mtime": 1791102388.227052,
+    "seen": 1791102762.8234813,
+    "ast_hash": "50bb0dd375c37c278bdd3ce805972e84",
+    "semantic_hash": ""
   },
   "src/controllers/fs.controller.js": {
     "mtime": 1791060952.7332006,
@@ -120,9 +120,9 @@
     "semantic_hash": ""
   },
   "src/services/MetadataService.js": {
-    "mtime": 1791060952.7492,
-    "seen": 1791088819.5058184,
-    "ast_hash": "951855adb6b49179e7ab8ca1d39e2d2e",
+    "mtime": 1791101675.2183473,
+    "seen": 1791102762.8235395,
+    "ast_hash": "f84f7b74a6b15155101e9e2e118e891e",
     "semantic_hash": ""
   },
   "src/services/PathService.js": {
@@ -456,9 +456,9 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1791100077.7544527,
-    "seen": 1791100128.6565971,
-    "ast_hash": "9080cdc0705752303ede8c75170e04f4",
+    "mtime": 1791102734.6570559,
+    "seen": 1791102762.8240058,
+    "ast_hash": "5d41549ee72e7ef729804772467b2c74",
     "semantic_hash": ""
   },
   "PROJECT_TREE.md": {
@@ -468,15 +468,15 @@
     "semantic_hash": "6f72ba4f8d01347aabdf0261fa963963"
   },
   "docs/CONTRACTS.md": {
-    "mtime": 1791100041.4919057,
-    "seen": 1791100128.6566048,
-    "ast_hash": "eeb783df0cba4ac557c677b3212c1e56",
+    "mtime": 1791102710.9391348,
+    "seen": 1791102762.8240125,
+    "ast_hash": "98a70590605e21703df374791b8b3a29",
     "semantic_hash": ""
   },
   "docs/REPO_MAP.md": {
-    "mtime": 1791100061.7952318,
-    "seen": 1791100128.6566088,
-    "ast_hash": "41df5b49a9f7cb51aea4cccb7fdd5a29",
+    "mtime": 1791102734.0415392,
+    "seen": 1791102762.8240185,
+    "ast_hash": "a987822c0018b93a454c58e3aff2a4fe",
     "semantic_hash": ""
   },
   "docs/STRUCTURE.md": {
@@ -624,9 +624,9 @@
     "semantic_hash": ""
   },
   ".claude/launch.json": {
-    "mtime": 1791099947.5426252,
-    "seen": 1791100128.6561155,
-    "ast_hash": "f102061557cbc3292de3f4b4aae03de5",
+    "mtime": 1791100173.3118658,
+    "seen": 1791102762.823405,
+    "ast_hash": "30636151a095dbc57ceaf17582a404a5",
     "semantic_hash": ""
   },
   "src/controllers/preview.controller.js": {
@@ -1164,9 +1164,9 @@
     "semantic_hash": ""
   },
   "src/services/SettingsService.js": {
-    "mtime": 1791091154.302755,
-    "seen": 1791096089.364287,
-    "ast_hash": "cacc78d26a7cd3ec4b00302c98b54dca",
+    "mtime": 1791101675.2193506,
+    "seen": 1791102762.8235638,
+    "ast_hash": "706233757d3c69b9e421c34e03a06cbf",
     "semantic_hash": ""
   },
   "test/api/settings.contract.test.js": {
@@ -1266,9 +1266,117 @@
     "semantic_hash": ""
   },
   "openspec/changes/api-v1-versioning-and-boundary/tasks.md": {
-    "mtime": 1791098972.2915063,
-    "seen": 1791100128.6567008,
-    "ast_hash": "1f9f8d7dff8043972057d10148a35b73",
+    "mtime": 1791100174.222626,
+    "seen": 1791102762.8240898,
+    "ast_hash": "e13a82fa690c709ba87ed51763e75abf",
+    "semantic_hash": ""
+  },
+  "scripts/deploy.sh": {
+    "mtime": 1791102548.0959902,
+    "seen": 1791102762.823463,
+    "ast_hash": "8b50cf91baf3981f44d41f269a19ce1f",
+    "semantic_hash": ""
+  },
+  "scripts/git-hooks/post-receive": {
+    "mtime": 1791102058.667173,
+    "seen": 1791102762.8234656,
+    "ast_hash": "4b074eea4d4a78631d13f4026700a101",
+    "semantic_hash": ""
+  },
+  "scripts/trigger-deploy.sh": {
+    "mtime": 1791102221.26257,
+    "seen": 1791102762.8234684,
+    "ast_hash": "5e8448d6815cb0174eb1a922d7244b9e",
+    "semantic_hash": ""
+  },
+  "src/config/dataDir.js": {
+    "mtime": 1791101672.536695,
+    "seen": 1791102762.8234785,
+    "ast_hash": "6bbe4cbba845a98d352a13fc715aebf8",
+    "semantic_hash": ""
+  },
+  "docs/DEPLOYMENT.md": {
+    "mtime": 1791102632.6408496,
+    "seen": 1791102762.8240156,
+    "ast_hash": "3243de65f645bc7e99e7df104f0bc43f",
+    "semantic_hash": ""
+  },
+  "docs/decisions/ADR-008-production-deployment.md": {
+    "mtime": 1791102676.5337274,
+    "seen": 1791102762.8240576,
+    "ast_hash": "a78f3d29afddcb62b60d38b61a7d0b86",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/.openspec.yaml": {
+    "mtime": 1791100524.9217577,
+    "seen": 1791102762.824216,
+    "ast_hash": "65987693ad0b202e10b6c1fc2af12e5f",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/design.md": {
+    "mtime": 1791101096.4294076,
+    "seen": 1791102762.8242185,
+    "ast_hash": "e677535608d1dd559d9506c037160cd4",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/proposal.md": {
+    "mtime": 1791101129.277106,
+    "seen": 1791102762.824221,
+    "ast_hash": "484bf0d89bdf547d0fe3099795b0cb77",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/specs/delivery-pipeline/spec.md": {
+    "mtime": 1791100855.0935879,
+    "seen": 1791102762.824223,
+    "ast_hash": "a10bce751d722494b3eddcaaf7fca7eb",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/specs/deployment-artifact/spec.md": {
+    "mtime": 1791100699.5444634,
+    "seen": 1791102762.824225,
+    "ast_hash": "e283b9dfb92d4a302af36e4e6324279d",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/specs/edge-proxy/spec.md": {
+    "mtime": 1791100830.5132854,
+    "seen": 1791102762.8242269,
+    "ast_hash": "359f89f163412766635c79a4f3daaa9d",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/specs/persistent-state/spec.md": {
+    "mtime": 1791100748.9565184,
+    "seen": 1791102762.8242288,
+    "ast_hash": "a19694f451b322a50be3579c9d87536c",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/specs/process-supervision/spec.md": {
+    "mtime": 1791100809.045213,
+    "seen": 1791102762.8242311,
+    "ast_hash": "07472c8ac85557858cef3c8fc3cc1227",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/specs/production-exposure/spec.md": {
+    "mtime": 1791100878.9696314,
+    "seen": 1791102762.8242335,
+    "ast_hash": "888319cd9c241f50a017952122f219a9",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/specs/release-lifecycle/spec.md": {
+    "mtime": 1791100781.7710664,
+    "seen": 1791102762.8242357,
+    "ast_hash": "f4049e5abfc186ea946340c71ab354c9",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/specs/runtime-configuration/spec.md": {
+    "mtime": 1791100721.9107952,
+    "seen": 1791102762.8242378,
+    "ast_hash": "9e341fdbaaa536b0ce918dbdd6234479",
+    "semantic_hash": ""
+  },
+  "openspec/changes/production-cicd-readiness/tasks.md": {
+    "mtime": 1791101243.688683,
+    "seen": 1791102762.8242402,
+    "ast_hash": "5264118b65c80bbba80e681b4a492f60",
     "semantic_hash": ""
   }
 }

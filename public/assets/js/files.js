@@ -570,7 +570,7 @@ const Files = (() => {
               </div>
             </div>
           </td>
-          <td class="col-size"><span class="mono-num">${f.isFolder || f.size == null ? '<span aria-label="Not applicable">—</span>' : Format.bytes(f.size)}</span></td>
+          <td class="col-size"><span class="mono-num">${f.size == null ? '<span aria-label="Size unavailable">—</span>' : Format.bytes(f.size)}</span></td>
           <td class="col-type"><span class="tag">${esc(typeLabel(f))}</span></td>
           <td class="col-downloads"><span class="mono-num">${f.downloads != null ? Format.compact(f.downloads) : '<span aria-label="Not applicable">—</span>'}</span></td>
           <td class="col-modified"><span class="mono-num mono-sm" title="${esc(Format.dateTime(f.modified))}">${esc(Format.relative(f.modified))}</span></td>
@@ -633,7 +633,7 @@ const Files = (() => {
             <div class="file-card-info">
               <div class="file-card-name" title="${name}">${name}${starMark(f)}</div>
               <div class="file-card-meta">
-                <span>${f.isFolder ? 'Folder' : (f.size == null ? '—' : Format.bytes(f.size))}</span>
+                <span>${f.size == null ? '—' : Format.bytes(f.size)}</span>
                 <span class="sep" aria-hidden="true"></span>
                 <span title="${esc(Format.dateTime(f.modified))}">${esc(Format.relative(f.modified))}</span>
               </div>
@@ -790,7 +790,7 @@ const Files = (() => {
         </div>
       </div>
       <dl class="meta-list">
-        <div class="meta-row"><dt class="meta-key">Size</dt><dd class="meta-val">${isFolder || file.size == null ? 'Not measured for folders' : Format.bytes(file.size)}</dd></div>
+        <div class="meta-row"><dt class="meta-key">Size</dt><dd class="meta-val">${file.size == null ? 'Unavailable' : Format.bytes(file.size)}</dd></div>
         <div class="meta-row"><dt class="meta-key">Type</dt><dd class="meta-val">${esc(typeLabel(file))}</dd></div>
         ${!isFolder && file.downloads != null ? `<div class="meta-row"><dt class="meta-key">Downloads</dt><dd class="meta-val">${Format.number(file.downloads)}</dd></div>` : ''}
         <div class="meta-row"><dt class="meta-key">Modified</dt><dd class="meta-val">${esc(Format.dateTime(file.modified))}</dd></div>

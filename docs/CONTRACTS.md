@@ -359,9 +359,10 @@ There is **no** time-series store, snapshot table, or history file anywhere in t
   `readdir` or on completion order.
 - **`type`** is the classification the `type` filter compares against (`folder`, or
   `classifyFile(name)`). The UI renders its badge from it, so a badge cannot disagree with its chip.
-- **`size` is `null` for a folder.** A directory's `st_size` (4096 on ext4, 0 on NTFS) measures
-  nothing about its contents, so the payload is identical on both platforms. `downloads` is also
-  `null` for folders.
+- **`size` is the recursive regular-file byte total for a folder** when its bounded walk completes.
+  Directory-entry `st_size` (4096 on ext4, 0 on NTFS) is never used. If the walk is truncated or
+  encounters an inaccessible subtree, `size` is `null` and `sizeAvailable` is `false`; otherwise
+  `sizeAvailable` is `true`. `downloads` is still `null` for folders.
 - **`counts`** covers every entry that survived `search` and `starredOnly` (before the `type`
   filter and pagination). `counts.all` equals the sum of every other key, **including `other`** —
   the unclassified bucket is counted, never dropped.
