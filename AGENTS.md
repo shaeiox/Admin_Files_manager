@@ -18,7 +18,7 @@
 | Uploads | Multer 2.x (`diskStorage`, via `UploadService`) | Streams to a hidden staging file inside `STORAGE_ROOT`, then moved into place; never buffer into memory |
 | Archiving | Archiver 8.x | ZIP streams are piped, never collected in memory |
 | Persistence | JSON file via `MetadataService` | Atomic temp-file-then-rename writes; singleton instance |
-| Frontend | Vanilla JS + CSS (no bundler) | Modules attach to `window` (`window.API`, `window.AFM.*`); `<script>` tag load order matters |
+| Frontend | Vanilla JS + CSS (no bundler) | Modules attach to `window` (`window.API`, `window.AFM.*`); `<script>` tag load order matters. `router.js` navigates between the four pages without a reload (ADR-005) |
 | Logging | Morgan (`dev` format) | Errors also logged via `console.error` in `errorHandler` |
 | Dev tooling | Nodemon | Ignores `data/*` and `public/*` |
 
@@ -27,7 +27,7 @@
 ```bash
 npm run dev      # Start with nodemon (http://localhost:3000)
 npm start        # Start in production mode
-npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 560 tests, exits 0:
+npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 594 tests, exits 0:
                  # services, API contracts (live server), frontend modules in a vm, integration, guardrails.
 ```
 
@@ -79,7 +79,12 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 56
    failures fatal.
 8. **Frontend has no build step.** Plain HTML pages + IIFE modules on `window`. When adding shared
    UI, extend `app.js` (Toast/Modal/Format/Icons); when calling the API, go through `window.API`
-   (`public/assets/js/api.js`) — do not call `fetch` ad hoc from page modules.
+   (`public/assets/js/api.js`) — do not call `fetch` ad hoc from page modules. (`router.js` fetches
+   the static page HTML, not the API.) Pages are swapped in place by `router.js`, so a page module's
+   `init()` can run many times per document: every `window`/`document` listener and timer it adds
+   must be removed by its `destroy()`, and controls in the topbar must be bound by delegation in
+   shared code. A new page must be added to `PAGES`/`MODULES` in `router.js` and load `router.js`
+   after `sidebar.js` (see "Page-module contract" in `docs/CONTRACTS.md`).
 9. **Downloads never navigate the main frame.** Single files use hidden iframes; ZIP uses a hidden
    form POST targeted at an iframe (see `api.js`). Keep this pattern: go through `API.downloadFile` /
    `API.downloadMultipleFiles` / `API.downloadZip`, never `window.open` (a test fails on `window.open(`
@@ -136,8 +141,9 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 56
   rendering. **Metadata is the exception:** `MetadataService._read` throws for a corrupt/unreadable store and `getSummary`
   uses `Promise.all`, so that case is a 500, not a degraded 200. Don't extend this pattern to sources that currently
   fail wholly without deciding which behaviour you want per capability.
-- **Some frontend calls are ahead of the backend.** `settings.js` requests `/api/settings` (GET + PUT) and
-  `/api/settings/action`, none of which exist server-side, so they 404. `dashboard.js`, `app.js`, `files.js` and
+- **Some frontend calls are ahead of the backend.** `settings.js` requests `/api/settings`, which does not exist
+  server-side, so it 404s; the page then shows a notice that settings are not stored and does not send the PUT or the
+  danger-zone POST. Only the theme setting takes effect (kept in the browser). `dashboard.js`, `app.js`, `files.js` and
   `uploads.js` are fully backed — their calls resolve. Don't assume a called endpoint is implemented; verify against `fs.routes.js` and
   `server.js` first (see "Known gaps" in `docs/CONTRACTS.md`).
 - **The Files page renders only what exists.** No control without a working handler, no success message for an

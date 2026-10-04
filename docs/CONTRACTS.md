@@ -542,14 +542,35 @@ the client path and doubles as the stable identifier across API and UI. `size` a
 | `Icons` / `icon()` / `hydrateIcons()` | `assets/js/app.js` | Inline SVG system (`<i data-icon="name">`) |
 | `Format` | `assets/js/app.js` | bytes/duration/relative-time/number formatters |
 | `Toast`, `Modal`, `Dropdown`, `ContextMenu` | `assets/js/app.js` | UI primitives |
-| `theme.js` | self-contained | Applies `[data-theme]` before paint; no dependencies |
+| `theme.js` | self-contained | Applies `[data-theme]` before paint; no dependencies. `Theme.refresh()` re-syncs swapped-in toggles |
+| `Router` | `assets/js/router.js` | Client-side navigation between the four pages (`navigate`, `resolve`); see below |
+| `Dashboard`, `Settings` | `assets/js/dashboard.js`, `assets/js/settings.js` | Page modules |
+
+#### Page-module contract (client-side navigation, ADR-005)
+
+Each page module registers one global (`Dashboard`, `Files`, `Uploads`, `Settings`) exposing:
+
+- `init()` — may run **more than once per document**: on first load, and again every time the page
+  is navigated back to. It binds to the freshly swapped markup.
+- `destroy()` — runs before the router swaps the page out. It removes every listener the module
+  added to `window`/`document`, and stops its timers (Dashboard health polling). Listeners bound to
+  elements inside `<main>` need no removal; that markup is discarded.
+- `beforeLeave()` *(optional)* — returns `Promise<boolean>`; `false` cancels the navigation
+  (Settings asks before dropping unsaved edits, since `beforeunload` does not fire).
+
+Uploads are not cancelled by leaving the Upload page: the queue lives in the module and is shown
+again on return. Shared chrome (`app.js`, `sidebar.js`, `theme.js`) is evaluated once per document
+and must keep using delegated `document` listeners for controls that live in the swapped topbar.
+`AFM.refreshChrome()` re-hydrates icons, the active nav entry and keyboard hints after a swap.
 
 ### Known gaps: frontend calls without a backend
 
 Some UI modules call endpoints that **do not exist** on the server yet (they hit the `/api`
-404 catch-all and surface an error toast):
+404 catch-all):
 
-- `settings.js` → `GET|PUT /settings`, `POST /settings/action`
+- `settings.js` → `GET /settings` (requested `silent`). A failure shows an on-page notice that
+  settings are not stored; Save and the danger-zone actions then explain that they cannot run
+  instead of sending `PUT /settings` / `POST /settings/action`. No error toast for the 404.
 - `app.js` → `GET /user/profile`, `GET /storage/quota`
 
 **No Dashboard endpoint is in this list any more.** `GET /dashboard/summary` and

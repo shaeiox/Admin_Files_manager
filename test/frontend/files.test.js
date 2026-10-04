@@ -1292,17 +1292,18 @@ describe('list columns are fixed-width and resizable', () => {
     }
   });
 
-  // TODO: the stub handle does not drive setColumnWidth as expected; behaviour verified in a browser.
-  test.skip('arrow keys resize, Delete resets; nothing reaches the row keyboard handler', async () => {
+  test('arrow keys resize, Delete resets; nothing reaches the row keyboard handler', async () => {
     const page = await booted();
-    const handle = { getAttribute: k => (k === 'data-resize' ? 'size' : null), closest: () => null };
+    // closest() answers like the real handle: it matches itself for [data-resize]
+    // and has no <th> to measure, so the configured width is the starting point.
+    const handle = { getAttribute: k => (k === 'data-resize' ? 'size' : null) };
+    handle.closest = sel => (sel === '[data-resize]' ? handle : null);
     let stopped = 0;
     const key = (k, extra = {}) => Object.assign(event(handle, { key: k, stopPropagation() { stopped++; } }), extra);
     page.c.onContainerKeydown(key('ArrowRight'));
-    const wider = page.state().colWidths.size;
-    assert.ok(wider > 110, `ArrowRight widened the column (${wider})`);
+    assert.equal(page.state().colWidths.size, 126, 'ArrowRight: 110 + 16');
     page.c.onContainerKeydown(key('ArrowLeft', { shiftKey: true }));
-    assert.ok(page.state().colWidths.size < wider, 'Shift+ArrowLeft narrowed it');
+    assert.equal(page.state().colWidths.size, 62, 'Shift+ArrowLeft: 126 - 64');
     page.c.onContainerKeydown(key('Delete'));
     assert.equal(page.state().colWidths.size, undefined, 'back to the default');
     assert.equal(stopped, 3);

@@ -54,6 +54,8 @@ admin-files-manager/
 │           ├── api.js            # ⭐ API client (window.API): fetch wrapper, XHR upload, iframe downloads
 │           ├── theme.js          # Theme controller (loaded first, pre-CSS)
 │           ├── sidebar.js        # Sidebar collapse + mobile drawer
+│           ├── router.js         # Client-side navigation between the four pages: fetches the target
+│           │                     #   page, swaps <main> + page overlays, calls destroy()/init() (ADR-005)
 │           ├── dashboard.js      # Page module (index.html)
 │           ├── files.js          # Page module (files.html) — see "Files page module" below
 │           ├── uploads.js        # Page module (uploads.html) — queue, progress, presets, destination
@@ -93,6 +95,8 @@ admin-files-manager/
 │       ├── dashboard.test.js                # dashboard renderers, no-history guarantees
 │       ├── files.test.js                    # files.js in a vm with stub DOM/API: states, navigation, selection,
 │       │                                    #   a11y semantics, escaping, and source-level guards
+│       ├── navigation.test.js               # router.js (which clicks it takes, full-load fallback), page
+│       │                                    #   teardown hooks, context-menu open/close, Settings notice
 │       └── uploads.test.js                  # uploads.js in a vm with stub DOM/API/XHR: queue derivations, failure
 │                                            #   kinds, escaping, destination gate, honesty + a11y source guards
 │
