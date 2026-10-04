@@ -14,8 +14,34 @@
 'use strict';
 
 const API = (() => {
-    /** API prefix shared by all endpoints */
-    const BASE_URL = '/api';
+    /** The same-origin versioned default (ADR-007). */
+    const DEFAULT_BASE_URL = '/api/v1';
+
+    /**
+     * API prefix shared by all endpoints, resolved ONCE at load so every URL a
+     * document builds points at the same place. First non-blank source wins:
+     *   1. window.AFM_API_BASE - a global set before this script loads
+     *   2. <meta name="afm-api-base" content="..."> in the page head
+     *   3. DEFAULT_BASE_URL
+     * Values are trimmed and trailing slashes stripped, so a path appended to it
+     * always has exactly one separator. This module is the only place that knows
+     * where the API lives; consumers pass endpoint paths, never URLs.
+     */
+    const BASE_URL = (() => {
+        const clean = (value) =>
+            (typeof value === 'string' ? value.trim().replace(/\/+$/, '') : '');
+
+        const fromGlobal = clean(window.AFM_API_BASE);
+        if (fromGlobal) return fromGlobal;
+
+        const meta = typeof document !== 'undefined' && typeof document.querySelector === 'function'
+            ? document.querySelector('meta[name="afm-api-base"]')
+            : null;
+        const fromMeta = clean(meta && meta.getAttribute('content'));
+        if (fromMeta) return fromMeta;
+
+        return DEFAULT_BASE_URL;
+    })();
 
     /* ══════════════════════════════════════════
        INTERNAL: JSON REQUEST CORE
@@ -310,10 +336,27 @@ const API = (() => {
     }
 
     /* ══════════════════════════════════════════
-       PUBLIC SURFACE
+       IMAGE URLS
+       An <img src> cannot go through fetch, so the boundary hands out the URL
+       instead - consumers never concatenate BASE_URL themselves.
        ══════════════════════════════════════════ */
 
-    return {
+    /**
+     * URL of a bounded preview image (GET /fs/thumbnail).
+     * @param {string} clientPath - App path e.g. "/media/a.png"
+     * @param {number|string} size - Requested edge length in px
+     * @returns {string}
+     */
+    function thumbnailUrl(clientPath, size) {
+        return `${BASE_URL}/fs/thumbnail?path=${encodeURIComponent(clientPath)}&size=${encodeURIComponent(size)}`;
+    }
+
+    /* ══════════════════════════════════════════
+       PUBLIC SURFACE
+       Frozen: BASE_URL is resolved once and cannot be repointed mid-document.
+       ══════════════════════════════════════════ */
+
+    return Object.freeze({
         BASE_URL,
         get,
         post,
@@ -323,7 +366,8 @@ const API = (() => {
         downloadFile,
         downloadMultipleFiles,
         downloadZip,
-    };
+        thumbnailUrl,
+    });
 })();
 
 window.API = API;

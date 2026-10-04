@@ -5,7 +5,9 @@
 
 ## Conventions
 
-- **Base URL:** `/api`
+- **Base URL:** `/api/v1` is the contract; `/api` is a retained compatibility alias served by the
+  same handlers. Paths below are written in their unversioned form — every one of them is served
+  identically under `/api/v1`. See *API versioning* (ADR-007).
 - **Success shape — a rule, not an exception.** Read-only **aggregate** endpoints return a
   **bare top-level shape** (the payload *is* the body, no wrapper). **Mutating** endpoints return
   the `{ "success": true, "data": ... }` envelope. `GET /api/dashboard/summary` and
@@ -67,11 +69,50 @@ These are recorded decisions, not oversights, and none of them is closed:
 - **`.env` is excluded from version control** (`.gitignore`), closing the ADR-001 open question on
   the environment file; ADR-003 tracks the remainder.
 
+## API versioning (ADR-007)
+
+- **`/api/v1` is the contract.** Every endpoint in the table below answers under `/api/v1/<resource>`
+  with the same status, the same guards and a byte-identical body as under `/api/<resource>`.
+  Resources: `health`, `fs`, `dashboard`, `settings`.
+- **`/api` is a compatibility alias, not a second contract.** It is served by the **same router
+  instances** (one assembly, `src/routes/api.js`), so the two prefixes cannot drift and a fix lands on
+  both. It is retained for existing callers and open tabs. Its removal is **not scheduled**: it needs
+  its own decision, and is blocked on authentication — removing an alias does not reduce the exposure
+  that authentication (ADR-003) is required to close.
+- **Mount order (load-bearing).** `server.js` mounts the assembly once, as
+  `app.use(['/api/v1', '/api'], apiRoutes)`, **before** the `/api` 404 catch-all (a two-argument
+  middleware that never calls `next()`; anything mounted after it is unreachable). `/api/v1` is listed
+  first, so a v1 request is never re-interpreted under the alias. Pinned by
+  `test/api/versioning.contract.test.js`.
+- **Unknown versions are refused.** `/api/v2/...` matches no route, reaches the catch-all, and answers
+  `404 { "success": false, "error": "API endpoint not found" }` — never v1's handlers, never the HTML
+  shell. The version segment is matched **case-sensitively** (`/api/V1/...` is an unknown version),
+  although the rest of the path keeps Express's default case-insensitive matching.
+- **The version is selected by the path only** — no header, query parameter, cookie or content
+  negotiation. Route modules declare no version segment; it is applied at the mount site only.
+- **Version discovery:** `GET /api/v1/health` (and its alias) carries `"apiVersion": 1`.
+- **Compatibility rules within v1 — additive only.** Allowed: a new endpoint, a new optional response
+  field, a new optional request parameter whose absence reproduces the previous behaviour. Anything
+  that removes, renames or retypes a field, parameter or endpoint goes to a future `/api/v2`, mounted
+  **alongside** v1 (v1 keeps serving). There is no deprecation-header machinery, because nothing is
+  deprecated.
+- **Client base URL.** `public/assets/js/api.js` resolves `API.BASE_URL` once at load, first non-blank
+  wins: `window.AFM_API_BASE` → `<meta name="afm-api-base" content="…">` → `/api/v1`. Trimmed; trailing
+  `/` stripped. The four page shells ship `<meta name="afm-api-base" content="/api/v1">`, so the default
+  deployment is same-origin and root-relative. Pointing it at `/api` is the configuration-only rollback;
+  pointing it at another host is a configuration change too, but **requires authentication and a
+  deliberate CORS decision first** (ADR-003) — CORS is unchanged by versioning.
+- **Every API URL is built inside `api.js`.** Page modules pass endpoint paths to
+  `API.get/post/put/del/upload` and use `API.downloadFile` / `downloadMultipleFiles` / `downloadZip` /
+  `thumbnailUrl(path, size)` for non-fetch transports; none reads `BASE_URL` to build a path or calls
+  `fetch` (only `router.js` does, for static page markup, which is not an API call). Pinned by
+  `test/frontend/api-boundary.test.js` and `test/integration/repo-guardrails.test.js`.
+
 ## Endpoints
 
 | Method | Path | Status | Notes |
 |---|---|---|---|
-| GET | `/api/health` | ✅ live | Boot/env check — **unchanged by the dashboard work**, byte-identical payload |
+| GET | `/api/health` | ✅ live | Boot/env check — **unchanged by the dashboard work**; additive `apiVersion` (ADR-007) |
 | GET | `/api/dashboard/summary` | ✅ live | Read-only aggregate; bare object, `200` with per-capability degradation |
 | GET | `/api/dashboard/health` | ✅ live | Read-only aggregate; bare array of runtime metric objects |
 | GET | `/api/settings` | ✅ live | Read-only aggregate; **bare** settings document, no envelope |
@@ -90,12 +131,14 @@ These are recorded decisions, not oversights, and none of them is closed:
 
 ### GET /api/health
 
-Liveness + environment probe. **Unchanged by the dashboard work — byte-identical payload**, and it
-keeps the envelope because it is not an aggregate. Returns the `env` string that the sidebar
-identity block renders; it is **not** a source of runtime metrics.
+Liveness + environment probe. **Unchanged by the dashboard work**, and it keeps the envelope because
+it is not an aggregate. Returns the `env` string that the sidebar identity block renders; it is
+**not** a source of runtime metrics. ADR-007 added one field, additively: `apiVersion` — the contract
+version the responding assembly serves (`1` on both `/api/v1/health` and the `/api/health` alias).
+The handler lives in `src/routes/api.js`, not `server.js`.
 
 ```json
-{ "success": true, "message": "Dimension API is running", "env": "development" }
+{ "success": true, "message": "Dimension API is running", "env": "development", "apiVersion": 1 }
 ```
 
 ### GET /api/dashboard/summary → `200`
@@ -634,6 +677,24 @@ any environment.
 - The server log (`console.error` in `errorHandler`) keeps the full error and its stack, so diagnosis
   is not lost. Pinned by `test/api/upload.surface.test.js` and `test/integration/error-disclosure.test.js`.
 
+### Error contract — stable within v1 (ADR-007)
+
+- **Envelope:** `{ "success": false, "error": string }`, non-empty `error`, nothing else required.
+  It does not change within v1; `/api/v1` and `/api` fail identically under identical conditions.
+- **Status meanings** are the table above, chosen by the failing condition. An unknown endpoint is
+  `404` in the envelope, never an HTML page.
+- **`kind` — reserved, not emitted.** The envelope reserves an optional string `kind`, a stable
+  machine-readable token matching `^[a-z][a-z-]*$` (not a rewording of `error`). **No endpoint sends
+  it today** (`src/` contains no producer; pinned). Its absence is valid: classify by status alone,
+  and never infer a kind from the message. When present it takes precedence over the status. Adding
+  it to an endpoint later is additive. `api.js` attaches `err.status` (`0` on transport failure) to
+  every rejection and copies `err.kind` only when the body carries a string `kind`; the transport
+  itself tags `network` / `aborted` on uploads.
+- **No disclosure, every endpoint:** no stack, absolute path, drive letter, UNC/backslash path or raw
+  errno text in any error body, in any environment (the Dashboard-scoped rule in
+  `filesystem-security` is the narrower original). Pinned for the versioned prefix by
+  `test/api/versioning.contract.test.js`.
+
 **Exception:** the two Dashboard endpoints do **not** follow this model. They answer `200` with
 per-capability degradation, so a partial failure is expressed in the payload
 (`volumeAvailable: false`, `truncated: true`, empty arrays) rather than in a status code. See
@@ -688,7 +749,7 @@ the client path and doubles as the stable identifier across API and UI. `size` a
 
 | Global | Source | Responsibility |
 |---|---|---|
-| `API` | `assets/js/api.js` | `get/post/put/del/upload/downloadFile/downloadMultipleFiles/downloadZip`, `BASE_URL` |
+| `API` | `assets/js/api.js` | `get/post/put/del/upload/downloadFile/downloadMultipleFiles/downloadZip/thumbnailUrl`, `BASE_URL` (resolved once, read-only; the object is frozen). The single frontend egress — see *API versioning* |
 | `Files` | `assets/js/files.js` | Files page; `Files.pure` (renderers/helpers) and `Files._controller` are test seams |
 | `Uploads` | `assets/js/uploads.js` | Upload page; `Uploads.pure` (derivations, row renderer) and `Uploads._controller` are test seams |
 | `AFM` | `assets/js/app.js` | Shared helpers namespace (`Toast`, `Modal`, `Format`, `Icons`, DOM utils, `applyWorkspaceName`) |
@@ -721,7 +782,7 @@ and must keep using delegated `document` listeners for controls that live in the
 
 **This list is empty.** Every call a frontend module makes today resolves against a documented
 endpoint in the table above. Do not add an entry for a call that exists — verify against
-`fs.routes.js`, `dashboard.routes.js`, `settings.routes.js` and `server.js` first; when a gap is
+`fs.routes.js`, `dashboard.routes.js`, `settings.routes.js`, `api.js` (the assembly) and `server.js` first; when a gap is
 closed, **delete** its bullet here in the same change that adds the endpoint.
 
 **Removed from this list:**

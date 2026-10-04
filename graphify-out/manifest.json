@@ -30,9 +30,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/api.js": {
-    "mtime": 1791060952.7042017,
-    "seen": 1791088819.5057828,
-    "ast_hash": "266c10529eb5c8094ec9b6d226270ac6",
+    "mtime": 1791099892.8695512,
+    "seen": 1791100128.6561487,
+    "ast_hash": "21d6f1a2dbe0a06680d5d8a8c340550a",
     "semantic_hash": ""
   },
   "public/assets/js/app.js": {
@@ -48,9 +48,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/files.js": {
-    "mtime": 1791091179.2497997,
-    "seen": 1791096089.3642392,
-    "ast_hash": "845fe84ca20b123f2d214b666ad6032e",
+    "mtime": 1791099892.9465928,
+    "seen": 1791100128.6561613,
+    "ast_hash": "4dd32d9c55fc6d222dbac4853e5dc103",
     "semantic_hash": ""
   },
   "public/assets/js/settings.js": {
@@ -78,9 +78,9 @@
     "semantic_hash": ""
   },
   "server.js": {
-    "mtime": 1791093347.3334048,
-    "seen": 1791096089.3642561,
-    "ast_hash": "ac5ec964ef32d01d6da371e7c124adcd",
+    "mtime": 1791099864.2297823,
+    "seen": 1791100128.6561904,
+    "ast_hash": "d70ed6cbb924706c040be981076c12d5",
     "semantic_hash": ""
   },
   "skills-lock.json": {
@@ -456,9 +456,9 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1791095609.081443,
-    "seen": 1791096089.3644927,
-    "ast_hash": "c40f5f4ac6fb88ef1335893435e1780c",
+    "mtime": 1791100077.7544527,
+    "seen": 1791100128.6565971,
+    "ast_hash": "9080cdc0705752303ede8c75170e04f4",
     "semantic_hash": ""
   },
   "PROJECT_TREE.md": {
@@ -468,15 +468,15 @@
     "semantic_hash": "6f72ba4f8d01347aabdf0261fa963963"
   },
   "docs/CONTRACTS.md": {
-    "mtime": 1791095665.2077484,
-    "seen": 1791096089.364497,
-    "ast_hash": "8283179f6b4d02646052ca11e2d2bbf6",
+    "mtime": 1791100041.4919057,
+    "seen": 1791100128.6566048,
+    "ast_hash": "eeb783df0cba4ac557c677b3212c1e56",
     "semantic_hash": ""
   },
   "docs/REPO_MAP.md": {
-    "mtime": 1791095626.4741018,
-    "seen": 1791096089.3644986,
-    "ast_hash": "59601296627df55825da5645ecb765a4",
+    "mtime": 1791100061.7952318,
+    "seen": 1791100128.6566088,
+    "ast_hash": "41df5b49a9f7cb51aea4cccb7fdd5a29",
     "semantic_hash": ""
   },
   "docs/STRUCTURE.md": {
@@ -516,27 +516,27 @@
     "semantic_hash": ""
   },
   "public/files.html": {
-    "mtime": 1791090659.1611934,
-    "seen": 1791090950.4604104,
-    "ast_hash": "1d8345fbbae23db30e394455a94f634d",
+    "mtime": 1791099921.7515922,
+    "seen": 1791100128.656989,
+    "ast_hash": "c8c968549156798b962cbe0c1fd0ee91",
     "semantic_hash": ""
   },
   "public/index.html": {
-    "mtime": 1791090658.987929,
-    "seen": 1791090950.4604137,
-    "ast_hash": "47187345fc618598a8c1b16e5b61b2d1",
+    "mtime": 1791099921.6096337,
+    "seen": 1791100128.6569934,
+    "ast_hash": "c1911d92581ade2c3fec17e3ac6abaa3",
     "semantic_hash": ""
   },
   "public/settings.html": {
-    "mtime": 1791095972.1982982,
-    "seen": 1791096089.3646638,
-    "ast_hash": "ed17c21c6654d8f1974d4777a81092e0",
+    "mtime": 1791099921.920617,
+    "seen": 1791100128.6569967,
+    "ast_hash": "6021c4297e0214080c6c28029a3166c9",
     "semantic_hash": ""
   },
   "public/uploads.html": {
-    "mtime": 1791090534.9322147,
-    "seen": 1791090950.4604194,
-    "ast_hash": "0d5da49304db38b5eafa409f0c278fca",
+    "mtime": 1791099921.835636,
+    "seen": 1791100128.6569996,
+    "ast_hash": "103c36c516c5222c81d12a1d11937d16",
     "semantic_hash": ""
   },
   "src/controllers/dashboard.controller.js": {
@@ -618,15 +618,15 @@
     "semantic_hash": ""
   },
   "test/integration/live-server.test.js": {
-    "mtime": 1791094379.6424086,
-    "seen": 1791096089.364366,
-    "ast_hash": "e8c745564e8d054d46c211f5c54cdeb9",
+    "mtime": 1791099874.5826678,
+    "seen": 1791100128.6563473,
+    "ast_hash": "342cdb8d43cc84b840ae0073c0044d4f",
     "semantic_hash": ""
   },
   ".claude/launch.json": {
-    "mtime": 1791060952.1780908,
-    "seen": 1791088819.505757,
-    "ast_hash": "30636151a095dbc57ceaf17582a404a5",
+    "mtime": 1791099947.5426252,
+    "seen": 1791100128.6561155,
+    "ast_hash": "f102061557cbc3292de3f4b4aae03de5",
     "semantic_hash": ""
   },
   "src/controllers/preview.controller.js": {
@@ -660,9 +660,9 @@
     "semantic_hash": ""
   },
   "test/frontend/files.test.js": {
-    "mtime": 1791093965.8735619,
-    "seen": 1791096089.3643496,
-    "ast_hash": "7e784cb86d03fa5ed6871f4f61fad3b4",
+    "mtime": 1791099920.964994,
+    "seen": 1791100128.6563148,
+    "ast_hash": "e4883d2ab02e99c6e93222569a5993f3",
     "semantic_hash": ""
   },
   "test/integration/error-disclosure.test.js": {
@@ -678,9 +678,9 @@
     "semantic_hash": ""
   },
   "test/integration/repo-guardrails.test.js": {
-    "mtime": 1791060952.7892,
-    "seen": 1791088819.5058541,
-    "ast_hash": "479368df409f88eff5a879875eff0684",
+    "mtime": 1791099847.3656046,
+    "seen": 1791100128.6563516,
+    "ast_hash": "21968a5ebcdd71d6e58ed63ce07fa4b1",
     "semantic_hash": ""
   },
   "test/utils/fileTypes.test.js": {
@@ -1146,9 +1146,9 @@
     "semantic_hash": ""
   },
   "openspec/changes/settings-page-correctness/tasks.md": {
-    "mtime": 1791094799.6095724,
-    "seen": 1791096089.3646123,
-    "ast_hash": "4931c3fa968cf7093380725a9411c4c5",
+    "mtime": 1791096103.3283923,
+    "seen": 1791100128.656897,
+    "ast_hash": "50792a5b8a3478b0e847d45f38301324",
     "semantic_hash": ""
   },
   "src/controllers/settings.controller.js": {
@@ -1191,6 +1191,84 @@
     "mtime": 1791095728.418231,
     "seen": 1791096089.364518,
     "ast_hash": "375d3a71e0a8887e4989c1d95b2118ba",
+    "semantic_hash": ""
+  },
+  "src/routes/api.js": {
+    "mtime": 1791099863.9936616,
+    "seen": 1791100128.6562274,
+    "ast_hash": "80a2ed9b40328ba87fb82e46038d0a25",
+    "semantic_hash": ""
+  },
+  "test/api/versioning.contract.test.js": {
+    "mtime": 1791099784.546124,
+    "seen": 1791100128.6563013,
+    "ast_hash": "35342978b70c4764403ae3388305dfe3",
+    "semantic_hash": ""
+  },
+  "test/frontend/api-boundary.test.js": {
+    "mtime": 1791099830.4298725,
+    "seen": 1791100128.6563032,
+    "ast_hash": "ecc050f52177ba59ad6a01fb3abeab00",
+    "semantic_hash": ""
+  },
+  "docs/decisions/ADR-007-api-versioning-and-boundary.md": {
+    "mtime": 1791100111.4490907,
+    "seen": 1791100128.6566517,
+    "ast_hash": "f610799443e749d1ab2a661a2b6e577e",
+    "semantic_hash": ""
+  },
+  "openspec/changes/api-v1-versioning-and-boundary/.openspec.yaml": {
+    "mtime": 1791098491.0129027,
+    "seen": 1791100128.6566548,
+    "ast_hash": "65987693ad0b202e10b6c1fc2af12e5f",
+    "semantic_hash": ""
+  },
+  "openspec/changes/api-v1-versioning-and-boundary/design.md": {
+    "mtime": 1791098871.2727911,
+    "seen": 1791100128.656657,
+    "ast_hash": "4673266b7e1c206daa687c481ba9ec23",
+    "semantic_hash": ""
+  },
+  "openspec/changes/api-v1-versioning-and-boundary/proposal.md": {
+    "mtime": 1791098642.2267916,
+    "seen": 1791100128.65666,
+    "ast_hash": "23c470371814ae00993541ba6eb5a49b",
+    "semantic_hash": ""
+  },
+  "openspec/changes/api-v1-versioning-and-boundary/specs/api-client-boundary/spec.md": {
+    "mtime": 1791098702.182129,
+    "seen": 1791100128.656663,
+    "ast_hash": "87e7792a7ede8498b2e0e751a9a30306",
+    "semantic_hash": ""
+  },
+  "openspec/changes/api-v1-versioning-and-boundary/specs/api-error-contract/spec.md": {
+    "mtime": 1791098721.6552641,
+    "seen": 1791100128.6566658,
+    "ast_hash": "989bd69fd92e23276b4e4eeba65a0d20",
+    "semantic_hash": ""
+  },
+  "openspec/changes/api-v1-versioning-and-boundary/specs/api-versioning/spec.md": {
+    "mtime": 1791098680.3980007,
+    "seen": 1791100128.6566684,
+    "ast_hash": "50a72514d221282216a75b949ff43a25",
+    "semantic_hash": ""
+  },
+  "openspec/changes/api-v1-versioning-and-boundary/specs/dashboard-api/spec.md": {
+    "mtime": 1791098752.5870752,
+    "seen": 1791100128.656695,
+    "ast_hash": "56626679ef063312f371a39347d5095b",
+    "semantic_hash": ""
+  },
+  "openspec/changes/api-v1-versioning-and-boundary/specs/legacy-api-compatibility/spec.md": {
+    "mtime": 1791098739.751853,
+    "seen": 1791100128.6566975,
+    "ast_hash": "ecf14ff13f0b01c2a76dccadefc04da4",
+    "semantic_hash": ""
+  },
+  "openspec/changes/api-v1-versioning-and-boundary/tasks.md": {
+    "mtime": 1791098972.2915063,
+    "seen": 1791100128.6567008,
+    "ast_hash": "1f9f8d7dff8043972057d10148a35b73",
     "semantic_hash": ""
   }
 }

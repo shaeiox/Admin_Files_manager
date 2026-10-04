@@ -206,15 +206,19 @@ describe('the liveness endpoint is untouched', () => {
         assert.ok(!('stack' in res.json), 'a success response carries no stack');
     });
 
-    test('the /api/health handler source is byte-identical to its pre-change form', () => {
+    // Re-pinned by api-v1-versioning-and-boundary (task 2.1, ADR-007): the handler
+    // moved from server.js into the shared assembly so /api/v1/health and
+    // /api/health are one handler, and it gained the additive `apiVersion` field.
+    // Everything else about it is still pinned byte-for-byte.
+    test('the /api/health handler source is byte-identical to its pinned form', () => {
         const source = fs.readFileSync(
-            path.join(__dirname, '..', '..', 'server.js'), 'utf8'
+            path.join(__dirname, '..', '..', 'src', 'routes', 'api.js'), 'utf8'
         );
-        const i = source.indexOf("app.get('/api/health'");
+        const i = source.indexOf("router.get('/health'");
         assert.ok(i > -1, 'handler present');
 
         // Extract the whole handler expression.
-        const start = source.lastIndexOf('app.get', i);
+        const start = source.lastIndexOf('router.get', i);
         let depth = 0, end = start;
         for (; end < source.length; end++) {
             if (source[end] === '(') depth++;
@@ -228,7 +232,7 @@ describe('the liveness endpoint is untouched', () => {
         const normalise = (x) => x.replace(/\s+/g, ' ').trim();
         assert.equal(
             normalise(handler),
-            normalise("app.get('/api/health', (req, res) => { res.json({ success: true, message: 'Dimension API is running', env: config.env }); })"),
+            normalise("router.get('/health', (req, res) => { res.json({ success: true, message: 'Dimension API is running', env: config.env, apiVersion: API_VERSION }); })"),
             'the liveness handler must not have been modified'
         );
     });

@@ -43,3 +43,79 @@ describe('version control', () => {
         assert.ok(gitignore.includes('temp/'));
     });
 });
+
+/* ── api-v1-versioning-and-boundary (task 1.5, api-client-boundary) ──
+   Additive only: the assertions above are unchanged. These pin that
+   public/assets/js/api.js is the single frontend egress and the only place
+   that knows where the API lives. */
+
+describe('the frontend API boundary', () => {
+    const JS_DIR = path.join(ROOT, 'public', 'assets', 'js');
+    const modules = fs.readdirSync(JS_DIR).filter((f) => f.endsWith('.js'));
+    /** Source with comments removed, so prose in a docblock neither passes nor fails a check. */
+    const code = (file) => fs.readFileSync(path.join(JS_DIR, file), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+
+    test('the boundary module exists and the scan covers every page module', () => {
+        for (const f of ['api.js', 'app.js', 'dashboard.js', 'files.js', 'notifications.js', 'router.js', 'settings.js', 'uploads.js']) {
+            assert.ok(modules.includes(f), `${f} is scanned`);
+        }
+    });
+
+    test('no frontend module other than api.js contains the /api prefix as a literal', () => {
+        for (const f of modules.filter((m) => m !== 'api.js')) {
+            assert.ok(!/['"`]\/api(\/|['"`])/.test(code(f)), `${f} hardcodes an /api path`);
+        }
+    });
+
+    test('no page shell hardcodes an API path outside the base-URL meta tag', () => {
+        for (const page of ['index.html', 'files.html', 'uploads.html', 'settings.html']) {
+            const html = fs.readFileSync(path.join(ROOT, 'public', page), 'utf8')
+                .replace(/<meta name="afm-api-base" content="[^"]*">/, '');
+            assert.ok(!/["'`]\/api(\/|["'`])/.test(html), `${page} hardcodes an /api path`);
+        }
+    });
+
+    test('only api.js and router.js call fetch(), and router.js fetches page markup only', () => {
+        const callers = modules.filter((f) => /\bfetch\s*\(/.test(code(f))).sort();
+        assert.deepEqual(callers, ['api.js', 'router.js']);
+        const routerFetches = [...code('router.js').matchAll(/\bfetch\s*\(\s*([^,)]+)/g)].map((m) => m[1].trim());
+        assert.deepEqual(routerFetches, ['path'], 'router.js fetches a page path, not an API endpoint');
+    });
+
+    test('no XMLHttpRequest outside api.js', () => {
+        for (const f of modules.filter((m) => m !== 'api.js')) {
+            assert.ok(!/new\s+XMLHttpRequest/.test(code(f)), `${f} opens its own XHR`);
+        }
+    });
+
+    test('no module reads API.BASE_URL to build a path', () => {
+        for (const f of modules.filter((m) => m !== 'api.js')) {
+            assert.ok(!/\bBASE_URL\b/.test(code(f)), `${f} reads BASE_URL`);
+        }
+    });
+
+    test('no consumer module carries its own version string', () => {
+        for (const f of modules.filter((m) => m !== 'api.js')) {
+            assert.ok(!/['"`]\/v\d+\//.test(code(f)), `${f} hardcodes a version segment`);
+        }
+    });
+
+    test('the shipped configuration is same-origin: no absolute API base anywhere', () => {
+        const api = code('api.js');
+        assert.ok(!/https?:\/\//.test(api), 'api.js names no host');
+        for (const page of ['index.html', 'files.html', 'uploads.html', 'settings.html']) {
+            const html = fs.readFileSync(path.join(ROOT, 'public', page), 'utf8');
+            const meta = html.match(/<meta name="afm-api-base" content="([^"]*)">/);
+            assert.ok(meta, `${page} declares the API base`);
+            assert.equal(meta[1], '/api/v1', `${page} ships the same-origin default`);
+            assert.ok(!/AFM_API_BASE/.test(html), `${page} sets no global override`);
+        }
+    });
+
+    test('the dependency manifest is still exactly the pre-change list', () => {
+        assert.deepEqual(Object.keys(pkg.dependencies).sort(),
+            ['archiver', 'cors', 'dotenv', 'express', 'helmet', 'morgan', 'multer']);
+    });
+});

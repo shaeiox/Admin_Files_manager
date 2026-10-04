@@ -7,9 +7,7 @@ const path = require('path');
 
 const config = require('./src/config/env');
 const errorHandler = require('./src/middlewares/errorHandler');
-const fsRoutes = require('./src/routes/fs.routes');
-const dashboardRoutes = require('./src/routes/dashboard.routes');
-const settingsRoutes = require('./src/routes/settings.routes');
+const apiRoutes = require('./src/routes/api');
 
 const app = express();
 
@@ -25,25 +23,17 @@ app.use(morgan('dev'));
 /* ─── Static Frontend Serving ─── */
 app.use(express.static(path.join(__dirname, 'public')));
 
-/* ─── API Routes (Placeholders for next phases) ─── */
 /* ─── API Routes ─── */
-app.get('/api/health', (req, res) => {
-    res.json({ success: true, message: 'Dimension API is running', env: config.env });
-});
-
-app.use('/api/fs', fsRoutes);
-
-// Dashboard API. Mounted BEFORE the /api catch-all below, because that
-// catch-all is a two-argument middleware that never calls next() and so
-// terminates the chain - anything mounted after it would be unreachable.
-app.use('/api/dashboard', dashboardRoutes);
-
-// Settings store (settings-page-correctness). Mounted in the same window as the
-// dashboard router - AFTER it and BEFORE the /api catch-all - because that
-// catch-all is a two-argument middleware that never calls next(), so a mount
-// placed after it would be permanently unreachable and GET /api/settings would
-// answer 404 even though the router exists.
-app.use('/api/settings', settingsRoutes);
+// One assembly (health, fs, dashboard, settings - src/routes/api.js) served at
+// two prefixes by a single registration: `/api/v1` is the contract, `/api` the
+// retained compatibility alias (ADR-007). The array order matters - `/api/v1` is
+// tried first, so a v1 request is never re-interpreted under the alias - and the
+// mount MUST precede the /api catch-all below, because that catch-all is a
+// two-argument middleware that never calls next() and so terminates the chain:
+// anything mounted after it would be permanently unreachable.
+// An unknown version (`/api/v2/...`) matches the alias with no route, falls
+// through, and gets the catch-all's JSON 404 - never v1's handlers.
+app.use(['/api/v1', '/api'], apiRoutes);
 
 // Catch-all for undefined API routes. Registered exactly once: it never calls
 // next(), so a second copy below it was unreachable dead code.

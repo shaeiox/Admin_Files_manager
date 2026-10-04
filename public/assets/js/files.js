@@ -654,7 +654,7 @@ const Files = (() => {
   let previewCapability = { available: false, formats: [], maxSize: 0 };
 
   function previewUrl(file, size) {
-    return `${window.API.BASE_URL}/fs/thumbnail?path=${encodeURIComponent(file.path)}&size=${size}`;
+    return window.API.thumbnailUrl(file.path, size);
   }
 
   function canPreview(file) {

@@ -27,8 +27,9 @@
 ```bash
 npm run dev      # Start with nodemon (http://localhost:3000)
 npm start        # Start in production mode
-npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 708 tests, exits 0:
-                 # services, API contracts (live server), frontend modules in a vm, integration, guardrails.
+npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 772 tests, exits 0:
+                 # services, API contracts (live server, incl. versioning.contract), frontend modules in a vm
+                 # (incl. api-boundary), integration, guardrails.
 ```
 
 - No lint/format/build/typecheck tooling is configured. Do not invent commands.
@@ -41,7 +42,7 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 70
   settings, `SettingsService.dbPath` **and its in-memory cache**) at a temp file before requiring
   `server.js` (see `test/api/fs.contract.test.js`, `test/api/settings.contract.test.js`). Two suites
   writing the real store once corrupted it.
-- Health check: `GET /api/health`.
+- Health check: `GET /api/v1/health` (alias `GET /api/health`); it reports `apiVersion: 1`.
 
 ## Architecture Rules (non-negotiable)
 
@@ -61,6 +62,14 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 70
    deliberate synchronous service helper is `FileSystemService.getHealthMetrics` — it touches no
    filesystem, only `os.totalmem`/`os.freemem`/`process.uptime`, and must stay cheap and stable
    because it is on the Dashboard polling path. Do not "async-ify" it, and do not add fs access to it.
+4a. **The API is versioned by mount prefix (ADR-007).** `/api/v1` is the contract; `/api` is a retained
+   compatibility alias. Both are served by **one** assembly, `src/routes/api.js`, which `server.js` mounts
+   once as `app.use(['/api/v1', '/api'], apiRoutes)` — **before** the `/api` catch-all, or every route is
+   silently unreachable. Route modules never declare a version segment; a new resource router is mounted
+   inside `api.js`, never with its own `app.use`. Within v1, changes are **additive only** (new endpoint,
+   new optional field, new optional parameter that defaults to current behaviour); removals and retypes
+   wait for a v2 mounted alongside. The `/api` alias must not be removed without its own decision — it is
+   blocked on authentication, because removing it closes no exposure.
 5. **Error contract:** throw `new AppError(message, statusCode)` from any layer; the global
    `errorHandler` middleware serializes it. Never `res.status(...).json(...)` an error inline from a
    route/controller, never `throw` raw strings or plain `Error` for expected failures.
@@ -82,7 +91,12 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 70
    failures fatal.
 8. **Frontend has no build step.** Plain HTML pages + IIFE modules on `window`. When adding shared
    UI, extend `app.js` (Toast/Modal/Format/Icons); when calling the API, go through `window.API`
-   (`public/assets/js/api.js`) — do not call `fetch` ad hoc from page modules. (`router.js` fetches
+   (`public/assets/js/api.js`) — do not call `fetch` ad hoc from page modules, and never build an API URL
+   yourself: no `/api` literal and no `API.BASE_URL` concatenation outside `api.js`. A non-fetch transport
+   (an `<img src>`, an iframe, a form) gets a named builder in `api.js` (e.g. `API.thumbnailUrl`).
+   `API.BASE_URL` is resolved once at load — `window.AFM_API_BASE` → `<meta name="afm-api-base">` →
+   `/api/v1` — and the shipped shells declare the same-origin default; `test/integration/repo-guardrails.test.js`
+   enforces the boundary. (`router.js` fetches
    the static page HTML, not the API.) Pages are swapped in place by `router.js`, so a page module's
    `init()` can run many times per document: every `window`/`document` listener and timer it adds
    must be removed by its `destroy()`, and controls in the topbar must be bound by delegation in
@@ -181,9 +195,10 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 70
 - New **read-only aggregate** endpoint (Dashboard-style): route in `src/routes/dashboard.routes.js` → handler in
   `src/controllers/dashboard.controller.js` → **reuse the existing services** (`FileSystemService.getTreeStats` /
   `getVolumeStats` / `getHealthMetrics` / `retainExisting`, `MetadataService.getActivities` / `getTopDownloads`) instead of
-  touching the filesystem or metadata from the controller. Mount it in `server.js` **before** the `/api` catch-all: that
-  catch-all is a two-argument middleware that never calls `next()`, so anything registered after it is unreachable. Do
-  **not** remount the filesystem router into the dashboard router — that would republish upload/rename/delete/folder/
+  touching the filesystem or metadata from the controller. A new resource router is mounted inside `src/routes/api.js`
+  (served on `/api/v1` and `/api` at once), and that assembly stays mounted in `server.js` **before** the `/api`
+  catch-all: that catch-all is a two-argument middleware that never calls `next()`, so anything registered after it is
+  unreachable. Do **not** remount the filesystem router into the dashboard router — that would republish upload/rename/delete/folder/
   download/ZIP under a second unauthenticated prefix. Return a **bare** payload (rule 6), and decide deliberately, per
   capability, whether the endpoint degrades with a 200 or fails wholly.
 - New service module: follow the static-class singleton pattern used by `FileSystemService` /

@@ -16,6 +16,8 @@ admin-files-manager/
 │   ├── config/
 │   │   └── env.js                # Env loader + boot-time guard (exits if STORAGE_ROOT missing)
 │   ├── routes/
+│   │   ├── api.js                # THE assembly: health + fs + dashboard + settings, mounted by server.js
+│   │   │                         #   at /api/v1 (contract) and /api (alias) — one router, no copies (ADR-007)
 │   │   ├── fs.routes.js          # /api/fs router — wires endpoints to controller fns
 │   │   ├── dashboard.routes.js   # /api/dashboard router — /summary + /health (read-only, no fs remount)
 │   │   └── settings.routes.js    # /api/settings router — GET (bare read) + PUT (full replace) only;
@@ -89,6 +91,10 @@ admin-files-manager/
 │   │   └── settingsService.test.js          # store: defaults on first read, atomic write, corrupt → 500,
 │   │                                        #   and validateSettingsPayload (whitelist, bounds, client paths)
 │   ├── api/
+│   │   ├── versioning.contract.test.js      # /api/v1 vs /api on a live server: same status + shape for every
+│   │   │                                    #   endpoint, /api/v2 + /api/V1 refused, no fs route under either
+│   │   │                                    #   dashboard prefix, v1 error envelope (no kind, no disclosure),
+│   │   │                                    #   endpoint set frozen, mount order + CORS pinned at source
 │   │   ├── dashboard.contract.test.js       # GET /api/dashboard/summary + /health payload shape
 │   │   ├── settings.contract.test.js        # GET/PUT /api/settings against a live server: bare read,
 │   │   │                                    #   {success,settings} write, 400 leaves the store byte-identical,
@@ -105,6 +111,9 @@ admin-files-manager/
 │   ├── utils/
 │   │   └── fileTypes.test.js                # server taxonomy == client FileTypes; no inline copy in the controller
 │   └── frontend/
+│       ├── api-boundary.test.js             # the real api.js in a vm: BASE_URL resolution (global → meta →
+│       │                                    #   /api/v1), every URL builder carries the base, failures carry
+│       │                                    #   status and never an invented kind
 │       ├── app.test.js                      # shared core helpers (panel states, storage display)
 │       ├── dashboard.test.js                # dashboard renderers, no-history guarantees
 │       ├── files.test.js                    # files.js in a vm with stub DOM/API: states, navigation, selection,
@@ -132,16 +141,19 @@ admin-files-manager/
         │                                        #   previews, list focus model, security posture
         ├── ADR-004-upload-page-integrity.md     # queue honesty, destination integrity, escaping, keyboard access
         ├── ADR-005-client-side-navigation.md   # router.js, the page-module lifecycle, destroy()/beforeLeave()
-        └── ADR-006-settings-store-and-scope.md # data/settings.json (JSON over XML), persist-only-what-works,
-                                                 #   strict whitelist + full replace, corrupt → 500,
-                                                 #   no credentials, danger zone deferred behind auth
+        ├── ADR-006-settings-store-and-scope.md # data/settings.json (JSON over XML), persist-only-what-works,
+        │                                        #   strict whitelist + full replace, corrupt → 500,
+        │                                        #   no credentials, danger zone deferred behind auth
+        └── ADR-007-api-versioning-and-boundary.md # /api/v1 as a mount prefix, one assembly mounted twice,
+                                                 #   alias retained (removal gated on auth), configurable
+                                                 #   API.BASE_URL, kind reserved, taxonomy endpoint deferred
 ```
 
 ## Entry Points
 
 | Entry | Trigger | What it does |
 |---|---|---|
-| `server.js` | `npm start` / `npm run dev` | Builds middleware chain (helmet → cors → json → urlencoded → morgan → static), then mounts `/api/health`, `/api/fs`, `/api/dashboard` and `/api/settings`, adds the API 404 catch-all, HTML fallback for SPA, global `errorHandler`, listens on `config.port` |
+| `server.js` | `npm start` / `npm run dev` | Builds middleware chain (helmet → cors → json → urlencoded → morgan → static), then mounts the `src/routes/api.js` assembly (`/health`, `/fs`, `/dashboard`, `/settings`) at `/api/v1` and `/api` in one registration, adds the API 404 catch-all, HTML fallback for SPA, global `errorHandler`, listens on `config.port` |
 | `src/config/env.js` | Imported first by `server.js` | Loads `.env`, hard-exits if `STORAGE_ROOT` is unset |
 | `public/index.html` | Browser GET `/` | Dashboard; other pages are sibling HTML files |
 | `test/**/*.test.js` | `npm test` (`node --test "test/**/*.test.js"`) | Zero-dependency `node:test` suites; discovery is scoped to `test/`, so a scratch `*.test.js` elsewhere cannot break the suite. Every server-booting suite points `MetadataService.dbPath` at a temp file — parallel test processes must never write the real `data/metadata.json` — and every suite that touches the settings store also repoints `SettingsService.dbPath` and clears its cache before requiring `server.js` |
@@ -149,7 +161,8 @@ admin-files-manager/
 ### ⚠ Mount order in `server.js` is load-bearing, not cosmetic
 
 ```
-/api/health  →  /api/fs  →  /api/dashboard  →  /api/settings  →  app.use('/api', catch-all)  →  SPA fallback  →  errorHandler
+app.use(['/api/v1', '/api'], apiRoutes)  →  app.use('/api', catch-all)  →  SPA fallback  →  errorHandler
+             └─ src/routes/api.js: version-segment guard → /health → /fs → /dashboard → /settings
 ```
 
 The `/api` 404 catch-all is a **two-argument middleware** (`(req, res) => …`) that sends its
@@ -157,11 +170,12 @@ response and **never calls `next()`**. It therefore *terminates* the chain for e
 that reaches it. Anything mounted after it is **unreachable** — not "shadowed", not "deprioritised":
 never invoked at all.
 
-So `/api/dashboard` and `/api/settings` **must** be mounted *before* that catch-all. Mounting either
+So the API assembly (and with it `/api/v1`, `/api/dashboard` and `/api/settings`) **must** be mounted *before* that catch-all. Mounting either
 after produces a server that boots cleanly, logs no error, and 404s on every request to it — a
-silent failure with no stack trace to follow. When adding a new router under `/api`, insert it above
-the catch-all and verify the ordering in the same change (`test/api/settings.contract.test.js` pins
-it for the settings router).
+silent failure with no stack trace to follow. When adding a new resource router, mount it **inside `src/routes/api.js`** — it is then reachable on
+both prefixes at once — never as a separate `app.use` in `server.js`
+(`test/api/versioning.contract.test.js` pins the ordering and the endpoint set;
+`test/api/settings.contract.test.js` pins it for the settings router).
 
 ## Module Boundaries
 
@@ -326,8 +340,10 @@ Rules worth knowing before you touch this path:
 
 | Task | Location |
 |---|---|
-| New filesystem endpoint | `src/routes/fs.routes.js` + `src/controllers/fs.controller.js` |
-| New dashboard/aggregate endpoint | `src/routes/dashboard.routes.js` + `src/controllers/dashboard.controller.js` — **mount the router in `server.js` ABOVE the `/api` catch-all** (see *Mount order*), keep it read-only, do **not** re-mount `fsRoutes` inside it |
+| New filesystem endpoint | `src/routes/fs.routes.js` + `src/controllers/fs.controller.js` (no version segment in the path — the mount adds it; additive-only within v1) |
+| New dashboard/aggregate endpoint | `src/routes/dashboard.routes.js` + `src/controllers/dashboard.controller.js` — keep it read-only, do **not** re-mount `fsRoutes` inside it |
+| New API resource router | mount it in `src/routes/api.js` (served on `/api/v1` and `/api` at once); never `app.use` it from `server.js` after the catch-all |
+| New API URL for a non-fetch transport (img, iframe, form) | a named builder in `public/assets/js/api.js` (like `thumbnailUrl`); page modules never read `API.BASE_URL` |
 | New operator preference (persisted, with a real consumer) | `src/services/SettingsService.js` schema + defaults, `validateSettingsPayload` in `src/utils/validators.js`, a named control in the markup, and the module's field table — then document it in CONTRACTS.md. A preference with **no consumer** is not a setting; remove its control instead |
 | New disk operation | `src/services/FileSystemService.js` |
 | New aggregation over the tree | `src/services/FileSystemService.js` (return raw values; shape the DTO in the controller) |

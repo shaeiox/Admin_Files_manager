@@ -217,6 +217,8 @@ function loadFiles({ routes = {}, location = '', store = {} } = {}) {
 
   sandbox.API = {
     BASE_URL: '/api',
+    // Mirrors api.js thumbnailUrl (api-v1-versioning-and-boundary): files.js no longer builds this URL itself.
+    thumbnailUrl: (p, size) => `/api/fs/thumbnail?path=${encodeURIComponent(p)}&size=${encodeURIComponent(size)}`,
     get: (url, opts) => { calls.get.push(url); calls.getRequests.push({ url, opts }); return respond(url); },
     post: (url, body) => { calls.post.push({ url, body }); return respond(`POST ${url}`); },
     put: (url, body) => { calls.put.push({ url, body }); return respond(`PUT ${url}`); },
@@ -1157,6 +1159,15 @@ describe('UI quality', () => {
     assert.match(grid, /<img src="\/api\/fs\/thumbnail\?path=%2Fpic\.png&amp;size=256"/);
     assert.doesNotMatch(grid, /fs\/download/);
     assert.match(grid, /preview-fallback/, 'a decode failure has a stated fallback');
+  });
+
+  test('previews: the <img src> comes from API.thumbnailUrl, never a hand-built URL (api-client-boundary)', () => {
+    const page = loadFiles();
+    page.c.setPreviewCapability({ available: true, formats: ['png'], maxSize: 512 });
+    const grid = page.pure.renderGridHtml(page.pure.createState({ files: [file('/pic.png', { type: 'image' })] }));
+    assert.match(grid, /<img src="\/api\/fs\/thumbnail\?path=%2Fpic\.png&amp;size=256"/);
+    assert.ok(!/BASE_URL/.test(FILES_SRC.replace(/\/\*[\s\S]*?\*\//g, '')), 'files.js does not read BASE_URL');
+    assert.match(FILES_SRC, /window\.API\.thumbnailUrl\(file\.path, size\)/);
   });
 
   test('the destructive confirmation states count, names and permanence; no undo anywhere', () => {
