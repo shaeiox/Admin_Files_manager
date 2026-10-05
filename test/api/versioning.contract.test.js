@@ -299,7 +299,11 @@ describe('the version is discoverable', () => {
         assert.equal(res.json.apiVersion, 1);
         assert.equal(res.json.success, true);
         assert.equal(res.json.message, 'Dimension API is running');
-        assert.ok('env' in res.json);
+        // `env` was removed by api-security-hardening: an unauthenticated caller
+        // is no longer told which environment it is talking to. `apiVersion` is
+        // the additive field ADR-007 added and is the deployment gate; it stays.
+        assert.ok(!('env' in res.json), 'the runtime environment is no longer disclosed');
+        assert.ok(!('environment' in res.json), 'and is not disclosed under another name');
     });
 
     test('the reported version equals the requested version segment', async () => {
@@ -533,7 +537,10 @@ describe('server.js mount order and posture (source)', () => {
 
     test('both prefixes are mounted strictly before the /api catch-all', () => {
         const mount = SERVER.indexOf("app.use(['/api/v1', '/api'], apiRoutes)");
-        const catchAll = SERVER.search(/app\.use\(\s*'\/api'\s*,/);
+        // The catch-all is the JSON 404 two-argument middleware. Matching its shape
+        // rather than any app.use('/api', ...) keeps this check pointing at the
+        // terminating handler, not at earlier /api middleware (the rate limiter).
+        const catchAll = SERVER.search(/app\.use\(\s*'\/api'\s*,\s*\(\s*req\s*,\s*res\s*\)\s*=>/);
         assert.ok(mount > -1, 'the shared assembly is mounted at /api/v1 and /api, v1 first');
         assert.ok(catchAll > -1, 'the catch-all exists');
         assert.ok(mount < catchAll, 'the assembly precedes the terminating catch-all');
@@ -544,10 +551,13 @@ describe('server.js mount order and posture (source)', () => {
         assert.ok(!/app\.get\(\s*'\/api/.test(SERVER), 'no inline API route');
     });
 
-    test('CORS is untouched: the bare cors() call, nothing wider', () => {
-        assert.equal((SERVER.match(/app\.use\(cors\(\)\);/g) || []).length, 1);
+    test('CORS is config-gated, never a bare permissive cors() (api-security-hardening)', () => {
+        // The versioning change left CORS alone; the security change made it
+        // same-origin-by-default. server.js must not reintroduce a bare cors().
+        assert.ok(!/app\.use\(cors\(\)\);/.test(SERVER), 'server.js has no bare cors()');
+        assert.match(SERVER, /config\.cors\.enabled/, 'CORS registration is gated by config');
+        // The allowlist lives in config/env.js, so server.js hardcodes no header.
         assert.ok(!/Access-Control-Allow-Origin/i.test(SERVER));
-        assert.ok(!/origin\s*:/.test(SERVER), 'no CORS origin option introduced');
     });
 
     test('the frontend fallback still excludes /api', () => {

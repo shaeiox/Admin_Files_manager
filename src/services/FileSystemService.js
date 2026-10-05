@@ -23,7 +23,11 @@ class FileSystemService {
      * @param {string} clientPath 
      */
     static async getStats(clientPath) {
-        const securePath = PathService.resolveSecurePath(clientPath);
+        // Canonicalise: unlike resolveSecurePath this sees THROUGH a symbolic link
+        // or junction, so an in-root link pointing outside the root is refused here
+        // instead of being followed by fs.stat. Every read, download, ZIP entry and
+        // preview resolves through here.
+        const securePath = await PathService.resolveSecureRealPath(clientPath);
         try {
             const stats = await fs.stat(securePath);
             return {

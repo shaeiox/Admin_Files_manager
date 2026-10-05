@@ -268,8 +268,12 @@ describe('API catch-all (registered once)', () => {
 
     test('server.js registers the /api catch-all exactly once', () => {
         const source = fs.readFileSync(path.join(__dirname, '..', '..', 'server.js'), 'utf8');
-        const registrations = source.match(/app\.use\(\s*'\/api'\s*,/g) || [];
-        assert.equal(registrations.length, 1);
+        // The catch-all is the JSON 404, a two-argument middleware. Matching its
+        // shape (not every app.use('/api', ...)) keeps the real invariant - one
+        // catch-all, never a duplicate - while tolerating legitimate /api
+        // middleware such as the rate limiter.
+        const catchAlls = source.match(/app\.use\(\s*'\/api'\s*,\s*\(\s*req\s*,\s*res\s*\)\s*=>/g) || [];
+        assert.equal(catchAlls.length, 1);
     });
 });
 

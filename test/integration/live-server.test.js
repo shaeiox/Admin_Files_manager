@@ -198,7 +198,8 @@ describe('the liveness endpoint is untouched', () => {
         assert.equal(res.status, 200);
         assert.equal(res.json.success, true);
         assert.equal(res.json.message, 'Dimension API is running');
-        assert.ok('env' in res.json, 'still echoes the environment');
+        assert.ok(!('env' in res.json), 'no longer echoes the environment (api-security-hardening)');
+        assert.equal(res.json.apiVersion, 1, 'still carries the deployment activation gate');
         assert.ok(!Array.isArray(res.json), 'still an object, not a metric array');
         for (const key of ['stats', 'storage', 'storageBreakdown', 'activities', 'topFiles']) {
             assert.ok(!(key in res.json), `${key} must not appear on the liveness endpoint`);
@@ -232,7 +233,7 @@ describe('the liveness endpoint is untouched', () => {
         const normalise = (x) => x.replace(/\s+/g, ' ').trim();
         assert.equal(
             normalise(handler),
-            normalise("router.get('/health', (req, res) => { res.json({ success: true, message: 'Dimension API is running', env: config.env, apiVersion: API_VERSION }); })"),
+            normalise("router.get('/health', (req, res) => { res.json({ success: true, message: 'Dimension API is running', apiVersion: API_VERSION }); })"),
             'the liveness handler must not have been modified'
         );
     });

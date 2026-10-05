@@ -55,6 +55,11 @@ function validateFileName(name) {
  * Validates that a client path string is well-formed.
  * The actual security check happens later in PathService.
  *
+ * A client path is a POSIX string rooted at `/` - that is the API contract, not
+ * a preference. Requiring the leading separator also means a bare `__proto__`
+ * or `constructor` can never become a KEY in the metadata store, where such a
+ * name would otherwise collide with an inherited object property.
+ *
  * @param {string} clientPath
  * @throws {AppError} 400 if invalid
  */
@@ -67,6 +72,9 @@ function validateClientPath(clientPath) {
     }
     if (clientPath.length > 4096) {
         throw new AppError('Path is too long.', 400);
+    }
+    if (!clientPath.startsWith('/')) {
+        throw new AppError('Path must be rooted at /.', 400);
     }
     return clientPath;
 }

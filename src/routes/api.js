@@ -2,7 +2,6 @@
 'use strict';
 
 const express = require('express');
-const config = require('../config/env');
 const fsRoutes = require('./fs.routes');
 const dashboardRoutes = require('./dashboard.routes');
 const settingsRoutes = require('./settings.routes');
@@ -40,10 +39,14 @@ router.use((req, res, next) => {
     next();
 });
 
-// Liveness. Moved here from server.js so every prefix is served by one handler;
-// `apiVersion` is additive - success/message/env are unchanged.
+// Liveness. Moved here from server.js so every prefix is served by one handler.
+// `apiVersion` is the deployment activation gate (scripts/deploy.sh) and stays.
+// `env` was REMOVED (api-security-hardening): it told an unauthenticated caller
+// which environment it was talking to. This is a deliberate departure from the
+// additive-only rule of ADR-007 - the field was informational, and hiding the
+// runtime environment from an anonymous caller is the point of the change.
 router.get('/health', (req, res) => {
-    res.json({ success: true, message: 'Dimension API is running', env: config.env, apiVersion: API_VERSION });
+    res.json({ success: true, message: 'Dimension API is running', apiVersion: API_VERSION });
 });
 
 router.use('/fs', fsRoutes);

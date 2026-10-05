@@ -7,15 +7,84 @@ const path = require('path');
 
 const config = require('./src/config/env');
 const errorHandler = require('./src/middlewares/errorHandler');
+const { createRateLimit } = require('./src/middlewares/rateLimit');
 const apiRoutes = require('./src/routes/api');
 
 const app = express();
 
+/* ─── Proxy trust ─── */
+// The app runs behind a single nginx hop (scripts/nginx/dimension.conf sends
+// X-Forwarded-For and terminates TLS). Trust exactly one hop so rate-limit
+// keying can use the forwarded client address without letting a caller spoof
+// extra hops. Keep this in step with the proxy deployment (ADR-008).
+const NGINX_PROXY_HOPS = 1;
+app.set('trust proxy', NGINX_PROXY_HOPS);
+
 /* ─── Security & Middlewares ─── */
+// Content-Security-Policy is ON (it was disabled because of CDN fonts and inline
+// scripts; neither exists any more). Every directive below is derived from what
+// the shipped SPA actually loads - this policy is measured, not guessed:
+//
+//   default-src 'self'  - everything falls back to same-origin.
+//   script-src  'self'  - the strict part, and the reason this matters. All eight
+//                         page modules are external files; there is no inline
+//                         <script> and no on* handler anywhere in the shells.
+//   style-src    ...    - 'unsafe-inline' is still REQUIRED: 13 inline style=
+//                         attributes live in the page modules' innerHTML
+//                         templates (app/dashboard/uploads). tokens.css also
+//                         @imports Google Fonts. Script strictness is what blocks
+//                         XSS; inline style is a far weaker vector, so this is the
+//                         honest cost of not rewriting every renderer. Tighten to
+//                         'self' once those templates stop emitting style=.
+//   font-src     ...    - fonts.gstatic.com serves the @imported webfonts.
+//   img-src      'self' data:  - thumbnails are same-origin; components.css uses
+//                         data:image/svg+xml backgrounds.
+//   connect-src  'self'  - window.API is same-origin /api/v1 (ADR-007). A cross-
+//                         origin deployment is blocked here by design; CORS
+//                         cannot relax CSP.
+//   object-src/base-uri/frame-ancestors - no plugins, no base-tag hijack, no
+//                         framing. frame-ancestors supersedes X-Frame-Options.
+const CSP_DIRECTIVES = {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'"],
+    styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+    fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+    imgSrc: ["'self'", 'data:'],
+    connectSrc: ["'self'"],
+    objectSrc: ["'none'"],
+    baseUri: ["'self'"],
+    frameAncestors: ["'self'"],
+};
+
 app.use(helmet({
-    contentSecurityPolicy: false // Disable CSP in dev to allow CDN fonts and inline scripts
+    contentSecurityPolicy: { useDefaults: false, directives: CSP_DIRECTIVES },
 }));
-app.use(cors());
+/* ─── CORS ─── */
+// Same-origin by default: unless explicitly enabled, no CORS middleware is
+// registered at all, so the browser never receives an
+// Access-Control-Allow-* header and every cross-origin call is refused at the
+// browser layer. When enabled, reflect only allowlisted origins (validated
+// once at startup in config.validateStartup); a same-origin request carries
+// no Origin header and is answered with no CORS header.
+if (config.cors.enabled) {
+    app.use(cors({
+        origin(requestOrigin, cb) {
+            if (!requestOrigin) return cb(null, false);
+            if (config.cors.allowWildcard) {
+                return cb(null, '*');
+            }
+            return cb(null, config.cors.allowedOrigins.includes(requestOrigin) ? requestOrigin : false);
+        },
+        methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+        credentials: false,
+    }));
+}
+
+/* ─── Rate limiting ─── */
+// Mounted on /api only, so the static shell and SPA fetches are never limited.
+// Placed BEFORE the body parsers: a flood is refused without paying to parse it.
+app.use('/api', createRateLimit());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
@@ -107,3 +176,6 @@ process.once('SIGTERM', () => shutdown('SIGTERM'));
 process.once('SIGINT', () => shutdown('SIGINT'));
 
 module.exports = server;
+// Expose the Express app alongside the HTTP listener so tests can assert
+// middleware configuration (e.g. `trust proxy`) without re-booting.
+module.exports.app = app;

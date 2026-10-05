@@ -7,17 +7,25 @@
 ## ⚠ Read first: this service is not safe to expose publicly
 
 - **The API is unauthenticated.** Anyone who can reach it can upload, rename, permanently delete
-  and download every file under `STORAGE_ROOT` (ADR-003).
-- **CORS admits any origin** (`cors()` defaults), so any web page the operator visits can call the
-  mutating endpoints from the operator's browser.
-- **The content security policy is disabled** (`helmet({ contentSecurityPolicy: false })`).
-  Render-time escaping is the only defence for filesystem-derived strings.
+  and download every file under `STORAGE_ROOT` (ADR-003). This remains the one Critical gap.
 - **The application binds every interface.** `app.listen(PORT)` takes no host argument, and there is
   no setting to change that. The host firewall is the **compensating control**. It is not
   authentication: anything that can reach the port can use the API.
 
-TLS, the proxy and the firewall below encrypt transport and narrow reachability. **They do not
-close any of these gaps.** Keep the service on a trusted network until authentication lands.
+Reduced by `api-security-hardening`, but **not** closed by it:
+
+- **Cross-origin access is same-origin by default** — the CORS middleware is only registered when
+  `AFM_CORS_ENABLED=true`, from a validated allowlist. A web page the operator visits can no longer
+  drive the mutating endpoints from their browser unless the operator has explicitly allowed that
+  origin.
+- **A content security policy is enabled** (`script-src 'self'`, no `'unsafe-inline'`, no
+  `unsafe-eval`). Render-time escaping is still the layer for filesystem-derived strings;
+  `style-src` still permits inline styles.
+- **Mutating routes are rate limited** and uploads are refused when the volume is low on space.
+
+Because **nothing authenticates**, those reduce drive-by and abuse exposure; they are not access
+control. TLS, the proxy and the firewall encrypt transport and narrow reachability. **They do not
+close the authentication gap.** Keep the service on a trusted network until authentication lands.
 The service is a browser admin surface, not a supported integration API.
 
 ## Host layout
@@ -48,6 +56,23 @@ Delivered by the systemd `EnvironmentFile`. The template is `.env.example`.
 | `NODE_ENV` | no | `development` | The unit sets `production`. |
 | `PORT` | no | `3000` | Must match the nginx `upstream` and is what `deploy.sh` health-checks. |
 | `UPLOAD_MAX_BYTES` | no | `5368709120` (5 GiB) | A positive integer. Anything else **refuses startup**. Keep nginx `client_max_body_size` above it. |
+
+Security controls added by `api-security-hardening`. **All are optional and every default is the
+safe one** — an unset `EnvironmentFile` never widens access.
+
+| Variable | Required | Default | Notes |
+|---|---|---|---|
+| `AFM_CORS_ENABLED` | no | `false` | **Leave unset.** The default registers no CORS middleware, so no `Access-Control-Allow-*` header is emitted and every cross-origin call is refused by the browser. Set `true` only for a deliberately cross-origin client. |
+| `AFM_CORS_ALLOWED_ORIGINS` | no | *(empty)* | Comma-separated **absolute** origins (`https://files.example.internal`). Each must be `http`/`https` with a host and **no path, query or fragment**; no scheme-relative values, no duplicates, max 20. A malformed entry **refuses startup**. |
+| `AFM_CORS_ALLOW_WILDCARD` | no | `false` | Permits a literal `*` entry. **Refuses startup when `NODE_ENV=production`** — a wildcard is incompatible with the authentication this service still lacks. |
+| `AFM_UPLOAD_FREE_SPACE_BYTES` | no | `104857600` (100 MiB) | Free space required on the staging volume before an upload is accepted; below it the upload is refused with `507` **before any byte is written**. `0` disables the check. A non-integer or negative value **refuses startup**. |
+| `AFM_UPLOAD_MAX_CONCURRENT` | no | `4` | Uploads this process accepts at once; the excess gets `429`. `0` disables. |
+| `AFM_RATE_LIMIT_WRITE_PER_MINUTE` | no | `60` | Per-client allowance for mutating routes. `0` disables. |
+| `AFM_RATE_LIMIT_READ_PER_MINUTE` | no | `600` | Per-client allowance for read routes — a separate bucket, so a read burst never spends the mutation allowance. `0` disables. |
+
+> Rate limits are keyed on `req.ip`, which the app trusts as the forwarded client address because
+> `server.js` sets `trust proxy` to the single documented nginx hop. If you insert another proxy in
+> front, that constant must change with it, or every client will share one key.
 
 - **Precedence:** a variable already in the process environment always wins. `dotenv` only fills
   unset variables, so a stray `.env` in a working directory can never override the `EnvironmentFile`.

@@ -12,7 +12,30 @@ dotenv.config();
 /** Default upload ceiling: 5 GiB. Kept in step with UploadService's own default. */
 const DEFAULT_UPLOAD_MAX_BYTES = 5 * 1024 * 1024 * 1024;
 
+/** Default free-space watermark required before an upload stages bytes. */
+const DEFAULT_UPLOAD_FREE_SPACE_BYTES = 100 * 1024 * 1024; // 100 MiB
+
+/** Max distinct CORS origins accepted in the allowlist. */
+const MAX_CORS_ORIGINS = 20;
+
 const env = process.env.NODE_ENV || 'development';
+
+function parseBool(raw, fallback) {
+    if (raw === undefined || raw === null || raw.trim() === '') return fallback;
+    const v = raw.trim().toLowerCase();
+    return v === 'true' || v === '1' || v === 'yes' || v === 'on';
+}
+
+function parseCorsAllowedOrigins(raw) {
+    if (raw === undefined || raw === null || raw.trim() === '') return [];
+    return raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
+function parseUploadFreeSpaceBytes(raw) {
+    if (raw === undefined || raw === null || raw.trim() === '') return DEFAULT_UPLOAD_FREE_SPACE_BYTES;
+    const n = Number(raw);
+    return Number.isSafeInteger(n) && n >= 0 ? n : undefined;
+}
 
 const config = {
     port: process.env.PORT || 3000,
@@ -23,7 +46,23 @@ const config = {
     // (validateStartup) so the store can never follow a release's working
     // directory and silently reinitialise empty (production-cicd-readiness D1).
     dataDir: resolveDataDir(),
+
+    // Cross-origin access policy. Same-origin by default (disabled); the
+    // operator must explicitly opt in and supply a validated allowlist before
+    // any Access-Control-Allow-* header is emitted.
+    cors: {
+        enabled: parseBool(process.env.AFM_CORS_ENABLED, false),
+        allowedOrigins: parseCorsAllowedOrigins(process.env.AFM_CORS_ALLOWED_ORIGINS),
+        allowWildcard: parseBool(process.env.AFM_CORS_ALLOW_WILDCARD, false),
+    },
+
+    // Free-space watermark (bytes) required in the storage root before an
+    // upload may stage bytes. Default keeps a small reserve; 0 disables the
+    // admission check.
+    uploadFreeSpaceBytes: parseUploadFreeSpaceBytes(process.env.AFM_UPLOAD_FREE_SPACE_BYTES),
 };
+
+config.DEFAULT_UPLOAD_FREE_SPACE_BYTES = DEFAULT_UPLOAD_FREE_SPACE_BYTES;
 
 /**
  * Startup-time configuration checks, run by server.js BEFORE it listens - the
@@ -75,7 +114,59 @@ function validateStartup(source = process.env) {
         }
     }
 
+    // Upload free-space watermark: a non-negative safe-integer byte count, or
+    // blank (which keeps the documented default). 0 explicitly disables the
+    // admission check.
+    const freeSpace = source.AFM_UPLOAD_FREE_SPACE_BYTES;
+    if (freeSpace !== undefined && freeSpace !== '') {
+        const parsed = Number(freeSpace);
+        if (!/^\d+$/.test(freeSpace.trim()) || !Number.isSafeInteger(parsed)) {
+            problems.push('AFM_UPLOAD_FREE_SPACE_BYTES must be a non-negative integer number of bytes.');
+        }
+    }
+
+    // CORS allowlist: absolute http(s) origins only, no path/query/fragment,
+    // no scheme-relative, no duplicates, bounded count. Wildcards require an
+    // explicit opt-in and are refused in production regardless, because the
+    // API is (by design) the only credential-protecting boundary.
+    const allowWildcard = parseBool(source.AFM_CORS_ALLOW_WILDCARD, false);
+    const isProduction = (source.NODE_ENV || 'development') === 'production';
+    if (allowWildcard && isProduction) {
+        problems.push('AFM_CORS_ALLOW_WILDCARD is refused when NODE_ENV=production.');
+    }
+    const origins = parseCorsAllowedOrigins(source.AFM_CORS_ALLOWED_ORIGINS);
+    if (origins.length > MAX_CORS_ORIGINS) {
+        problems.push(`AFM_CORS_ALLOWED_ORIGINS supports at most ${MAX_CORS_ORIGINS} origins.`);
+    }
+    const seen = new Set();
+    for (const origin of origins) {
+        const problem = validateCorsOrigin(origin, allowWildcard, isProduction);
+        if (problem) problems.push(`AFM_CORS_ALLOWED_ORIGINS: "${origin}" ${problem}`);
+        try {
+            const key = new URL(origin).origin.toLowerCase();
+            if (seen.has(key)) problems.push(`AFM_CORS_ALLOWED_ORIGINS: duplicate origin "${origin}".`);
+            seen.add(key);
+        } catch { /* validateCorsOrigin already reported */ }
+    }
+
     return problems;
+}
+
+function validateCorsOrigin(value, allowWildcard, isProduction) {
+    if (typeof value !== 'string' || value !== value.trim() || value === '') return 'must be a non-empty trimmed string.';
+    if (value === '*') {
+        if (isProduction) return 'wildcards are refused in production.';
+        if (!allowWildcard) return 'requires AFM_CORS_ALLOW_WILDCARD=true.';
+        return null;
+    }
+    if (value.startsWith('//')) return 'scheme-relative values are not allowed.';
+    let url;
+    try { url = new URL(value); } catch { return 'is not a valid absolute URL.'; }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return 'must be http or https.';
+    if (url.hostname === '') return 'must include a host.';
+    if (url.pathname !== '/' && url.pathname !== '') return 'must not include a path.';
+    if (url.search || url.hash) return 'must not include a query string or fragment.';
+    return null;
 }
 
 /** A configured directory must exist, be a directory, and be readable and traversable. */

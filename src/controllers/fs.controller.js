@@ -347,12 +347,16 @@ async function downloadFile(req, res, next) {
             throw new AppError('Cannot download a directory.', 400);
         }
 
-        const fileName = path.posix.basename(clientPath);
+        const fileName = validateFileName(path.posix.basename(clientPath));
         const encodedName = encodeURIComponent(fileName);
 
+        // The name becomes a response header, so it must satisfy the filename
+        // rules rather than be merely quoted: Node rejects CR/LF in a header
+        // value (an unhandled 500), and an illegal name has no business being
+        // advertised. A refused download is a client error, not a server fault.
         res.setHeader(
             'Content-Disposition',
-            `attachment; filename="${fileName.replace(/"/g, '')}"; filename*=UTF-8''${encodedName}`
+            `attachment; filename="${fileName}"; filename*=UTF-8''${encodedName}`
         );
         res.setHeader('Content-Length', stats.size);
         res.setHeader('Content-Type', 'application/octet-stream');

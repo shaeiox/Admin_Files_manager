@@ -6,6 +6,48 @@ const path = require('path');
 const AppError = require('../utils/AppError');
 const { resolveDataDir } = require('../config/dataDir');
 
+/**
+ * Coerce a parsed store into the documented shape:
+ * `{ downloads: {<path>: number}, starred: string[], activities: object[] }`.
+ *
+ * The store is a file on disk that a human can edit and that a partially written
+ * write can leave odd, so every reader downstream is entitled to assume the
+ * shape. Without this, a missing `starred` turned `db.starred.includes(...)` into
+ * a TypeError and a missing `downloads` turned a counter into `undefined`.
+ *
+ * `downloads` is built with a NULL prototype on purpose: the keys are client
+ * paths, and a plain `{}` would answer `downloads['__proto__']` with
+ * `Object.prototype` - an object where a count belongs. A null-prototype object
+ * has no such inherited keys, so a hostile or hand-edited key stays inert data.
+ *
+ * ponytail: entries that are not finite numbers are dropped, not coerced. A
+ * corrupt counter is not a measurement, and the repo already refuses to render
+ * one (see getTopDownloads).
+ */
+function normalizeStore(parsed) {
+    const source = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+
+    const downloads = Object.create(null);
+    const rawDownloads = source.downloads;
+    if (rawDownloads && typeof rawDownloads === 'object' && !Array.isArray(rawDownloads)) {
+        // Object.entries yields OWN enumerable keys only, so an inherited
+        // `__proto__` is never carried across.
+        for (const [key, value] of Object.entries(rawDownloads)) {
+            if (typeof value === 'number' && Number.isFinite(value)) downloads[key] = value;
+        }
+    }
+
+    const starred = Array.isArray(source.starred)
+        ? source.starred.filter((entry) => typeof entry === 'string')
+        : [];
+
+    const activities = Array.isArray(source.activities)
+        ? source.activities.filter((entry) => entry !== null && typeof entry === 'object' && !Array.isArray(entry))
+        : [];
+
+    return { downloads, starred, activities };
+}
+
 class MetadataService {
     constructor() {
         // Absolute path to the JSON database file
@@ -49,7 +91,9 @@ class MetadataService {
 
         try {
             const data = await fs.readFile(this.dbPath, 'utf8');
-            this.cache = JSON.parse(data);
+            // Normalised, never stored raw: the file on disk may be hand-edited
+            // or oddly shaped, and every consumer below assumes the shape.
+            this.cache = normalizeStore(JSON.parse(data));
             return this.cache;
         } catch (error) {
             if (error.code === 'ENOENT') {

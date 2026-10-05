@@ -47,25 +47,46 @@
   (e.g. `/media/videos/clip.mp4`). The server rejects anything that escapes the root (`403`).
 - **Timestamps:** file `modified` is a **millisecond epoch number**; activity `time` is ms epoch.
 
-### Security posture — stated limitations (ADR-003)
+### Security posture (ADR-003, extended by api-security-hardening)
 
-These are recorded decisions, not oversights, and none of them is closed:
+**Still open — recorded decisions, not oversights:**
 
 - **The API is unauthenticated.** Every endpoint below, including upload, rename, delete, star and
   `PUT /api/settings`, answers any caller. This is the current design for a trusted, single-operator
   host. **Authentication is required before the service is exposed beyond localhost** — a follow-up
-  change.
-- **Combined with open CORS, a write endpoint is a write endpoint.** Because any origin is admitted
-  and nothing authenticates, `PUT /api/settings` (like every other mutating route) can be called by
-  any web page the operator visits. That is why `data/settings.json` is constrained to non-secret
-  preference values and **no credential may ever be stored in it** (ADR-006) — and why no
-  destructive settings endpoint exists at all.
-- **Cross-origin access is open.** `server.js` mounts `cors()` with its defaults, which allow any
-  origin. Combined with the absence of authentication, **any web page the operator visits can call
-  every mutating endpoint.** Recorded at the same severity as the missing authentication.
-- **The content security policy is disabled** (`helmet({ contentSecurityPolicy: false })`).
-  Rendering-time escaping in the page modules is therefore the **only** layer between a
-  filesystem-derived string and the DOM. Escaping does not fully compensate for the missing policy.
+  change, and the one remaining Critical.
+- **No CSRF defence.** With no session there is nothing to forge yet, but any future cookie-based
+  session must arrive with token or SameSite protection. Prefer a bearer token.
+
+**Closed by `api-security-hardening`:**
+
+- **Cross-origin access is same-origin by default.** `server.js` registers the CORS middleware only
+  when `AFM_CORS_ENABLED=true`, from a validated allowlist (`AFM_CORS_ALLOWED_ORIGINS`); otherwise no
+  `Access-Control-Allow-*` header is emitted at all and every cross-origin call is refused by the
+  browser. Wildcards require `AFM_CORS_ALLOW_WILDCARD=true` and are **refused when
+  `NODE_ENV=production`**. This is what removes the drive-by exposure: any page the operator visits
+  can no longer reach a mutating endpoint.
+- **A content security policy is enabled.** `script-src 'self'` with no `'unsafe-inline'` and no
+  `unsafe-eval`, plus `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'self'`. The shipped
+  shells contain no inline script and no inline event handler, so the policy is real rather than
+  aspirational. **Known gap:** `style-src` still carries `'unsafe-inline'` because 13 inline `style=`
+  attributes live in the page modules' `innerHTML` templates; rendering-time escaping remains the
+  layer between a filesystem-derived string and the DOM. Tighten `style-src` once those templates
+  stop emitting inline styles.
+- **Symbolic links and junctions are not followed on the read boundary.** `PathService
+  .resolveSecureRealPath()` canonicalises and re-checks containment, so a link inside `STORAGE_ROOT`
+  pointing outside it is refused with `403` by download, list, ZIP and preview. Previously the
+  lexical check passed and `fs.stat` followed the link.
+- **Mutating routes are rate limited.** Per client, keyed on `req.ip` (which is trustworthy because
+  `server.js` sets `trust proxy` to the single documented nginx hop). Reads have a separate, much
+  larger allowance.
+- **Uploads are governed by free space and concurrency.** Below `AFM_UPLOAD_FREE_SPACE_BYTES` the
+  upload is refused with `507` **before any byte is staged**; an unreadable capacity reading admits
+  the upload rather than locking the operator out.
+- **`GET /api/v1/health` no longer reports `NODE_ENV`.** It reports `success`, `message` and
+  `apiVersion` — `apiVersion` is the deployment activation gate in `scripts/deploy.sh` and must stay.
+  This is a deliberate departure from ADR-007's additive-only rule: the field was informational, and
+  the sidebar identity block now reports an honest absence instead.
 - **`.env` is excluded from version control** (`.gitignore`), closing the ADR-001 open question on
   the environment file; ADR-003 tracks the remainder.
 
@@ -112,7 +133,7 @@ These are recorded decisions, not oversights, and none of them is closed:
 
 | Method | Path | Status | Notes |
 |---|---|---|---|
-| GET | `/api/health` | ✅ live | Boot/env check — **unchanged by the dashboard work**; additive `apiVersion` (ADR-007) |
+| GET | `/api/health` | ✅ live | Liveness check — additive `apiVersion` (ADR-007); `env` removed (`api-security-hardening`) |
 | GET | `/api/dashboard/summary` | ✅ live | Read-only aggregate; bare object, `200` with per-capability degradation |
 | GET | `/api/dashboard/health` | ✅ live | Read-only aggregate; bare array of runtime metric objects |
 | GET | `/api/settings` | ✅ live | Read-only aggregate; **bare** settings document, no envelope |
@@ -138,8 +159,13 @@ version the responding assembly serves (`1` on both `/api/v1/health` and the `/a
 The handler lives in `src/routes/api.js`, not `server.js`.
 
 ```json
-{ "success": true, "message": "Dimension API is running", "env": "development", "apiVersion": 1 }
+{ "success": true, "message": "Dimension API is running", "apiVersion": 1 }
 ```
+
+`env` was **removed** by `api-security-hardening`: an unauthenticated caller is no longer told which
+environment it is talking to. The sidebar identity block consequently reports an honest absence
+rather than the environment name. `apiVersion` is the deployment activation gate in
+`scripts/deploy.sh` and must not be removed.
 
 ### GET /api/dashboard/summary → `200`
 
@@ -378,9 +404,14 @@ There is **no** time-series store, snapshot table, or history file anywhere in t
 
 ### GET /api/fs/download?path=...
 
-- Streams `application/octet-stream` attachment; sets `Content-Disposition` (UTF-8 encoded
-  filename), `Content-Length`, `Cache-Control: no-cache`.
-- Directories: `400`. Increment download counter on stream open (fire-and-forget).
+- Streams `application/octet-stream` attachment; sets `Content-Disposition` (both the quoted
+  `filename=` form and the authoritative `filename*=UTF-8''` form), `Content-Length`,
+  `Cache-Control: no-cache`.
+- The name must satisfy `validateFileName`: a file whose name the rules refuse is `400` with **no**
+  header built from it (`api-security-hardening`). This also removes a `500` — Node rejects CR/LF in
+  a header value, which a POSIX filename may legally contain.
+- Directories: `400`. A symbolic link or junction whose target lies outside the root: `403`.
+  Increment download counter on stream open (fire-and-forget).
 - Never use it as an image source: the forced octet-stream type is deliberate (it stops untrusted
   content rendering inline). Previews have their own endpoint.
 
@@ -955,6 +986,8 @@ Additive section (production-cicd-readiness). The operator runbook is `docs/DEPL
   `superseded`.
 - **Shutdown.** `SIGTERM`/`SIGINT` stops new connections, drains in-flight requests, and force-exits
   after 30 s. This is ordered below systemd's 45 s and nginx's 600 s.
-- **Exposure is unchanged.** The API is still unauthenticated, CORS still admits any origin, CSP is
-  still disabled, and the app still binds every interface. The host firewall is a compensating
-  control only (ADR-003, ADR-008).
+- **Exposure is reduced, not closed.** `api-security-hardening` made CORS same-origin by default,
+  enabled a CSP, rate-limited mutating routes, closed the symlink escape and removed `env` from the
+  health endpoint. **The API is still unauthenticated** and the app still binds every interface, so
+  the host firewall remains a required compensating control (ADR-003, ADR-008). Cross-origin and
+  cross-site request forgery are only meaningfully closed once authentication lands.

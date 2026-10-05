@@ -112,6 +112,26 @@ required follow-up; none is closed by this change.
 | **CSP disabled** (`helmet({ contentSecurityPolicy: false })`) | High | Rendering-time escaping in `files.js` (all filesystem-derived values, tested end to end in `test/integration/escaping.test.js`) is now the only layer for filesystem-derived content | Enable a policy once inline styles/scripts are removed from the remaining pages. Escaping does **not** fully compensate for the missing policy. |
 | **`.env` tracked** | High | **Closed here:** `.gitignore` excludes `.env` and the file is untracked. This is the ADR-001 follow-up "Add `.env` to `.gitignore`" — the same item, not a second one. | Rotate any secret that was ever committed. |
 
+> **Status update — `api-security-hardening` (2026-10-05).** The table above is the record as it stood
+> when this decision was taken; it is left unedited so the reasoning stays readable. Two of the four
+> rows have since moved:
+>
+> - **`cors()` admits any origin — CLOSED.** CORS is now same-origin by default; the middleware is
+>   registered only when `AFM_CORS_ENABLED=true`, from a validated allowlist, and wildcards are
+>   refused in production.
+> - **CSP disabled — CLOSED, with one recorded gap.** A policy is enabled with `script-src 'self'`
+>   (no `'unsafe-inline'`, no `unsafe-eval`) plus `object-src`/`base-uri`/`frame-ancestors`. The shells
+>   turned out to contain no inline script and no inline event handler. `style-src` still permits
+>   inline styles, because 13 inline `style=` attributes live in the page modules' `innerHTML`
+>   templates; rendering-time escaping remains the layer for filesystem-derived strings.
+> - **No authentication — STILL OPEN.** This is the one Critical that remains, and it is why the
+>   runbook still refuses to call the service safe to expose. CSRF protection is also still absent,
+>   because with no session there is nothing to forge yet.
+>
+> The same change also rate-limited mutating routes, refused uploads below a free-space watermark,
+> stopped the read boundary from following symbolic links out of the root, and removed `NODE_ENV`
+> from `GET /api/v1/health`.
+
 ## Consequences
 
 **Positive**

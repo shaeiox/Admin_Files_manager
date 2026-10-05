@@ -321,12 +321,12 @@ describe('route isolation', () => {
         assert.equal(res.status, 200);
     });
 
-    test('the pre-existing liveness endpoint is unchanged', async () => {
+    test('the liveness endpoint keeps its shape, minus the removed env field', async () => {
         const res = await get('/api/health');
         assert.equal(res.status, 200);
         assert.equal(res.json.success, true);
         assert.equal(res.json.message, 'Dimension API is running');
-        assert.ok('env' in res.json, 'still echoes environment');
+        assert.ok(!('env' in res.json), 'no longer echoes environment (api-security-hardening)');
         assert.ok(!('stats' in res.json), 'not converted into the dashboard payload');
         assert.ok(!Array.isArray(res.json), 'still an object, not a metric array');
     });

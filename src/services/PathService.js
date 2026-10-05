@@ -2,6 +2,7 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs/promises');
 const config = require('../config/env');
 const AppError = require('../utils/AppError');
 
@@ -39,6 +40,56 @@ class PathService {
         }
 
         return targetPath;
+    }
+
+    /**
+     * Canonicalises a client path and refuses it when the RESOLVED target escapes
+     * the storage root.
+     *
+     * `resolveSecurePath` is a lexical guard: it checks the path STRING. It cannot
+     * see that an in-root entry is a symbolic link (or a Windows junction) pointing
+     * somewhere else on disk, and `fs.stat` follows links, so a download of such an
+     * entry would stream bytes from outside the managed tree. The aggregate walk has
+     * always skipped links for exactly this reason; this closes the read/download side.
+     *
+     * `realpath` fails on a not-yet-existing path, so this is only for paths that are
+     * about to be read. Both sides of the comparison are canonicalised, which keeps a
+     * single resolution basis (the separator-boundary rule above still applies).
+     *
+     * @param {string} clientPath
+     * @returns {Promise<string>} the canonical absolute path, proven inside the root
+     */
+    static async resolveSecureRealPath(clientPath) {
+        const securePath = this.resolveSecurePath(clientPath);
+        const rootPath = path.resolve(config.storageRoot);
+
+        let realPath;
+        try {
+            realPath = await fs.realpath(securePath);
+        } catch (error) {
+            if (error.code === 'ENOENT') {
+                throw new AppError(`Item not found: ${clientPath}`, 404);
+            }
+            if (error.code === 'EACCES') {
+                throw new AppError('Permission denied.', 403);
+            }
+            throw new AppError('Failed to read file details from disk.', 500);
+        }
+
+        // Canonicalise the root the same way, so the two sides share one basis.
+        let realRoot;
+        try {
+            realRoot = await fs.realpath(rootPath);
+        } catch {
+            realRoot = rootPath;
+        }
+
+        const contained = realPath === realRoot || realPath.startsWith(realRoot + path.sep);
+        if (!contained) {
+            throw new AppError('Access denied. Path traversal detected.', 403);
+        }
+
+        return realPath;
     }
 
     /**

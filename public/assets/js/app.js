@@ -946,19 +946,17 @@ function resolveStorageDisplay(storage) {
 /**
  * Decide what the sidebar identity block shows. This application has no user
  * API and no authentication, so there is no person to name and no operator to
- * greet: the only true statements available are the environment the server runs
- * in, and that the application is self-hosted. Everything else is an absence.
- * @param {object|null} health - the `GET /api/health` response
+ * greet.
+ *
+ * It used to display the runtime environment, read from `env` on the health
+ * response. The server no longer discloses that to an anonymous caller
+ * (api-security-hardening), so the block reports an honest absence instead of a
+ * label the client can no longer obtain. Nothing here may invent an identity.
+ *
+ * @param {object|null} _health - the `GET /api/health` response, now unused
  * @returns {{available: boolean, avatar: string, name: string, role: string}}
  */
-function resolveIdentityDisplay(health) {
-  const env = (health && typeof health === 'object') ? health.env : null;
-
-  if (typeof env === 'string' && env.trim() !== '') {
-    // The avatar stays empty: initials would assert a person who does not exist.
-    return { available: true, avatar: '', name: env, role: 'Self-hosted' };
-  }
-
+function resolveIdentityDisplay(_health) {
   return {
     available: false,
     avatar: '',

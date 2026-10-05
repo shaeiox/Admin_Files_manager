@@ -119,3 +119,25 @@ describe('the frontend API boundary', () => {
             ['archiver', 'cors', 'dotenv', 'express', 'helmet', 'morgan', 'multer']);
     });
 });
+
+/* ── api-security-hardening (CORS default-off) ──
+   Structural fact: server.js must never register the CORS middleware with its
+   permissive defaults. Cross-origin access is opt-in via config.cors, so a bare
+   `cors()` call is a regression even if runtime tests are skipped. */
+
+describe('the CORS posture in server.js', () => {
+    /** server.js with comments removed, so explanatory prose cannot satisfy the check. */
+    const serverCode = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+
+    test('cors() is never registered with empty options', () => {
+        assert.ok(!/cors\(\s*\)/.test(serverCode),
+            'server.js calls cors() with defaults, which would re-enable open CORS');
+    });
+
+    test('the cors middleware is gated on config.cors.enabled', () => {
+        assert.match(serverCode, /if\s*\(\s*config\.cors\.enabled\s*\)/,
+            'CORS registration is not guarded by the enable flag');
+    });
+});

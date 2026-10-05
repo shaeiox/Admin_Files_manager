@@ -208,12 +208,19 @@ describe('resolveStorageDisplay - unavailable states never render a figure', () 
    ══════════════════════════════════════════ */
 
 describe('resolveIdentityDisplay - the environment, never a person', () => {
-    test('a real /api/health payload renders the environment', () => {
-        const health = { success: true, message: 'Dimension API is running', env: 'production' };
-        const view = resolveIdentityDisplay(health);
-        assert.equal(view.available, true);
-        assert.equal(view.name, 'production');
-        assert.equal(view.role, 'Self-hosted');
+    test('no health payload renders an environment: the server no longer discloses one', () => {
+        // `env` was removed from GET /api/v1/health (api-security-hardening), so
+        // there is nothing true left to name here. A payload that still carries
+        // the old field must not resurrect it.
+        for (const health of [
+            { success: true, message: 'Dimension API is running', apiVersion: 1 },
+            { success: true, message: 'Dimension API is running', env: 'production' },
+        ]) {
+            const view = resolveIdentityDisplay(health);
+            assert.equal(view.available, false);
+            assert.equal(view.name, 'Unknown');
+            assert.equal(view.role, 'Environment unavailable');
+        }
     });
 
     test('no initials are rendered for any input', () => {
@@ -305,12 +312,14 @@ describe('updateStorageUI - sidebar volume card', () => {
 });
 
 describe('updateUserUI - sidebar identity', () => {
-    test('renders the environment name and self-hosted role', () => {
+    test('renders an honest absence: the server no longer discloses the environment', () => {
         const nodes = sidebarNodes();
+        // Even a stale payload still carrying the removed `env` field must not be
+        // rendered: the disclosure was closed at the source (api-security-hardening).
         updateUserUI({ success: true, message: 'Dimension API is running', env: 'development' });
 
-        assert.equal(nodes['.user-name'].textContent, 'development');
-        assert.equal(nodes['.user-role'].textContent, 'Self-hosted');
+        assert.equal(nodes['.user-name'].textContent, 'Unknown');
+        assert.equal(nodes['.user-role'].textContent, 'Environment unavailable');
         assert.equal(nodes['.user-avatar'].textContent, '');
     });
 
@@ -470,7 +479,7 @@ describe('seam 4 - helpers are exported for reuse', () => {
         const nodes = sidebarNodes();
         AFM.updateStorageUI(volumeFixture({}));
         assert.equal(nodes['.storage-pct'].textContent, '50.0%');
-        AFM.updateUserUI({ env: 'production' });
-        assert.equal(nodes['.user-name'].textContent, 'production');
+        AFM.updateUserUI({ apiVersion: 1 });
+        assert.equal(nodes['.user-name'].textContent, 'Unknown');
     });
 });

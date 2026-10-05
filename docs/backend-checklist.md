@@ -125,7 +125,7 @@ have required decisions that belong in their own change.
 | # | Issue | Where |
 |---|---|---|
 | 1 | `err.stack` is serialised to clients outside production, leaking absolute OS paths. | `src/middlewares/errorHandler.js:20` |
-| 2 | CORS is fully open (`app.use(cors())`, no origin allow-list). **Recorded decision, still open** — ADR-003 §9; to be fixed with authentication. | `server.js:19` |
+| 2 | ~~CORS is fully open (`app.use(cors())`, no origin allow-list).~~ **CLOSED** by `api-security-hardening`: CORS is same-origin by default (`AFM_CORS_ENABLED`, validated allowlist). With no authentication this reduces drive-by exposure; it is not access control. | `server.js`, `src/config/env.js` |
 | 3 | There is no authentication or authorization on any endpoint, including upload and delete. **Recorded decision, still open** — ADR-003 §9; required before non-localhost exposure. | whole app |
 | 4 | `.env` is git-tracked and contains a machine-specific `STORAGE_ROOT`. **Partly resolved:** `.gitignore` now excludes `.env` and `temp/`; the already-tracked file must still be removed from the index (`git rm --cached .env`). | `.gitignore`, `.env` |
 | 5 | `MetadataService._write` uses a **fixed** temp path, so concurrent writes can interleave and corrupt `metadata.json`. | `src/services/MetadataService.js` |
