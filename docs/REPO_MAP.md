@@ -20,7 +20,9 @@ admin-files-manager/
 │   ├── trigger-deploy.sh         # REPO side: allow-list `git archive` of one commit, shipped over one SSH session
 │   ├── git-hooks/post-receive    # bare-repo trigger: deploys pushes to the deployment branch (gates deploy, not push)
 │   ├── systemd/dimension.service # unit: unprivileged identity, EnvironmentFile, TimeoutStopSec 45s, journal
-│   └── nginx/dimension.conf      # TLS proxy: body ceiling 6g (> app limit), 600s timeouts, streaming, no SPA fallback
+│   ├── nginx/dimension.conf      # TLS proxy: body ceiling 6g (> app limit), 600s timeouts, streaming, no SPA fallback
+│   ├── nginx/cloudavid.conf      # Two-domain live config: files. = static portal, admin. = basic-auth proxy to :3000
+│   └── nginx/README.md           # Runbook for cloudavid.conf: install, certs, htpasswd, verification, troubleshooting
 ├── temp/                         # Scratch (git-ignored; never discovered by npm test)
 │
 ├── src/                          # ─── Backend ───

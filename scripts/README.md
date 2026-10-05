@@ -48,6 +48,8 @@ still lands in the repository but **deploys nowhere**.
 | `deploy.sh` | Deploy host | Validates, tests, activates, health-checks, rolls back, prunes |
 | `systemd/dimension.service` | Deploy host | Runs the app: unprivileged user, graceful stop, journal logging |
 | `nginx/dimension.conf` | Deploy host | TLS, 6 GB body ceiling, 600 s timeouts, streaming |
+| `nginx/cloudavid.conf` | CloudAvid host | Two domains: static portal (`files.`) + basic-auth proxy to the app (`admin.`) |
+| `nginx/README.md` | CloudAvid host | Runbook for `cloudavid.conf`: prerequisites, certs, htpasswd, install, verification, troubleshooting |
 
 All scripts are run as **`bash <script>`**, because the exec bit is not stored in this repository.
 They are pinned to LF line endings by `.gitattributes`.
