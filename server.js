@@ -38,10 +38,9 @@ app.set('trust proxy', NGINX_PROXY_HOPS);
 //                         'self' once those templates stop emitting style=.
 //   font-src     ...    - fonts.gstatic.com serves the @imported webfonts.
 //   img-src      'self' data:  - thumbnails are same-origin; components.css uses
-//                         data:image/svg+xml backgrounds.
-//   connect-src  'self'  - window.API is same-origin /api/v1 (ADR-007). A cross-
-//                         origin deployment is blocked here by design; CORS
-//                         cannot relax CSP.
+//                         data:image/svg+xml backgrounds.//   connect-src  'self'  - window.API is same-origin /admin/v1 (ADR-007). A cross-
+//   origin deployment is blocked here by design; CORS
+//   cannot relax CSP.
 //   object-src/base-uri/frame-ancestors - no plugins, no base-tag hijack, no
 //                         framing. frame-ancestors supersedes X-Frame-Options.
 const CSP_DIRECTIVES = {
@@ -81,9 +80,9 @@ if (config.cors.enabled) {
 }
 
 /* ─── Rate limiting ─── */
-// Mounted on /api only, so the static shell and SPA fetches are never limited.
+// Mounted on /admin only, so the static shell and SPA fetches are never limited.
 // Placed BEFORE the body parsers: a flood is refused without paying to parse it.
-app.use('/api', createRateLimit());
+app.use('/admin', createRateLimit());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -94,26 +93,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 /* ─── API Routes ─── */
 // One assembly (health, fs, dashboard, settings - src/routes/api.js) served at
-// two prefixes by a single registration: `/api/v1` is the contract, `/api` the
-// retained compatibility alias (ADR-007). The array order matters - `/api/v1` is
+// two prefixes by a single registration: `/admin/v1` is the contract, `/admin` the
+// retained compatibility alias (ADR-007). The array order matters - `/admin/v1` is
 // tried first, so a v1 request is never re-interpreted under the alias - and the
-// mount MUST precede the /api catch-all below, because that catch-all is a
+// mount MUST precede the /admin catch-all below, because that catch-all is a
 // two-argument middleware that never calls next() and so terminates the chain:
 // anything mounted after it would be permanently unreachable.
-// An unknown version (`/api/v2/...`) matches the alias with no route, falls
+// An unknown version (`/admin/v2/...`) matches the alias with no route, falls
 // through, and gets the catch-all's JSON 404 - never v1's handlers.
-app.use(['/api/v1', '/api'], apiRoutes);
+app.use(['/admin/v1', '/admin'], apiRoutes);
 
 // Catch-all for undefined API routes. Registered exactly once: it never calls
 // next(), so a second copy below it was unreachable dead code.
-app.use('/api', (req, res) => {
+app.use('/admin', (req, res) => {
     res.status(404).json({ success: false, error: 'API endpoint not found' });
 });
 
 /* ─── Frontend Fallback (Pathless Middleware compatible with Express 5 / Node 24) ─── */
 app.use((req, res, next) => {
     // Only serve index.html for GET requests that expect HTML
-    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+    if (req.method === 'GET' && !req.path.startsWith('/admin')) {
         return res.sendFile(path.join(__dirname, 'public', 'index.html'));
     }
     next();

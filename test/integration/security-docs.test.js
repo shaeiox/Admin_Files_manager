@@ -90,8 +90,8 @@ describe('the contract no longer claims the closed gaps are open', () => {
 
     test('the health response no longer documents an env field', () => {
         const healthSection = contracts.slice(
-            contracts.indexOf('### GET /api/health'),
-            contracts.indexOf('### GET /api/dashboard/summary'),
+            contracts.indexOf('### GET /admin/health'),
+            contracts.indexOf('### GET /admin/dashboard/summary'),
         );
         assert.ok(healthSection.length > 0, 'the health section is still present');
         assert.ok(!/"env"\s*:/.test(healthSection), 'the health example still shows an env field');

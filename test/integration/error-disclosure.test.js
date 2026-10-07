@@ -116,7 +116,7 @@ const REPO_DIR = path.resolve(__dirname, '..', '..');
 
 describe('error responses never disclose server filesystem layout', () => {
     test('a 403 from path containment carries no stack and no path', async () => {
-        const res = await call('DELETE', '/api/fs/delete', { paths: ['/../root-secret/x'] });
+        const res = await call('DELETE', '/admin/fs/delete', { paths: ['/../root-secret/x'] });
 
         assert.equal(res.status, 403);
         assertNoDisclosure(res, '403 traversal');
@@ -125,13 +125,13 @@ describe('error responses never disclose server filesystem layout', () => {
     });
 
     test('a 404 carries no stack and no path', async () => {
-        const res = await call('GET', '/api/fs/list?path=%2Fdoes-not-exist');
+        const res = await call('GET', '/admin/fs/list?path=%2Fdoes-not-exist');
         assert.equal(res.status, 404);
         assertNoDisclosure(res, '404');
     });
 
     test('a 400 from input validation carries no stack', async () => {
-        const res = await call('POST', '/api/fs/folder', {});
+        const res = await call('POST', '/admin/fs/folder', {});
         assert.equal(res.status, 400);
         assertNoDisclosure(res, '400');
     });
@@ -172,7 +172,7 @@ describe('error responses never disclose server filesystem layout', () => {
     });
 
     test('AppError messages are still forwarded - the fix is not over-broad', async () => {
-        const res = await call('GET', '/api/fs/list?path=%2F..%2F..%2Fescape');
+        const res = await call('GET', '/admin/fs/list?path=%2F..%2F..%2Fescape');
         assert.equal(res.status, 403);
         // Authored, static, path-free: this is the message a user needs.
         assert.equal(res.json.error, 'Access denied. Path traversal detected.');
@@ -180,7 +180,7 @@ describe('error responses never disclose server filesystem layout', () => {
     });
 
     test('the error envelope matches the documented contract', async () => {
-        const res = await call('GET', '/api/fs/list?path=%2Fdoes-not-exist');
+        const res = await call('GET', '/admin/fs/list?path=%2Fdoes-not-exist');
         assert.deepEqual(
             Object.keys(res.json).sort(),
             ['error', 'success'],

@@ -98,7 +98,7 @@ SSH_OPTS="-i ~/.ssh/dimension_deploy" bash scripts/trigger-deploy.sh dimension-d
 The last line must read `DEPLOY_OUTCOME=success …`. Then check health from your machine:
 
 ```bash
-curl -s https://<host>/api/v1/health
+curl -s https://<host>/admin/v1/health
 ```
 
 The response should include `"apiVersion":1`.

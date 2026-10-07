@@ -15,7 +15,7 @@
 
 const API = (() => {
     /** The same-origin versioned default (ADR-007). */
-    const DEFAULT_BASE_URL = '/api/v1';
+    const DEFAULT_BASE_URL = '/admin/v1';
 
     /**
      * API prefix shared by all endpoints, resolved ONCE at load so every URL a

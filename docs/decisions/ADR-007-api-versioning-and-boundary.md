@@ -18,9 +18,9 @@ sites (`api.js`, plus `router.js` for static page markup). Exactly **one** URL w
 boundary: `files.js` concatenated `window.API.BASE_URL` for a thumbnail `<img src>`. So this is a
 **changeability** problem, not a structural one.
 
-Two server facts shaped the solution. First, the `/api` catch-all in `server.js` is a two-argument
+Two server facts shaped the solution. First, the `/admin` catch-all in `server.js` is a two-argument
 middleware that never calls `next()`, so any mount placed after it is unreachable. Second,
-`GET /api/health` was an inline handler, outside any router.
+`GET /admin/health` was an inline handler, outside any router.
 
 The service is single-operator, same-origin and unauthenticated (ADR-003). That makes now the cheapest
 time to introduce versioning: it does not have to land alongside authentication.
@@ -29,7 +29,7 @@ time to introduce versioning: it does not have to land alongside authentication.
 
 ### 1. The version is a mount prefix; route modules are version-agnostic
 
-`/api/v1/<resource>` is the contract. Route modules (`fs.routes.js`, `dashboard.routes.js`,
+`/admin/v1/<resource>` is the contract. Route modules (`fs.routes.js`, `dashboard.routes.js`,
 `settings.routes.js`) declare **no** version segment. The version is applied only where they are
 mounted, so one module can serve any number of prefixes without being copied.
 
@@ -39,34 +39,40 @@ selects it.
 ### 2. One assembly, mounted once at two prefixes
 
 `src/routes/api.js` composes the health handler and the three existing routers. `server.js` mounts it
-with a single registration, **before** the `/api` catch-all:
+with a single registration, **before** the `/admin` catch-all:
 
 ```js
-app.use(['/api/v1', '/api'], apiRoutes);
-app.use('/api', notFoundCatchAll);
+app.use(['/admin/v1', '/admin'], apiRoutes);
+app.use('/admin', notFoundCatchAll);
 ```
 
 Both prefixes run the **same router instances**, so drift is impossible by construction. The health
-handler moved into the assembly so `/api/v1/health` is served too. It gained the additive field
+handler moved into the assembly so `/admin/v1/health` is served too. It gained the additive field
 `apiVersion: 1`.
 
-The two prefixes share a single array registration, not two `app.use` lines. One `app.use('/api', …)`
-in `server.js` therefore stays the catch-all, as the existing guard requires. `/api/v1` is listed
+The two prefixes share a single array registration, not two `app.use` lines. One `app.use('/admin', …)`
+in `server.js` therefore stays the catch-all, as the existing guard requires. `/admin/v1` is listed
 first, so a v1 request is never re-interpreted under the alias.
 
 Express matches mount paths case-insensitively, so the assembly starts with a guard: a version segment
-that is not exactly `v1` (for example `/api/V1/...`) leaves the router via `next('router')` and
-reaches the catch-all. `/api/v2/...` matches the alias, finds no route, and reaches the catch-all the
+that is not exactly `v1` (for example `/admin/V1/...`) leaves the router via `next('router')` and
+reaches the catch-all. `/admin/v2/...` matches the alias, finds no route, and reaches the catch-all the
 same way. Either way the response is the JSON `404` envelope, never v1's handlers and never the SPA
 shell.
 
-### 3. The legacy `/api/*` surface is a retained alias; removal is gated on authentication
+### 3. The legacy `/api/*` surface was a retained alias — renamed to `/admin` in this change
 
 The alias keeps open tabs, bookmarks and the ~160 test path literals working, and it makes rollback a
 configuration edit. Its removal is **not scheduled**, and it requires its own decision record.
 Removal is also **blocked on authentication**. Withdrawing the alias would leave the same handlers
 reachable under `/api/v1`, so it would reduce the unauthenticated exposure by exactly zero. Treating
 alias removal as a security action would misrepresent it as one.
+
+In this change the entire API prefix is renamed from `/api` to `/admin`, including its alias:
+the contract moves from `/api/v1` to `/admin/v1` and the compatibility alias from `/api` to `/admin`.
+The old `/api` / `/api/v1` prefixes are **not** kept as a second compatibility layer alongside the new
+ones — that would republish the same handlers under two unrelated top-level prefixes, which is exactly
+the duplication ADR-007 intended to avoid. Callers still on `/api/*` must be re-pointed at `/admin/*`.
 
 ### 4. Within v1, changes are additive only
 
@@ -75,18 +81,18 @@ whose absence reproduces current behaviour. A removal, rename or retype goes to 
 **alongside** v1. There are no `Deprecation`/`Sunset` headers, because nothing is deprecated, and
 machinery with no consumer is the failure mode `AGENTS.md` prohibits.
 
-### 5. `API.BASE_URL` is resolved configuration, defaulting to same-origin `/api/v1`
+### 5. `API.BASE_URL` is resolved configuration, defaulting to same-origin `/admin/v1`
 
 `api.js` resolves the base **once** at load. The first non-blank source wins:
 
 1. `window.AFM_API_BASE`
 2. `<meta name="afm-api-base" content="…">`
-3. `/api/v1`
+3. `/admin/v1`
 
 The value is trimmed, and trailing slashes are stripped. The public `API` object is frozen, so one
 document never splits its traffic across two bases. The four page shells ship the same-origin
 default in a head `<meta>`, which leaves the byte-identical sidebar untouched. A different host or
-prefix is now a configuration change. Rolling back to `/api` is one too.
+prefix is now a configuration change. Rolling back to `/admin` is one too.
 
 ### 6. Every API URL is built inside the boundary
 
@@ -102,7 +108,7 @@ reserved. **No endpoint emits it**, and its absence is valid. `api.js` already c
 the server sends a string. Populating `kind` would require auditing every endpoint and touching
 `uploads.js`, which another change owns. Emitting it later is additive and needs no client change.
 
-### 8. No `GET /api/v1/fs/file-types` — the taxonomy endpoint is deferred
+### 8. No `GET /admin/v1/fs/file-types` — the taxonomy endpoint is deferred
 
 There are three reasons:
 
@@ -132,7 +138,7 @@ for any origin split. This change blocks neither.
 - **Query-parameter versioning.** It pollutes caches and every download URL.
 - **Per-version route files** (`routes/v1/*.js`). This is exactly the duplication the change exists
   to avoid.
-- **Middleware that rewrites `/api/v2` → `/api/v1`.** It would silently serve a newer client from an
+- **Middleware that rewrites `/admin/v2` → `/admin/v1`.** It would silently serve a newer client from an
   older contract.
 - **Two `app.use` lines in `server.js`.** It works, but it breaks the existing "catch-all registered
   exactly once" guard and scatters the surface across the file whose ordering is most fragile.
@@ -141,13 +147,13 @@ for any origin split. This change blocks neither.
 
 ## Consequences
 
-- `/api/v1/*` and `/api/*` are byte-compatible for every endpoint. This is pinned live by
+- `/admin/v1/*` and `/admin/*` are byte-compatible for every endpoint. This is pinned live by
   `test/api/versioning.contract.test.js`, which also pins that the endpoint set is frozen, that no
   filesystem route exists under either dashboard prefix, that the error envelope discloses nothing,
   and that the mount order and `cors()` line are unchanged.
 - The frontend is a v1 consumer, and the boundary is enforced at source by
   `test/frontend/api-boundary.test.js` and `test/integration/repo-guardrails.test.js`.
-- One pre-existing assertion was re-pinned: the source pin on the `/api/health` handler now points
+- One pre-existing assertion was re-pinned: the source pin on the `/admin/health` handler now points
   at `src/routes/api.js` and includes `apiVersion`. This was approved by the maintainer.
 - Everything ADR-003 records as Critical is unchanged: no authentication, open CORS, and CSP
   disabled. The service must still not be reachable beyond localhost.

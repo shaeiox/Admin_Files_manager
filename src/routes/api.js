@@ -9,13 +9,13 @@ const settingsRoutes = require('./settings.routes');
 /**
  * The API surface, assembled once (api-v1-versioning-and-boundary, ADR-007).
  *
- * server.js mounts THIS router at both `/api/v1` (the contract) and `/api` (the
+ * server.js mounts THIS router at both `/admin/v1` (the contract) and `/admin` (the
  * retained compatibility alias). Both prefixes therefore run the same router
  * instances, handlers and guards - they cannot drift, and a fix lands on both.
  *
  * Route modules declare no version segment: the version is applied only at the
  * mount site. A future v2 is a separate assembly mounted alongside this one,
- * never a rewrite of `/api/v2` onto v1.
+ * never a rewrite of `/admin/v2` onto v1.
  *
  * The filesystem router is mounted only under `/fs`. It is deliberately NOT
  * remounted under `/dashboard`: that would republish upload/rename/delete/folder/

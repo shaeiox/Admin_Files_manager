@@ -51,7 +51,7 @@ SettingsService.dbPath = SETTINGS_PATH;
 SettingsService.cache = null;
 
 const NOT_FOUND = { success: false, error: 'API endpoint not found' };
-const PREFIXES = ['/api/v1', '/api'];
+const PREFIXES = ['/admin/v1', '/admin'];
 
 let server;
 let port;
@@ -173,7 +173,7 @@ after(async () => {
    ══════════════════════════════════════════ */
 
 describe('the versioned namespace (api-versioning)', () => {
-    test('GET /api/v1/fs/list is reachable and is the listing payload', async () => {
+    test('GET /admin/v1/fs/list is reachable and is the listing payload', async () => {
         const res = await send('GET', '/api/v1/fs/list?path=/');
         assert.equal(res.status, 200);
         assert.notDeepEqual(res.json, NOT_FOUND);
@@ -181,7 +181,7 @@ describe('the versioned namespace (api-versioning)', () => {
         assert.equal(typeof res.json.total, 'number');
     });
 
-    test('every read endpoint answers identically on /api/v1 and /api', async () => {
+    test('every read endpoint answers identically on /admin/v1 and /admin', async () => {
         for (const endpoint of [
             '/health',
             '/fs/tree',
@@ -192,9 +192,9 @@ describe('the versioned namespace (api-versioning)', () => {
             '/dashboard/health',
             '/settings',
         ]) {
-            const v1 = await send('GET', `/api/v1${endpoint}`);
-            const legacy = await send('GET', `/api${endpoint}`);
-            assert.equal(v1.status, 200, `/api/v1${endpoint} -> ${v1.status} ${v1.text.slice(0, 80)}`);
+            const v1 = await send('GET', `/admin/v1${endpoint}`);
+            const legacy = await send('GET', `/admin${endpoint}`);
+            assert.equal(v1.status, 200, `/admin/v1${endpoint} -> ${v1.status} ${v1.text.slice(0, 80)}`);
             assert.equal(v1.status, legacy.status, `${endpoint}: same status`);
             assert.deepEqual(shapeOf(v1.json), shapeOf(legacy.json), `${endpoint}: same shape`);
         }
@@ -202,8 +202,8 @@ describe('the versioned namespace (api-versioning)', () => {
 
     test('state-free reads are byte-identical across prefixes', async () => {
         for (const endpoint of ['/fs/tree', '/fs/list?path=/', '/fs/thumbnail/capability', '/settings']) {
-            const v1 = await send('GET', `/api/v1${endpoint}`);
-            const legacy = await send('GET', `/api${endpoint}`);
+            const v1 = await send('GET', `/admin/v1${endpoint}`);
+            const legacy = await send('GET', `/admin${endpoint}`);
             assert.equal(v1.text, legacy.text, `${endpoint}: byte-identical body`);
         }
     });
@@ -228,20 +228,20 @@ describe('the versioned namespace (api-versioning)', () => {
         }
     });
 
-    test('POST /api/v1/fs/star returns the same envelope as POST /api/fs/star', async () => {
-        const v1 = await sendJson('POST', '/api/v1/fs/star', { path: '/notes.txt', starred: true });
-        const legacy = await sendJson('POST', '/api/fs/star', { path: '/notes.txt', starred: true });
+    test('POST /admin/v1/fs/star returns the same envelope as POST /admin/fs/star', async () => {
+        const v1 = await sendJson('POST', '/admin/v1/fs/star', { path: '/notes.txt', starred: true });
+        const legacy = await sendJson('POST', '/admin/fs/star', { path: '/notes.txt', starred: true });
         assert.equal(v1.status, 200);
         assert.equal(v1.status, legacy.status);
         assert.deepEqual(v1.json, { success: true, data: { path: '/notes.txt', starred: true } });
         assert.deepEqual(v1.json, legacy.json, 'byte-compatible mutation envelope');
-        await sendJson('POST', '/api/v1/fs/star', { path: '/notes.txt', starred: false });
+        await sendJson('POST', '/admin/v1/fs/star', { path: '/notes.txt', starred: false });
     });
 
     test('folder, upload, rename and delete round-trip on both prefixes with one shape', async () => {
         const shapes = {};
         for (const prefix of PREFIXES) {
-            const tag = prefix === '/api' ? 'legacy' : 'v1';
+            const tag = prefix === '/admin' ? 'legacy' : 'v1';
 
             const folder = await sendJson('POST', `${prefix}/fs/folder`, { path: `/dir-${tag}` });
             assert.equal(folder.status, 201, `${prefix} folder -> ${folder.text}`);
@@ -268,10 +268,10 @@ describe('the versioned namespace (api-versioning)', () => {
         assert.deepEqual(shapes.v1, shapes.legacy, 'every mutation has one status and one shape on both prefixes');
     });
 
-    test('PUT /api/v1/settings round-trips exactly as PUT /api/settings', async () => {
-        const current = (await send('GET', '/api/v1/settings')).json;
-        const v1 = await sendJson('PUT', '/api/v1/settings', current);
-        const legacy = await sendJson('PUT', '/api/settings', current);
+    test('PUT /admin/v1/settings round-trips exactly as PUT /admin/settings', async () => {
+        const current = (await send('GET', '/admin/v1/settings')).json;
+        const v1 = await sendJson('PUT', '/admin/v1/settings', current);
+        const legacy = await sendJson('PUT', '/admin/settings', current);
         assert.equal(v1.status, 200, v1.text);
         assert.deepEqual(v1.json, legacy.json);
     });
@@ -283,8 +283,8 @@ describe('the versioned namespace (api-versioning)', () => {
             ['POST', '/fs/folder', { path: '/CON' }],
             ['PUT', '/settings', { nope: true }],
         ]) {
-            const v1 = payload ? await sendJson(method, `/api/v1${endpoint}`, payload) : await send(method, `/api/v1${endpoint}`);
-            const legacy = payload ? await sendJson(method, `/api${endpoint}`, payload) : await send(method, `/api${endpoint}`);
+            const v1 = payload ? await sendJson(method, `/admin/v1${endpoint}`, payload) : await send(method, `/admin/v1${endpoint}`);
+            const legacy = payload ? await sendJson(method, `/admin${endpoint}`, payload) : await send(method, `/admin${endpoint}`);
             assert.ok(v1.status >= 400, `${endpoint} fails`);
             assert.equal(v1.status, legacy.status, `${endpoint}: same status`);
             assert.deepEqual(v1.json, legacy.json, `${endpoint}: same envelope`);
@@ -293,8 +293,8 @@ describe('the versioned namespace (api-versioning)', () => {
 });
 
 describe('the version is discoverable', () => {
-    test('GET /api/v1/health reports API version 1 and keeps the liveness fields', async () => {
-        const res = await send('GET', '/api/v1/health');
+    test('GET /admin/v1/health reports API version 1 and keeps the liveness fields', async () => {
+        const res = await send('GET', '/admin/v1/health');
         assert.equal(res.status, 200);
         assert.equal(res.json.apiVersion, 1);
         assert.equal(res.json.success, true);
@@ -307,32 +307,32 @@ describe('the version is discoverable', () => {
     });
 
     test('the reported version equals the requested version segment', async () => {
-        const res = await send('GET', '/api/v1/health');
-        assert.equal(`v${res.json.apiVersion}`, '/api/v1/health'.split('/')[2]);
+        const res = await send('GET', '/admin/v1/health');
+        assert.equal(`v${res.json.apiVersion}`, '/admin/v1/health'.split('/')[2]);
     });
 
     test('the legacy alias is the v1 contract and says so', async () => {
-        const res = await send('GET', '/api/health');
+        const res = await send('GET', '/admin/health');
         assert.equal(res.json.apiVersion, 1);
     });
 });
 
 describe('an unknown version is refused (api-versioning)', () => {
-    test('GET /api/v2/fs/list is the JSON 404 envelope - no listing is performed', async () => {
-        const res = await send('GET', '/api/v2/fs/list?path=/');
+    test('GET /admin/v2/fs/list is the JSON 404 envelope - no listing is performed', async () => {
+        const res = await send('GET', '/admin/v2/fs/list?path=/');
         assert.equal(res.status, 404);
         assert.deepEqual(res.json, NOT_FOUND, 'the catch-all, not a listing');
         assert.ok(!('items' in res.json));
     });
 
     test('an unknown version is not answered with the SPA shell', async () => {
-        const res = await send('GET', '/api/v2/fs/list');
+        const res = await send('GET', '/admin/v2/fs/list');
         assert.match(res.headers['content-type'], /application\/json/);
         assert.ok(!/<html|<!DOCTYPE/i.test(res.text));
     });
 
     test('a version segment differing in case is refused, not resolved to v1', async () => {
-        for (const p of ['/api/V1/fs/list?path=/', '/api/V1/health']) {
+        for (const p of ['/admin/V1/fs/list?path=/', '/admin/V1/health']) {
             const res = await send('GET', p);
             assert.equal(res.status, 404, p);
             assert.deepEqual(res.json, NOT_FOUND, p);
@@ -340,7 +340,7 @@ describe('an unknown version is refused (api-versioning)', () => {
     });
 
     test('unknown paths under the versioned prefix reach the catch-all', async () => {
-        for (const p of ['/api/v1/fs/does-not-exist', '/api/v1/nope', '/api/v1/v1/health', '/api/v1']) {
+        for (const p of ['/admin/v1/fs/does-not-exist', '/admin/v1/nope', '/admin/v1/v1/health', '/admin/v1']) {
             const res = await send('GET', p);
             assert.equal(res.status, 404, p);
             assert.deepEqual(res.json, NOT_FOUND, p);
@@ -348,7 +348,7 @@ describe('an unknown version is refused (api-versioning)', () => {
     });
 
     test('unknown versioned Dashboard paths reach the catch-all', async () => {
-        const res = await send('GET', '/api/v1/dashboard/does-not-exist');
+        const res = await send('GET', '/admin/v1/dashboard/does-not-exist');
         assert.equal(res.status, 404);
         assert.deepEqual(res.json, NOT_FOUND);
     });
@@ -365,7 +365,7 @@ describe('no filesystem route under any dashboard prefix (security)', () => {
         ['GET', 'thumbnail?path=%2Fa.png'], ['GET', 'thumbnail/capability'], ['GET', 'tree'], ['GET', 'list?path=/'],
     ];
 
-    for (const prefix of ['/api/v1/dashboard', '/api/dashboard']) {
+    for (const prefix of ['/admin/v1/dashboard', '/admin/dashboard']) {
         test(`${prefix} serves no filesystem route`, async () => {
             for (const [method, route] of FS_ROUTES) {
                 const res = method === 'GET'
@@ -378,8 +378,8 @@ describe('no filesystem route under any dashboard prefix (security)', () => {
         });
     }
 
-    test('/api/v1/fs serves only the filesystem resource\'s own routes', async () => {
-        for (const p of ['/api/v1/fs/summary', '/api/v1/fs/health', '/api/v1/fs/settings', '/api/v1/fs/dashboard/summary']) {
+    test('/admin/v1/fs serves only the filesystem resource\'s own routes', async () => {
+        for (const p of ['/admin/v1/fs/summary', '/admin/v1/fs/health', '/admin/v1/fs/settings', '/admin/v1/fs/dashboard/summary']) {
             const res = await send('GET', p);
             assert.equal(res.status, 404, p);
             assert.deepEqual(res.json, NOT_FOUND, p);
@@ -387,7 +387,7 @@ describe('no filesystem route under any dashboard prefix (security)', () => {
     });
 
     test('settings exposes no destructive route under the versioned prefix', async () => {
-        for (const [method, p] of [['POST', '/api/v1/settings/action'], ['DELETE', '/api/v1/settings'], ['POST', '/api/v1/settings']]) {
+        for (const [method, p] of [['POST', '/admin/v1/settings/action'], ['DELETE', '/admin/v1/settings'], ['POST', '/admin/v1/settings']]) {
             const res = await send(method, p);
             assert.equal(res.status, 404, `${method} ${p}`);
         }
@@ -398,17 +398,17 @@ describe('no filesystem route under any dashboard prefix (security)', () => {
    1.3 — the error contract on the versioned prefix
    ══════════════════════════════════════════ */
 
-describe('the error contract on /api/v1 (api-error-contract)', () => {
+describe('the error contract on /admin/v1 (api-error-contract)', () => {
     test('every error path is the envelope, discloses nothing, and carries no kind', async () => {
         const cases = [
-            [404, () => send('GET', '/api/v1/nope')],
-            [404, () => send('GET', '/api/v1/fs/list?path=/does-not-exist')],
-            [403, () => send('GET', '/api/v1/fs/list?path=/..%2F..%2F..')],
-            [400, () => sendJson('POST', '/api/v1/fs/folder', { path: '/bad<name' })],
-            [404, () => send('GET', '/api/v1/fs/download?path=%2Fmissing.bin')],
-            [400, () => sendJson('PUT', '/api/v1/fs/rename', { oldPath: '/notes.txt', newName: '../x' })],
-            [409, () => sendJson('POST', '/api/v1/fs/folder', { path: '/sub' })],
-            [400, () => sendJson('PUT', '/api/v1/settings', { general: 'nope' })],
+            [404, () => send('GET', '/admin/v1/nope')],
+            [404, () => send('GET', '/admin/v1/fs/list?path=/does-not-exist')],
+            [403, () => send('GET', '/admin/v1/fs/list?path=/..%2F..%2F..')],
+            [400, () => sendJson('POST', '/admin/v1/fs/folder', { path: '/bad<name' })],
+            [404, () => send('GET', '/admin/v1/fs/download?path=%2Fmissing.bin')],
+            [400, () => sendJson('PUT', '/admin/v1/fs/rename', { oldPath: '/notes.txt', newName: '../x' })],
+            [409, () => sendJson('POST', '/admin/v1/fs/folder', { path: '/sub' })],
+            [400, () => sendJson('PUT', '/admin/v1/settings', { general: 'nope' })],
         ];
         for (const [status, run] of cases) {
             const res = await run();
@@ -418,7 +418,7 @@ describe('the error contract on /api/v1 (api-error-contract)', () => {
     });
 
     test('a malformed JSON body does not relay the parser\'s own text', async () => {
-        const res = await send('PUT', '/api/v1/settings', {
+        const res = await send('PUT', '/admin/v1/settings', {
             body: '{ not json', headers: { 'Content-Type': 'application/json' },
         });
         assert.equal(res.status, 400);
@@ -436,14 +436,14 @@ describe('the error contract on /api/v1 (api-error-contract)', () => {
         fs.writeFileSync(SETTINGS_PATH, '{ "general": ');
         SettingsService.cache = null;
 
-        const res = await send('GET', '/api/v1/settings');
+        const res = await send('GET', '/admin/v1/settings');
         assert.equal(res.status, 500);
         assertErrorEnvelope(res, 'corrupt store');
         assert.equal(res.json.error, 'Settings store could not be read');
     });
 
     test('kind is absent today, and its absence is a well-formed envelope', async () => {
-        const res = await send('GET', '/api/v1/fs/list?path=/does-not-exist');
+        const res = await send('GET', '/admin/v1/fs/list?path=/does-not-exist');
         assert.equal(res.json.success, false);
         assert.equal(res.json.kind, undefined);
     });
@@ -535,20 +535,20 @@ describe('the two prefixes are one implementation (legacy-api-compatibility)', (
 describe('server.js mount order and posture (source)', () => {
     const SERVER = fs.readFileSync(path.join(REPO, 'server.js'), 'utf8');
 
-    test('both prefixes are mounted strictly before the /api catch-all', () => {
-        const mount = SERVER.indexOf("app.use(['/api/v1', '/api'], apiRoutes)");
+    test('both prefixes are mounted strictly before the /admin catch-all', () => {
+        const mount = SERVER.indexOf("app.use(['/admin/v1', '/admin'], apiRoutes)");
         // The catch-all is the JSON 404 two-argument middleware. Matching its shape
-        // rather than any app.use('/api', ...) keeps this check pointing at the
-        // terminating handler, not at earlier /api middleware (the rate limiter).
-        const catchAll = SERVER.search(/app\.use\(\s*'\/api'\s*,\s*\(\s*req\s*,\s*res\s*\)\s*=>/);
-        assert.ok(mount > -1, 'the shared assembly is mounted at /api/v1 and /api, v1 first');
+        // rather than any app.use('/admin', ...) keeps this check pointing at the
+        // terminating handler, not at earlier /admin middleware (the rate limiter).
+        const catchAll = SERVER.search(/app\.use\(\s*'\/admin'\s*,\s*\(\s*req\s*,\s*res\s*\)\s*=>/);
+        assert.ok(mount > -1, 'the shared assembly is mounted at /admin/v1 and /admin, v1 first');
         assert.ok(catchAll > -1, 'the catch-all exists');
         assert.ok(mount < catchAll, 'the assembly precedes the terminating catch-all');
     });
 
     test('no router is mounted directly by server.js any more - one assembly serves every prefix', () => {
         assert.ok(!/require\('\.\/src\/routes\/(fs|dashboard|settings)\.routes'\)/.test(SERVER));
-        assert.ok(!/app\.get\(\s*'\/api/.test(SERVER), 'no inline API route');
+        assert.ok(!/app\.get\(\s*'\/admin/.test(SERVER), 'no inline API route');
     });
 
     test('CORS is config-gated, never a bare permissive cors() (api-security-hardening)', () => {
@@ -560,7 +560,7 @@ describe('server.js mount order and posture (source)', () => {
         assert.ok(!/Access-Control-Allow-Origin/i.test(SERVER));
     });
 
-    test('the frontend fallback still excludes /api', () => {
-        assert.ok(SERVER.includes("!req.path.startsWith('/api')"));
+    test('the frontend fallback still excludes /admin', () => {
+        assert.ok(SERVER.includes("!req.path.startsWith('/admin')"));
     });
 });

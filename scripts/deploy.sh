@@ -30,7 +30,7 @@
 #   SYSTEMCTL       "sudo -n systemctl"          how to restart the unit
 #   KEEP_RELEASES   5                            retention cap (active + previous always kept)
 #   HEALTH_TIMEOUT  60                           seconds to wait for a healthy restart
-#   EXPECT_API_VERSION 1                         the apiVersion /api/v1/health must report
+#   EXPECT_API_VERSION 1                         the apiVersion /admin/v1/health must report
 #   SKIP_TESTS      0                            1 skips the suite gate (emergencies only; logged loudly)
 #   DEPLOY_ALLOW_OLDER 0                         1 permits activating an older commit on purpose
 
@@ -117,7 +117,7 @@ restart_service() {
 health_ok() {
     local port url deadline body
     port="$(env_value PORT)"; port="${port:-3000}"
-    url="http://127.0.0.1:${port}/api/v1/health"
+    url="http://127.0.0.1:${port}/admin/v1/health"
     deadline=$(( $(date +%s) + HEALTH_TIMEOUT ))
     log "Waiting up to ${HEALTH_TIMEOUT}s for $url to report apiVersion $EXPECT_API_VERSION"
     while (( $(date +%s) < deadline )); do

@@ -125,16 +125,16 @@ after(async () => {
    MOUNT ORDER
    ══════════════════════════════════════════ */
 
-describe('mount order (the /api catch-all terminates the chain)', () => {
-    test('GET /api/settings is not swallowed by the 404 catch-all', async () => {
-        const res = await send('GET', '/api/settings');
+describe('mount order (the /admin catch-all terminates the chain)', () => {
+    test('GET /admin/settings is not swallowed by the 404 catch-all', async () => {
+        const res = await send('GET', '/admin/settings');
         assert.notEqual(res.status, 404,
-            'the settings router must be mounted BEFORE the /api catch-all');
+            'the settings router must be mounted BEFORE the /admin catch-all');
         assert.equal(res.status, 200);
     });
 
-    test('POST /api/settings/action does not exist - no destructive settings endpoint', async () => {
-        const res = await sendJson('POST', '/api/settings/action', { action: 'deleteWorkspace' });
+    test('POST /admin/settings/action does not exist - no destructive settings endpoint', async () => {
+        const res = await sendJson('POST', '/admin/settings/action', { action: 'deleteWorkspace' });
         assert.equal(res.status, 404);
         assert.equal(res.json.success, false);
         assert.match(res.json.error, /not found/i);
@@ -145,9 +145,9 @@ describe('mount order (the /api catch-all terminates the chain)', () => {
    GET /api/settings - BARE read (design D3)
    ══════════════════════════════════════════ */
 
-describe('GET /api/settings', () => {
+describe('GET /admin/settings', () => {
     test('answers 200 with the bare settings object and NO envelope', async () => {
-        const res = await send('GET', '/api/settings');
+        const res = await send('GET', '/admin/settings');
         assert.equal(res.status, 200);
         assert.match(res.headers['content-type'], /application\/json/);
 
@@ -168,7 +168,7 @@ describe('GET /api/settings', () => {
         SettingsService.cache = null;
         fs.rmSync(SETTINGS_PATH, { force: true });
 
-        const res = await send('GET', '/api/settings');
+        const res = await send('GET', '/admin/settings');
         assert.equal(res.status, 200);
         assert.deepEqual(res.json, {
             general: { workspaceName: null, defaultUploadFolder: null },
@@ -180,7 +180,7 @@ describe('GET /api/settings', () => {
 
     test('reflects what PUT last persisted', async () => {
         const saved = await seed();
-        const res = await send('GET', '/api/settings');
+        const res = await send('GET', '/admin/settings');
         assert.equal(res.status, 200);
         assert.deepEqual(res.json, saved);
     });
@@ -190,7 +190,7 @@ describe('GET /api/settings', () => {
    PUT /api/settings - ENVELOPED full replace (design D3/D4)
    ══════════════════════════════════════════ */
 
-describe('PUT /api/settings with a valid full document', () => {
+describe('PUT /admin/settings with a valid full document', () => {
     test('answers 200 with { success: true, settings } and the persisted document', async () => {
         await seed();
         const doc = {
@@ -198,7 +198,7 @@ describe('PUT /api/settings with a valid full document', () => {
             appearance: { defaultView: 'grid' },
         };
 
-        const res = await sendJson('PUT', '/api/settings', doc);
+        const res = await sendJson('PUT', '/admin/settings', doc);
         assert.equal(res.status, 200);
         assert.equal(res.json.success, true);
         assert.deepEqual(res.json.settings, doc, 'the write echoes the persisted document');
@@ -209,9 +209,9 @@ describe('PUT /api/settings with a valid full document', () => {
             general: { workspaceName: 'Round Trip', defaultUploadFolder: '/inbox' },
             appearance: { defaultView: 'grid' },
         };
-        await sendJson('PUT', '/api/settings', doc);
+        await sendJson('PUT', '/admin/settings', doc);
 
-        const read = await send('GET', '/api/settings');
+        const read = await send('GET', '/admin/settings');
         assert.equal(read.status, 200);
         assert.deepEqual(read.json, doc, 'read-back equality');
         assert.deepEqual(JSON.parse(storeBytes()), doc, 'and the store itself');
@@ -219,7 +219,7 @@ describe('PUT /api/settings with a valid full document', () => {
 
     test('normalizes through the validator: trimmed name, "" becomes null', async () => {
         await seed();
-        const res = await sendJson('PUT', '/api/settings', {
+        const res = await sendJson('PUT', '/admin/settings', {
             general: { workspaceName: '   ', defaultUploadFolder: null },
             appearance: { defaultView: null },
         });
@@ -230,7 +230,7 @@ describe('PUT /api/settings with a valid full document', () => {
 
     test('a full replace drops nothing but is not a merge: omitted keys are rejected', async () => {
         const before = await seed();
-        const res = await sendJson('PUT', '/api/settings', {
+        const res = await sendJson('PUT', '/admin/settings', {
             general: { workspaceName: 'Partial', defaultUploadFolder: null },
         });
         assert.equal(res.status, 400);
@@ -243,11 +243,11 @@ describe('PUT /api/settings with a valid full document', () => {
    PUT refusals - 400 envelope AND a byte-identical store
    ══════════════════════════════════════════ */
 
-describe('PUT /api/settings refuses invalid documents without writing', () => {
+describe('PUT /admin/settings refuses invalid documents without writing', () => {
     /** Seeds, runs the PUT, and asserts both halves of the refusal contract. */
     async function assertRefused(payload, label) {
         const before = storeBytes();
-        const res = await sendJson('PUT', '/api/settings', payload);
+        const res = await sendJson('PUT', '/admin/settings', payload);
 
         assert.equal(res.status, 400, `${label}: status`);
         assert.equal(res.json.success, false, `${label}: envelope success`);
@@ -332,7 +332,7 @@ describe('PUT /api/settings refuses invalid documents without writing', () => {
     test('a refusal message carries no host path or stack detail', async () => {
         await seed();
         const before = storeBytes();
-        const res = await sendJson('PUT', '/api/settings', {
+        const res = await sendJson('PUT', '/admin/settings', {
             general: { workspaceName: null, defaultUploadFolder: '/../../etc' },
             appearance: { defaultView: null },
         });
@@ -347,7 +347,7 @@ describe('PUT /api/settings refuses invalid documents without writing', () => {
         SettingsService.cache = null;
         fs.rmSync(SETTINGS_PATH, { force: true });
 
-        const res = await sendJson('PUT', '/api/settings', {
+        const res = await sendJson('PUT', '/admin/settings', {
             general: { workspaceName: null, defaultUploadFolder: '/../../etc' },
             appearance: { defaultView: null },
         });
@@ -360,7 +360,7 @@ describe('PUT /api/settings refuses invalid documents without writing', () => {
         await seed();
         const before = storeBytes();
 
-        const res = await send('PUT', '/api/settings');
+        const res = await send('PUT', '/admin/settings');
         assert.equal(res.status, 400);
         assert.equal(res.json.success, false);
         assert.equal(storeBytes(), before);
@@ -370,7 +370,7 @@ describe('PUT /api/settings refuses invalid documents without writing', () => {
         await seed();
         const before = storeBytes();
 
-        const res = await send('PUT', '/api/settings', {
+        const res = await send('PUT', '/admin/settings', {
             body: '{ not json',
             headers: { 'Content-Type': 'application/json' },
         });

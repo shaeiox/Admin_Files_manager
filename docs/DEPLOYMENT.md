@@ -124,8 +124,8 @@ Run these as root. Replace `files.example.internal`, the certificate paths and t
    ```bash
    ufw default deny incoming && ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw enable
    ```
-   Port 3000 is not opened. Check from another machine that `curl http://<host>:3000/api/v1/health`
-   fails while `curl http://127.0.0.1:3000/api/v1/health` succeeds on the host.
+   Port 3000 is not opened. Check from another machine that `curl http://<host>:3000/admin/v1/health`
+   fails while `curl http://127.0.0.1:3000/admin/v1/health` succeeds on the host.
 9. **Deploy key.** In `~dimension-deploy/.ssh/authorized_keys`, restrict the key to the deploy
    entry point:
    ```
@@ -136,7 +136,7 @@ Run these as root. Replace `files.example.internal`, the certificate paths and t
 10. **First deployment, watched.** From a checkout, run
     `SSH_OPTS="-i ~/.ssh/dimension_deploy" bash scripts/trigger-deploy.sh dimension-deploy@<host> master`.
     Check that `DEPLOY_OUTCOME=success` is printed, that `systemctl status dimension` is active, and
-    that `curl -s https://<host>/api/v1/health` reports `"apiVersion":1`.
+    that `curl -s https://<host>/admin/v1/health` reports `"apiVersion":1`.
 
 ## Deploy
 
@@ -160,7 +160,7 @@ it over a single SSH session. The artifact is a `git archive` of an allow-list: 
    the storage root. Its output goes to `logs/test-<release>.log`.
 6. **Activate atomically.** The `current` symlink is replaced by `rename(2)`, so there is never a
    moment without an active release. Then `systemctl restart dimension` runs.
-7. **Health-check** `http://127.0.0.1:$PORT/api/v1/health` for up to 60 s. The check requires
+7. **Health-check** `http://127.0.0.1:$PORT/admin/v1/health` for up to 60 s. The check requires
    `"success":true` and `"apiVersion":1`.
 8. **On failure, roll back automatically** to the previous release, restart, and check health again.
 9. **Prune** down to 5 releases (`KEEP_RELEASES`). The active and previous releases are never
@@ -242,7 +242,7 @@ request-path behaviour and belongs in its own change.
 | `pre-activation-failed` … `test suite failed` | Read `logs/test-<release>.log`. Nothing was activated. |
 | `pre-activation-failed` … `npm ci failed` | The lockfile is out of date, or the registry is unreachable from the host. |
 | `pre-activation-failed` … `holds no store` | `AFM_DATA_DIR` points at an empty directory on a host that has run before. Point it back at the real store. |
-| `rolled-back` | The new release did not answer `/api/v1/health` within 60 s. Check `journalctl -u dimension` around the deploy time. |
+| `rolled-back` | The new release did not answer `/admin/v1/health` within 60 s. Check `journalctl -u dimension` around the deploy time. |
 | `413` from nginx on a large upload | `client_max_body_size` is below `UPLOAD_MAX_BYTES`. |
 | `\r: command not found` | A script arrived with CRLF line endings. `.gitattributes` pins LF for `*.sh`, `*.service`, `*.conf` and the hook; re-checkout. |
 

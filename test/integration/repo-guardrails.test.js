@@ -109,7 +109,7 @@ describe('the frontend API boundary', () => {
             const html = fs.readFileSync(path.join(ROOT, 'public', page), 'utf8');
             const meta = html.match(/<meta name="afm-api-base" content="([^"]*)">/);
             assert.ok(meta, `${page} declares the API base`);
-            assert.equal(meta[1], '/api/v1', `${page} ships the same-origin default`);
+            assert.equal(meta[1], '/admin/v1', `${page} ships the same-origin default`);
             assert.ok(!/AFM_API_BASE/.test(html), `${page} sets no global override`);
         }
     });

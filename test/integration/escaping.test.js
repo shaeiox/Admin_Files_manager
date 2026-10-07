@@ -67,7 +67,7 @@ function loadRenderers() {
     sandbox.window = sandbox;
     vm.createContext(sandbox);
     vm.runInContext(fs.readFileSync(path.join(pub, 'app.js'), 'utf8'), sandbox);
-    sandbox.API = { BASE_URL: '/api' };
+    sandbox.API = { BASE_URL: '/admin' };
     vm.runInContext(fs.readFileSync(path.join(pub, 'files.js'), 'utf8'), sandbox);
     return sandbox.Files.pure;
 }
@@ -103,7 +103,7 @@ after(async () => {
 describe('a hostile name placed out of band renders as text', () => {
     test('list, grid, drawer, breadcrumb and tree', async () => {
         const pure = loadRenderers();
-        const listing = await getJson('/api/fs/list?path=/&sort=name&dir=asc');
+        const listing = await getJson('/admin/fs/list?path=/&sort=name&dir=asc');
         assert.equal(listing.items.length, 2, 'the server lists both hostile entries');
 
         const state = pure.createState({ files: listing.items, total: listing.total });
@@ -114,14 +114,14 @@ describe('a hostile name placed out of band renders as text', () => {
         const folder = listing.items.find((i) => i.isFolder);
         assertInert(pure.renderBreadcrumbHtml(folder.path), 'breadcrumb');
 
-        const tree = await getJson('/api/fs/tree');
+        const tree = await getJson('/admin/fs/tree');
         const treeState = pure.createState({ tree, treeLoaded: true, expanded: new Set(['/']), currentPath: folder.path });
         assertInert(pure.renderTreeHtml(treeState), 'tree');
     });
 
     test('the delete confirmation, which the shared modal inserts as markup', async () => {
         const pure = loadRenderers();
-        const listing = await getJson('/api/fs/list?path=/');
+        const listing = await getJson('/admin/fs/list?path=/');
         assertInert(pure.deleteConfirmCopy(listing.items).message, 'confirmation');
     });
 });

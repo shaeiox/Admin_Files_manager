@@ -120,8 +120,8 @@ describe('traversal containment is enforced on the LIVE server', () => {
     ];
 
     for (const p of escapes) {
-        test(`GET /api/fs/list rejects ${p}`, async () => {
-            const res = await call('GET', `/api/fs/list?path=${encodeURIComponent(p)}`);
+        test(`GET /admin/fs/list rejects ${p}`, async () => {
+            const res = await call('GET', `/admin/fs/list?path=${encodeURIComponent(p)}`);
             assert.ok(res.status === 403 || res.status === 404,
                 `expected 403/404, got ${res.status}`);
             assert.ok(secretIntact(), 'the outside file must be untouched');
@@ -129,7 +129,7 @@ describe('traversal containment is enforced on the LIVE server', () => {
     }
 
     test('DELETE cannot escape via a name-prefix sibling', async () => {
-        const res = await call('DELETE', '/api/fs/delete', { paths: ['/../root-secret/secret.txt'] });
+        const res = await call('DELETE', '/admin/fs/delete', { paths: ['/../root-secret/secret.txt'] });
 
         assert.equal(res.status, 403, `expected 403 from containment, got ${res.status}`);
         assert.match(res.json.error, /traversal/i);
@@ -137,14 +137,14 @@ describe('traversal containment is enforced on the LIVE server', () => {
     });
 
     test('DELETE cannot escape via a nested sibling', async () => {
-        const res = await call('DELETE', '/api/fs/delete', { paths: ['/media/../../root-secret/secret.txt'] });
+        const res = await call('DELETE', '/admin/fs/delete', { paths: ['/media/../../root-secret/secret.txt'] });
 
         assert.ok(res.status >= 400, `expected a rejection, got ${res.status}`);
         assert.ok(secretIntact());
     });
 
     test('RENAME cannot write outside the root (note: oldPath, not path)', async () => {
-        const res = await call('PUT', '/api/fs/rename', {
+        const res = await call('PUT', '/admin/fs/rename', {
             oldPath: '/a.png',
             newName: '../escaped.png',
         });
@@ -156,7 +156,7 @@ describe('traversal containment is enforced on the LIVE server', () => {
     });
 
     test('RENAME cannot read outside the root', async () => {
-        const res = await call('PUT', '/api/fs/rename', {
+        const res = await call('PUT', '/admin/fs/rename', {
             oldPath: '/../root-secret/secret.txt',
             newName: 'x.txt',
         });
@@ -166,34 +166,34 @@ describe('traversal containment is enforced on the LIVE server', () => {
     });
 
     test('the storage root itself cannot be deleted', async () => {
-        const res = await call('DELETE', '/api/fs/delete', { paths: ['/'] });
+        const res = await call('DELETE', '/admin/fs/delete', { paths: ['/'] });
 
         assert.ok(res.status >= 400, `expected a rejection, got ${res.status}`);
         assert.ok(fs.existsSync(ROOT), 'the storage root still exists');
     });
 
     test('legitimate writes still work - the guard is not over-blocking', async () => {
-        const renamed = await call('PUT', '/api/fs/rename', {
+        const renamed = await call('PUT', '/admin/fs/rename', {
             oldPath: '/a.png',
             newName: 'renamed.png',
         });
         assert.equal(renamed.status, 200, `legitimate rename failed: ${renamed.body.slice(0, 120)}`);
         assert.equal(fs.existsSync(path.join(ROOT, 'renamed.png')), true);
 
-        const folder = await call('POST', '/api/fs/folder', { path: '/created' });
+        const folder = await call('POST', '/admin/fs/folder', { path: '/created' });
         assert.ok(folder.status >= 200 && folder.status < 300,
             `legitimate mkdir failed: ${folder.status}`);
         assert.ok(fs.existsSync(path.join(ROOT, 'created')));
 
-        const deleted = await call('DELETE', '/api/fs/delete', { paths: ['/renamed.png'] });
+        const deleted = await call('DELETE', '/admin/fs/delete', { paths: ['/renamed.png'] });
         assert.equal(deleted.status, 200);
         assert.equal(fs.existsSync(path.join(ROOT, 'renamed.png')), false);
     });
 });
 
 describe('the liveness endpoint is untouched', () => {
-    test('GET /api/health keeps its exact shape and carries no dashboard fields', async () => {
-        const res = await call('GET', '/api/health');
+    test('GET /admin/health keeps its exact shape and carries no dashboard fields', async () => {
+        const res = await call('GET', '/admin/health');
 
         assert.equal(res.status, 200);
         assert.equal(res.json.success, true);
@@ -208,10 +208,10 @@ describe('the liveness endpoint is untouched', () => {
     });
 
     // Re-pinned by api-v1-versioning-and-boundary (task 2.1, ADR-007): the handler
-    // moved from server.js into the shared assembly so /api/v1/health and
-    // /api/health are one handler, and it gained the additive `apiVersion` field.
+    // moved from server.js into the shared assembly so /admin/v1/health and
+    // /admin/health are one handler, and it gained the additive `apiVersion` field.
     // Everything else about it is still pinned byte-for-byte.
-    test('the /api/health handler source is byte-identical to its pinned form', () => {
+    test('the /admin/health handler source is byte-identical to its pinned form', () => {
         const source = fs.readFileSync(
             path.join(__dirname, '..', '..', 'src', 'routes', 'api.js'), 'utf8'
         );
@@ -241,7 +241,7 @@ describe('the liveness endpoint is untouched', () => {
 
 describe('dashboard read endpoints on the live server', () => {
     test('summary returns real, well-formed, path-free data', async () => {
-        const res = await call('GET', '/api/dashboard/summary');
+        const res = await call('GET', '/admin/dashboard/summary');
 
         assert.equal(res.status, 200);
         for (const key of ['stats', 'storage', 'storageBreakdown', 'activities', 'topFiles', 'health']) {
@@ -271,7 +271,7 @@ describe('dashboard read endpoints on the live server', () => {
     });
 
     test('health is a bare array with a stable metric set and no invented status', async () => {
-        const first = await call('GET', '/api/dashboard/health');
+        const first = await call('GET', '/admin/dashboard/health');
         assert.equal(first.status, 200);
         assert.ok(Array.isArray(first.json), 'bare array');
 
@@ -284,30 +284,30 @@ describe('dashboard read endpoints on the live server', () => {
         assert.ok(!first.json.some((m) => /load/i.test(m.name)),
             'load average must never be surfaced');
 
-        const second = await call('GET', '/api/dashboard/health');
+        const second = await call('GET', '/admin/dashboard/health');
         const shape = (a) => a.map((m) => `${m.name}|${m.unit}|${m.icon}`).sort().join(',');
         assert.equal(shape(second.json), shape(first.json), 'metric row set is stable across polls');
     });
 
     test('every dashboard route is reachable - the mount precedes the catch-all', async () => {
-        assert.equal((await call('GET', '/api/dashboard/summary')).status, 200);
-        assert.equal((await call('GET', '/api/dashboard/health')).status, 200);
+        assert.equal((await call('GET', '/admin/dashboard/summary')).status, 200);
+        assert.equal((await call('GET', '/admin/dashboard/health')).status, 200);
 
-        const unknown = await call('GET', '/api/dashboard/nope');
+        const unknown = await call('GET', '/admin/dashboard/nope');
         assert.equal(unknown.status, 404, 'unknown dashboard paths still reach the catch-all');
     });
 
-    test('the filesystem router is not republished under /api/dashboard', async () => {
+    test('the filesystem router is not republished under /admin/dashboard', async () => {
         for (const [method, p] of [
-            ['GET', '/api/dashboard/list'],
-            ['GET', '/api/dashboard/tree'],
-            ['POST', '/api/dashboard/folder'],
-            ['POST', '/api/dashboard/upload'],
-            ['PUT', '/api/dashboard/rename'],
-            ['DELETE', '/api/dashboard/delete'],
+            ['GET', '/admin/dashboard/list'],
+            ['GET', '/admin/dashboard/tree'],
+            ['POST', '/admin/dashboard/folder'],
+            ['POST', '/admin/dashboard/upload'],
+            ['PUT', '/admin/dashboard/rename'],
+            ['DELETE', '/admin/dashboard/delete'],
         ]) {
             const res = await call(method, p, method === 'GET' ? undefined : {});
-            assert.equal(res.status, 404, `${method} ${p} must not exist under /api/dashboard`);
+            assert.equal(res.status, 404, `${method} ${p} must not exist under /admin/dashboard`);
         }
     });
 });

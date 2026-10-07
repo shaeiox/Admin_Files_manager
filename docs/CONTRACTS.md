@@ -5,33 +5,33 @@
 
 ## Conventions
 
-- **Base URL:** `/api/v1` is the contract; `/api` is a retained compatibility alias served by the
+- **Base URL:** `/admin/v1` is the contract; `/admin` is a retained compatibility alias served by the
   same handlers. Paths below are written in their unversioned form — every one of them is served
-  identically under `/api/v1`. See *API versioning* (ADR-007).
+  identically under `/admin/v1`. See *API versioning* (ADR-007).
 - **Success shape — a rule, not an exception.** Read-only **aggregate** endpoints return a
   **bare top-level shape** (the payload *is* the body, no wrapper). **Mutating** endpoints return
-  the `{ "success": true, "data": ... }` envelope. `GET /api/dashboard/summary` and
-  `GET /api/dashboard/health` are read-only aggregates, so they follow the bare precedent like
+  the `{ "success": true, "data": ... }` envelope. `GET /admin/dashboard/summary` and
+  `GET /admin/dashboard/health` are read-only aggregates, so they follow the bare precedent like
   `tree` and `list` do — they are **not** exceptions to it:
 
   | Endpoint | Kind | Body |
   |---|---|---|
-  | `GET /api/fs/tree` | read | `[rootNode]` — bare array |
-  | `GET /api/fs/list` | read | `{ items, total, counts }` — bare object |
-  | `GET /api/dashboard/summary` | read | bare object |
-  | `GET /api/dashboard/health` | read | bare array |
-  | `POST /api/fs/folder` | write | `{ success, data }` |
-  | `POST /api/fs/upload` | write | `{ success, data }` |
-  | `PUT /api/fs/rename` | write | `{ success, data }` |
-  | `DELETE /api/fs/delete` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
-  | `POST /api/fs/star` | write | `{ success, data }` |
-  | `GET /api/fs/thumbnail/capability` | read | `{ available, formats, maxSize }` — bare object |
-  | `GET /api/settings` | read | the settings document — **bare object**, no `success` field |
-  | `PUT /api/settings` | write | `{ success, settings }` |
+  | `GET /admin/fs/tree` | read | `[rootNode]` — bare array |
+  | `GET /admin/fs/list` | read | `{ items, total, counts }` — bare object |
+  | `GET /admin/dashboard/summary` | read | bare object |
+  | `GET /admin/dashboard/health` | read | bare array |
+  | `POST /admin/fs/folder` | write | `{ success, data }` |
+  | `POST /admin/fs/upload` | write | `{ success, data }` |
+  | `PUT /admin/fs/rename` | write | `{ success, data }` |
+  | `DELETE /admin/fs/delete` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
+  | `POST /admin/fs/star` | write | `{ success, data }` |
+  | `GET /admin/fs/thumbnail/capability` | read | `{ available, formats, maxSize }` — bare object |
+  | `GET /admin/settings` | read | the settings document — **bare object**, no `success` field |
+  | `PUT /admin/settings` | write | `{ success, settings }` |
 
   (Verified against every `res.json` call in `fs.controller.js`, `preview.controller.js`,
-  `dashboard.controller.js` and `settings.controller.js`. `GET /api/fs/download`,
-  `POST /api/fs/download-zip` and a successful `GET /api/fs/thumbnail` are streams/bytes and return
+  `dashboard.controller.js` and `settings.controller.js`. `GET /admin/fs/download`,
+  `POST /admin/fs/download-zip` and a successful `GET /admin/fs/thumbnail` are streams/bytes and return
   no JSON body.)
 - **Error:** any status with `{ "success": false, "error": "human-readable message" }`. Never a
   `stack`, in any environment: `errorHandler` forwards only `AppError` messages (authored static
@@ -83,7 +83,7 @@
 - **Uploads are governed by free space and concurrency.** Below `AFM_UPLOAD_FREE_SPACE_BYTES` the
   upload is refused with `507` **before any byte is staged**; an unreadable capacity reading admits
   the upload rather than locking the operator out.
-- **`GET /api/v1/health` no longer reports `NODE_ENV`.** It reports `success`, `message` and
+- **`GET /admin/v1/health` no longer reports `NODE_ENV`.** It reports `success`, `message` and
   `apiVersion` — `apiVersion` is the deployment activation gate in `scripts/deploy.sh` and must stay.
   This is a deliberate departure from ADR-007's additive-only rule: the field was informational, and
   the sidebar identity block now reports an honest absence instead.
@@ -92,35 +92,36 @@
 
 ## API versioning (ADR-007)
 
-- **`/api/v1` is the contract.** Every endpoint in the table below answers under `/api/v1/<resource>`
-  with the same status, the same guards and a byte-identical body as under `/api/<resource>`.
+- **`/admin/v1` is the contract.** Every endpoint in the table below answers under `/admin/v1/<resource>`
+  with the same status, the same guards and a byte-identical body as under `/admin/<resource>`.
   Resources: `health`, `fs`, `dashboard`, `settings`.
-- **`/api` is a compatibility alias, not a second contract.** It is served by the **same router
+- **`/admin` is a compatibility alias, not a second contract.** It is served by the **same router
   instances** (one assembly, `src/routes/api.js`), so the two prefixes cannot drift and a fix lands on
   both. It is retained for existing callers and open tabs. Its removal is **not scheduled**: it needs
   its own decision, and is blocked on authentication — removing an alias does not reduce the exposure
-  that authentication (ADR-003) is required to close.
+  that authentication (ADR-003) is required to close. The previous `/api` / `/api/v1` prefixes are not
+  kept as a second compatibility layer; this change renames the API prefix from `/api` to `/admin`.
 - **Mount order (load-bearing).** `server.js` mounts the assembly once, as
-  `app.use(['/api/v1', '/api'], apiRoutes)`, **before** the `/api` 404 catch-all (a two-argument
-  middleware that never calls `next()`; anything mounted after it is unreachable). `/api/v1` is listed
+  `app.use(['/admin/v1', '/admin'], apiRoutes)`, **before** the `/admin` 404 catch-all (a two-argument
+  middleware that never calls `next()`; anything mounted after it is unreachable). `/admin/v1` is listed
   first, so a v1 request is never re-interpreted under the alias. Pinned by
   `test/api/versioning.contract.test.js`.
-- **Unknown versions are refused.** `/api/v2/...` matches no route, reaches the catch-all, and answers
+- **Unknown versions are refused.** `/admin/v2/...` matches no route, reaches the catch-all, and answers
   `404 { "success": false, "error": "API endpoint not found" }` — never v1's handlers, never the HTML
-  shell. The version segment is matched **case-sensitively** (`/api/V1/...` is an unknown version),
+  shell. The version segment is matched **case-sensitively** (`/admin/V1/...` is an unknown version),
   although the rest of the path keeps Express's default case-insensitive matching.
 - **The version is selected by the path only** — no header, query parameter, cookie or content
   negotiation. Route modules declare no version segment; it is applied at the mount site only.
-- **Version discovery:** `GET /api/v1/health` (and its alias) carries `"apiVersion": 1`.
+- **Version discovery:** `GET /admin/v1/health` (and its alias) carries `"apiVersion": 1`.
 - **Compatibility rules within v1 — additive only.** Allowed: a new endpoint, a new optional response
   field, a new optional request parameter whose absence reproduces the previous behaviour. Anything
-  that removes, renames or retypes a field, parameter or endpoint goes to a future `/api/v2`, mounted
+  that removes, renames or retypes a field, parameter or endpoint goes to a future `/admin/v2`, mounted
   **alongside** v1 (v1 keeps serving). There is no deprecation-header machinery, because nothing is
   deprecated.
 - **Client base URL.** `public/assets/js/api.js` resolves `API.BASE_URL` once at load, first non-blank
-  wins: `window.AFM_API_BASE` → `<meta name="afm-api-base" content="…">` → `/api/v1`. Trimmed; trailing
-  `/` stripped. The four page shells ship `<meta name="afm-api-base" content="/api/v1">`, so the default
-  deployment is same-origin and root-relative. Pointing it at `/api` is the configuration-only rollback;
+  wins: `window.AFM_API_BASE` → `<meta name="afm-api-base" content="…">` → `/admin/v1`. Trimmed; trailing
+  `/` stripped. The four page shells ship `<meta name="afm-api-base" content="/admin/v1">`, so the default
+  deployment is same-origin and root-relative. Pointing it at `/admin` is the configuration-only rollback;
   pointing it at another host is a configuration change too, but **requires authentication and a
   deliberate CORS decision first** (ADR-003) — CORS is unchanged by versioning.
 - **Every API URL is built inside `api.js`.** Page modules pass endpoint paths to
@@ -133,29 +134,29 @@
 
 | Method | Path | Status | Notes |
 |---|---|---|---|
-| GET | `/api/health` | ✅ live | Liveness check — additive `apiVersion` (ADR-007); `env` removed (`api-security-hardening`) |
-| GET | `/api/dashboard/summary` | ✅ live | Read-only aggregate; bare object, `200` with per-capability degradation |
-| GET | `/api/dashboard/health` | ✅ live | Read-only aggregate; bare array of runtime metric objects |
-| GET | `/api/settings` | ✅ live | Read-only aggregate; **bare** settings document, no envelope |
-| PUT | `/api/settings` | ✅ live | Strict validated **full replace**; `400` on any unknown key or bad value |
-| GET | `/api/fs/tree` | ✅ live | Sidebar tree, exactly 2 levels below the root |
-| GET | `/api/fs/list` | ✅ live | Directory listing, filter/sort/paginate, `starredOnly` |
-| GET | `/api/fs/download` | ✅ live | Stream single file attachment |
-| GET | `/api/fs/thumbnail/capability` | ✅ live | Whether previews can be produced (bare object) |
-| GET | `/api/fs/thumbnail` | ✅ live | Bounded image preview, or an explicit unavailable marker |
-| POST | `/api/fs/folder` | ✅ live | Create directory |
-| POST | `/api/fs/upload` | ✅ live | Multipart upload — **field order matters**, see below |
-| POST | `/api/fs/star` | ✅ live | Toggle or set the starred flag |
-| POST | `/api/fs/download-zip` | ✅ live | Streams a ZIP of up to 500 paths |
-| PUT | `/api/fs/rename` | ✅ live | Same-directory rename |
-| DELETE | `/api/fs/delete` | ✅ live | Bulk delete (≤500 paths); a `200` can be a partial failure |
+| GET | `/admin/health` | ✅ live | Liveness check — additive `apiVersion` (ADR-007); `env` removed (`api-security-hardening`) |
+| GET | `/admin/dashboard/summary` | ✅ live | Read-only aggregate; bare object, `200` with per-capability degradation |
+| GET | `/admin/dashboard/health` | ✅ live | Read-only aggregate; bare array of runtime metric objects |
+| GET | `/admin/settings` | ✅ live | Read-only aggregate; **bare** settings document, no envelope |
+| PUT | `/admin/settings` | ✅ live | Strict validated **full replace**; `400` on any unknown key or bad value |
+| GET | `/admin/fs/tree` | ✅ live | Sidebar tree, exactly 2 levels below the root |
+| GET | `/admin/fs/list` | ✅ live | Directory listing, filter/sort/paginate, `starredOnly` |
+| GET | `/admin/fs/download` | ✅ live | Stream single file attachment |
+| GET | `/admin/fs/thumbnail/capability` | ✅ live | Whether previews can be produced (bare object) |
+| GET | `/admin/fs/thumbnail` | ✅ live | Bounded image preview, or an explicit unavailable marker |
+| POST | `/admin/fs/folder` | ✅ live | Create directory |
+| POST | `/admin/fs/upload` | ✅ live | Multipart upload — **field order matters**, see below |
+| POST | `/admin/fs/star` | ✅ live | Toggle or set the starred flag |
+| POST | `/admin/fs/download-zip` | ✅ live | Streams a ZIP of up to 500 paths |
+| PUT | `/admin/fs/rename` | ✅ live | Same-directory rename |
+| DELETE | `/admin/fs/delete` | ✅ live | Bulk delete (≤500 paths); a `200` can be a partial failure |
 
-### GET /api/health
+### GET /admin/health
 
 Liveness + environment probe. **Unchanged by the dashboard work**, and it keeps the envelope because
 it is not an aggregate. Returns the `env` string that the sidebar identity block renders; it is
 **not** a source of runtime metrics. ADR-007 added one field, additively: `apiVersion` — the contract
-version the responding assembly serves (`1` on both `/api/v1/health` and the `/api/health` alias).
+version the responding assembly serves (`1` on both `/admin/v1/health` and the `/admin/health` alias).
 The handler lives in `src/routes/api.js`, not `server.js`.
 
 ```json

@@ -67,7 +67,7 @@ function uploadRequest(filename, content = 'PAYLOAD', { fields = {} } = {}) {
 
     return new Promise((resolve, reject) => {
         const req = http.request({
-            host: '127.0.0.1', port, path: '/api/v1/fs/upload', method: 'POST',
+            host: '127.0.0.1', port, path: '/admin/v1/fs/upload', method: 'POST',
             headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': body.length },
             agent: false,
         }, (res) => {

@@ -87,16 +87,16 @@ async function everyUrl(API, seen) {
 }
 
 describe('BASE_URL is resolved configuration (api-client-boundary)', () => {
-    test('the default is the same-origin versioned prefix /api/v1', () => {
-        assert.equal(loadApi().API.BASE_URL, '/api/v1');
+    test('the default is the same-origin versioned prefix /admin/v1', () => {
+        assert.equal(loadApi().API.BASE_URL, '/admin/v1');
     });
 
     test('a window.AFM_API_BASE override is honoured', () => {
-        assert.equal(loadApi({ global: '/proxy/api/v1' }).API.BASE_URL, '/proxy/api/v1');
+        assert.equal(loadApi({ global: '/proxy/admin/v1' }).API.BASE_URL, '/proxy/admin/v1');
     });
 
     test('a <meta name="afm-api-base"> override is honoured', () => {
-        assert.equal(loadApi({ meta: '/api' }).API.BASE_URL, '/api');
+        assert.equal(loadApi({ meta: '/admin' }).API.BASE_URL, '/admin');
     });
 
     test('the global beats the meta tag', () => {
@@ -105,26 +105,26 @@ describe('BASE_URL is resolved configuration (api-client-boundary)', () => {
 
     test('an empty or whitespace override falls back - never an empty prefix', () => {
         for (const value of ['', '   ', '\t\n']) {
-            assert.equal(loadApi({ global: value }).API.BASE_URL, '/api/v1', `global ${JSON.stringify(value)}`);
-            assert.equal(loadApi({ meta: value }).API.BASE_URL, '/api/v1', `meta ${JSON.stringify(value)}`);
+            assert.equal(loadApi({ global: value }).API.BASE_URL, '/admin/v1', `global ${JSON.stringify(value)}`);
+            assert.equal(loadApi({ meta: value }).API.BASE_URL, '/admin/v1', `meta ${JSON.stringify(value)}`);
         }
     });
 
     test('an empty global falls through to the meta tag, not straight to the default', () => {
-        assert.equal(loadApi({ global: '  ', meta: '/api' }).API.BASE_URL, '/api');
+        assert.equal(loadApi({ global: '  ', meta: '/admin' }).API.BASE_URL, '/admin');
     });
 
     test('a non-string global is ignored rather than stringified', () => {
-        assert.equal(loadApi({ global: 42 }).API.BASE_URL, '/api/v1');
-        assert.equal(loadApi({ global: null, meta: '/api' }).API.BASE_URL, '/api');
+        assert.equal(loadApi({ global: 42 }).API.BASE_URL, '/admin/v1');
+        assert.equal(loadApi({ global: null, meta: '/admin' }).API.BASE_URL, '/admin');
     });
 
     test('override values are trimmed', () => {
-        assert.equal(loadApi({ meta: '  /api/v1  ' }).API.BASE_URL, '/api/v1');
+        assert.equal(loadApi({ meta: '  /admin/v1  ' }).API.BASE_URL, '/admin/v1');
     });
 
     test('a trailing slash never produces a doubled separator', async () => {
-        for (const base of ['/api/v1/', '/api/v1///', 'https://files.example.test/api/v1/']) {
+        for (const base of ['/admin/v1/', '/admin/v1///', 'https://files.example.test/admin/v1/']) {
             const { API, seen } = loadApi({ global: base });
             for (const url of await everyUrl(API, seen)) {
                 assert.ok(!/[^:]\/\//.test(url), `${base} -> ${url}`);
@@ -133,14 +133,14 @@ describe('BASE_URL is resolved configuration (api-client-boundary)', () => {
     });
 
     test('resolution happens once: BASE_URL is frozen and stable across requests', async () => {
-        const { API, seen } = loadApi({ meta: '/api/v1' });
+        const { API, seen } = loadApi({ meta: '/admin/v1' });
         const first = API.BASE_URL;
         await API.get('/health');
         Reflect.set(API, 'BASE_URL', '/elsewhere');
         await API.get('/health');
         assert.equal(API.BASE_URL, first);
         assert.ok(Object.isFrozen(API), 'the public surface is frozen');
-        assert.deepEqual(seen.fetch.map((f) => f.url), ['/api/v1/health', '/api/v1/health']);
+        assert.deepEqual(seen.fetch.map((f) => f.url), ['/admin/v1/health', '/admin/v1/health']);
     });
 
     test('the module works with no document at all (meta lookup is optional)', () => {
@@ -148,7 +148,7 @@ describe('BASE_URL is resolved configuration (api-client-boundary)', () => {
         sandbox.window = sandbox;
         vm.createContext(sandbox);
         vm.runInContext(API_SRC, sandbox);
-        assert.equal(sandbox.API.BASE_URL, '/api/v1');
+        assert.equal(sandbox.API.BASE_URL, '/admin/v1');
     });
 });
 
@@ -156,39 +156,39 @@ describe('every API URL is built inside the boundary', () => {
     test('thumbnailUrl builds under the resolved base and encodes both parameters', () => {
         const { API } = loadApi();
         assert.equal(API.thumbnailUrl('/My Pics/a&b.png', 256),
-            '/api/v1/fs/thumbnail?path=%2FMy%20Pics%2Fa%26b.png&size=256');
-        assert.equal(API.thumbnailUrl('/x.png', '5&x=1'), '/api/v1/fs/thumbnail?path=%2Fx.png&size=5%26x%3D1');
+            '/admin/v1/fs/thumbnail?path=%2FMy%20Pics%2Fa%26b.png&size=256');
+        assert.equal(API.thumbnailUrl('/x.png', '5&x=1'), '/admin/v1/fs/thumbnail?path=%2Fx.png&size=5%26x%3D1');
     });
 
     test('JSON, upload, download, multi-download, ZIP and thumbnail URLs all carry the resolved base', async () => {
         const { API, seen } = loadApi();
         const urls = await everyUrl(API, seen);
         assert.equal(urls.length, 9);
-        for (const url of urls) assert.ok(url.startsWith('/api/v1/'), url);
+        for (const url of urls) assert.ok(url.startsWith('/admin/v1/'), url);
         assert.deepEqual(urls, [
-            '/api/v1/fs/list?path=%2F',
-            '/api/v1/fs/folder',
-            '/api/v1/settings',
-            '/api/v1/fs/delete',
-            '/api/v1/fs/upload',
-            '/api/v1/fs/download?path=%2Fa.txt',
-            '/api/v1/fs/download?path=%2Fb.txt',
-            '/api/v1/fs/download-zip',
-            '/api/v1/fs/thumbnail?path=%2Fpic.png&size=256',
+            '/admin/v1/fs/list?path=%2F',
+            '/admin/v1/fs/folder',
+            '/admin/v1/settings',
+            '/admin/v1/fs/delete',
+            '/admin/v1/fs/upload',
+            '/admin/v1/fs/download?path=%2Fa.txt',
+            '/admin/v1/fs/download?path=%2Fb.txt',
+            '/admin/v1/fs/download-zip',
+            '/admin/v1/fs/thumbnail?path=%2Fpic.png&size=256',
         ]);
     });
 
     test('a base-URL change moves every URL at once', async () => {
-        const { API, seen } = loadApi({ global: 'https://files.example.test/api/v1' });
+        const { API, seen } = loadApi({ global: 'https://files.example.test/admin/v1' });
         for (const url of await everyUrl(API, seen)) {
-            assert.ok(url.startsWith('https://files.example.test/api/v1/'), url);
+            assert.ok(url.startsWith('https://files.example.test/admin/v1/'), url);
         }
     });
 
-    test('rollback is configuration-only: pointing the base at /api moves every URL to the legacy alias', async () => {
-        const { API, seen } = loadApi({ meta: '/api' });
+    test('rollback is configuration-only: pointing the base at /admin moves every URL to the legacy alias', async () => {
+        const { API, seen } = loadApi({ meta: '/admin' });
         for (const url of await everyUrl(API, seen)) {
-            assert.ok(url.startsWith('/api/') && !url.startsWith('/api/v1'), url);
+            assert.ok(url.startsWith('/admin/') && !url.startsWith('/admin/v1'), url);
         }
     });
 

@@ -98,7 +98,7 @@ function postUpload(targetPort, parts) {
         }
     }
     chunks.push(Buffer.from(`--${boundary}--${CRLF}`));
-    return send(targetPort, 'POST', '/api/fs/upload', {
+    return send(targetPort, 'POST', '/admin/fs/upload', {
         body: Buffer.concat(chunks),
         headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
     });
@@ -210,7 +210,7 @@ describe('upload failure classes answer with distinct statuses', () => {
 
 describe('a non-authored failure never leaks through a non-500 status', () => {
     test('malformed JSON (a framework 400 carrying raw parser text) answers generically', async () => {
-        const res = await send(port, 'POST', '/api/fs/folder', {
+        const res = await send(port, 'POST', '/admin/fs/folder', {
             body: '{"path": "/x", <not json>',
             headers: { 'Content-Type': 'application/json' },
         });
@@ -312,7 +312,7 @@ describe('an unset environment selector discloses nothing', () => {
         assert.equal(rejected.status, 400);
         assertNoDisclosure(rejected, 'child: invalid name');
 
-        const malformed = await send(childPort, 'POST', '/api/fs/folder', {
+        const malformed = await send(childPort, 'POST', '/admin/fs/folder', {
             body: '{nope', headers: { 'Content-Type': 'application/json' },
         });
         assert.equal(malformed.status, 400);
