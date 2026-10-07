@@ -22,3 +22,8 @@ download/
 
 # Scratch harnesses and probes (never committed, never discovered by npm test)
 temp/
+.agents
+.claude
+.codeintel
+.freebuf
+.opencode
