@@ -22,3 +22,6 @@ download/
 
 # Scratch harnesses and probes (never committed, never discovered by npm test)
 temp/
+
+# Security-audit skill output (local findings, not a committed artifact)
+docs/security-audit/
