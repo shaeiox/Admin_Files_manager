@@ -22,6 +22,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
+const { applyBootstrapEnv, redirectAdminDb, login: authLogin } = require('../helpers/authenticated');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'afm-csp-'));
 const ROOT = path.join(TMP, 'root');
@@ -44,13 +45,16 @@ process.env.AFM_DATA_DIR = DATA;
 const MetadataService = require('../../src/services/MetadataService');
 MetadataService.dbPath = path.join(TMP, 'metadata.json');
 MetadataService.cache = null;
+applyBootstrapEnv();
+redirectAdminDb(path.join(TMP, 'admin.sqlite'));
 
 let server;
 let port;
+let authHeaders = {};
 
 function request(pathname) {
     return new Promise((resolve, reject) => {
-        http.get({ host: '127.0.0.1', port, path: pathname, agent: false }, (res) => {
+        http.get({ host: '127.0.0.1', port, path: pathname, headers: authHeaders, agent: false }, (res) => {
             let body = '';
             res.on('data', (c) => { body += c; });
             res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }));
@@ -62,6 +66,7 @@ before(async () => {
     server = require('../../server.js');
     await new Promise((resolve) => (server.listening ? resolve() : server.once('listening', resolve)));
     port = server.address().port;
+    authHeaders = (await authLogin(port)).headers;
 });
 
 after(async () => {
@@ -70,6 +75,9 @@ after(async () => {
     if (ORIGINAL_ROOT === undefined) delete process.env.STORAGE_ROOT; else process.env.STORAGE_ROOT = ORIGINAL_ROOT;
     if (ORIGINAL_PORT === undefined) delete process.env.PORT; else process.env.PORT = ORIGINAL_PORT;
     if (ORIGINAL_DATA === undefined) delete process.env.AFM_DATA_DIR; else process.env.AFM_DATA_DIR = ORIGINAL_DATA;
+    // Close the admin-db connection before recursively removing TMP: on Windows an
+    // open node:sqlite handle (WAL file) makes the directory undeletable (EPERM).
+    require('../../src/db/connection').reset();
     fs.rmSync(TMP, { recursive: true, force: true });
 });
 

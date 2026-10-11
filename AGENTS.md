@@ -142,8 +142,14 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 77
   transformer is installed (none is; adding one is its own security-reviewed change). Non-images are refused
   from the name before any byte is read; failures carry `X-Preview: unavailable`. Never point an `<img>` at
   `/api/fs/download`, and never relax its `application/octet-stream`.
-- **The API is unauthenticated and `cors()` admits any origin** — a recorded decision (ADR-003), not an
-  oversight, and not closed. Authentication must land before the service is reachable beyond localhost.
+- **The API is authenticated (ADR-009, phase 1).** Every endpoint except `GET /health` and
+  `POST /auth/login` requires a session (`afm_session` cookie or `Authorization: Bearer`), checked
+  by `authenticate` in `src/routes/api.js`, plus a CSRF header on every non-GET request. This is a
+  **single-tenant, flat-authorization** slice — any active session has today's full capability set;
+  there is no tenancy, no permission catalogue, and no per-file access-policy enforcement yet (those
+  are tracked in `openspec/changes/admin-identity-and-access-control/`). CORS stays same-origin by
+  default (`cors()` is only registered when `AFM_CORS_ENABLED=true`, from a validated allowlist) —
+  this was closed earlier by `api-security-hardening` and is unrelated to the auth work.
 - **Filename rules are cross-platform strict:** reject `[<>:"|?*\x00-\x1F]`, reserved Windows names
   (`CON`, `PRN`, `COM1-9`, ...), leading/trailing dots/spaces, and any `/` or `..`. Match
   `validateFileName`; don't loosen it for convenience.

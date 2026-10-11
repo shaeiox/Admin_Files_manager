@@ -149,6 +149,18 @@ function validateStartup(source = process.env) {
         } catch { /* validateCorsOrigin already reported */ }
     }
 
+    // Bootstrap-admin credentials (ADR-009): both or neither, never a
+    // hardcoded default. A short password here would create an account
+    // UserService itself would refuse to create through its own API.
+    const bootstrapUsername = source.AFM_BOOTSTRAP_ADMIN_USERNAME;
+    const bootstrapPassword = source.AFM_BOOTSTRAP_ADMIN_PASSWORD;
+    if (Boolean(bootstrapUsername) !== Boolean(bootstrapPassword)) {
+        problems.push('AFM_BOOTSTRAP_ADMIN_USERNAME and AFM_BOOTSTRAP_ADMIN_PASSWORD must be set together.');
+    }
+    if (bootstrapPassword && bootstrapPassword.length < 8) {
+        problems.push('AFM_BOOTSTRAP_ADMIN_PASSWORD must be at least 8 characters.');
+    }
+
     return problems;
 }
 

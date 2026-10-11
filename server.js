@@ -133,6 +133,14 @@ if (configProblems.length > 0) {
     process.exit(1);
 }
 
+/* ─── Admin database (ADR-009) ─── */
+// Opened and migrated here, synchronously, so a schema failure stops boot
+// the same way a bad STORAGE_ROOT does - never discovered lazily on the
+// first authenticated request. ensureBootstrapAdmin only acts when no
+// account exists yet; it never overwrites one.
+require('./src/db/connection').get();
+require('./src/db/bootstrap').ensureBootstrapAdmin();
+
 /* ─── Boot Server ─── */
 // The handle is exported so integration tests can read the bound port and close
 // the listener. Without it every require() leaks a live server that keeps the

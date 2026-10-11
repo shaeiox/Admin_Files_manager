@@ -21,6 +21,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
+const { applyBootstrapEnv, redirectAdminDb, login: authLogin } = require('../helpers/authenticated');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'afm-rate-'));
 const ROOT = path.join(TMP, 'root');
@@ -41,20 +42,29 @@ process.env.DOTENV_CONFIG_QUIET = 'true';
 process.env.STORAGE_ROOT = ROOT;
 process.env.PORT = '0';
 process.env.AFM_DATA_DIR = DATA;
-process.env.AFM_RATE_LIMIT_WRITE_PER_MINUTE = String(WRITE_BUDGET);
+// +1: the one-time login call in before() is itself a POST under /api and
+// spends one unit of the SAME global write bucket before any test runs (the
+// rate limiter in server.js runs before the auth gate, so it counts every
+// mutating request regardless of session). Reserving that one slot keeps
+// WRITE_BUDGET meaning exactly what the tests below assert: the budget
+// available to the star-request burst.
+process.env.AFM_RATE_LIMIT_WRITE_PER_MINUTE = String(WRITE_BUDGET + 1);
 process.env.AFM_RATE_LIMIT_READ_PER_MINUTE = String(READ_BUDGET);
 
 const MetadataService = require('../../src/services/MetadataService');
 MetadataService.dbPath = path.join(TMP, 'metadata.json');
 MetadataService.cache = null;
+applyBootstrapEnv();
+redirectAdminDb(path.join(TMP, 'admin.sqlite'));
 
 let server;
 let port;
+let authHeaders = {};
 
 function request(pathname, { method = 'GET', body = null, headers = {} } = {}) {
     return new Promise((resolve, reject) => {
         const req = http.request(
-            { host: '127.0.0.1', port, path: pathname, method, headers, agent: false },
+            { host: '127.0.0.1', port, path: pathname, method, headers: { ...authHeaders, ...headers }, agent: false },
             (res) => {
                 const chunks = [];
                 res.on('data', (c) => chunks.push(c));
@@ -91,6 +101,7 @@ before(async () => {
     server = require('../../server.js');
     await new Promise((resolve) => (server.listening ? resolve() : server.once('listening', resolve)));
     port = server.address().port;
+    authHeaders = (await authLogin(port)).headers;
 });
 
 after(async () => {
@@ -101,6 +112,7 @@ after(async () => {
     if (ORIGINAL_DATA === undefined) delete process.env.AFM_DATA_DIR; else process.env.AFM_DATA_DIR = ORIGINAL_DATA;
     if (ORIGINAL_W === undefined) delete process.env.AFM_RATE_LIMIT_WRITE_PER_MINUTE; else process.env.AFM_RATE_LIMIT_WRITE_PER_MINUTE = ORIGINAL_W;
     if (ORIGINAL_R === undefined) delete process.env.AFM_RATE_LIMIT_READ_PER_MINUTE; else process.env.AFM_RATE_LIMIT_READ_PER_MINUTE = ORIGINAL_R;
+    require('../../src/db/connection').reset(); // release the sqlite file lock before rmSync (Windows)
     fs.rmSync(TMP, { recursive: true, force: true });
 });
 

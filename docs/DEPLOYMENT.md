@@ -64,7 +64,7 @@ safe one** — an unset `EnvironmentFile` never widens access.
 |---|---|---|---|
 | `AFM_CORS_ENABLED` | no | `false` | **Leave unset.** The default registers no CORS middleware, so no `Access-Control-Allow-*` header is emitted and every cross-origin call is refused by the browser. Set `true` only for a deliberately cross-origin client. |
 | `AFM_CORS_ALLOWED_ORIGINS` | no | *(empty)* | Comma-separated **absolute** origins (`https://files.example.internal`). Each must be `http`/`https` with a host and **no path, query or fragment**; no scheme-relative values, no duplicates, max 20. A malformed entry **refuses startup**. |
-| `AFM_CORS_ALLOW_WILDCARD` | no | `false` | Permits a literal `*` entry. **Refuses startup when `NODE_ENV=production`** — a wildcard is incompatible with the authentication this service still lacks. |
+| `AFM_CORS_ALLOW_WILDCARD` | no | `false` | Permits a literal `*` entry. **Refuses startup when `NODE_ENV=production`** — a wildcard combined with credentialed requests is never safe. |
 | `AFM_UPLOAD_FREE_SPACE_BYTES` | no | `104857600` (100 MiB) | Free space required on the staging volume before an upload is accepted; below it the upload is refused with `507` **before any byte is written**. `0` disables the check. A non-integer or negative value **refuses startup**. |
 | `AFM_UPLOAD_MAX_CONCURRENT` | no | `4` | Uploads this process accepts at once; the excess gets `429`. `0` disables. |
 | `AFM_RATE_LIMIT_WRITE_PER_MINUTE` | no | `60` | Per-client allowance for mutating routes. `0` disables. |
@@ -73,6 +73,14 @@ safe one** — an unset `EnvironmentFile` never widens access.
 > Rate limits are keyed on `req.ip`, which the app trusts as the forwarded client address because
 > `server.js` sets `trust proxy` to the single documented nginx hop. If you insert another proxy in
 > front, that constant must change with it, or every client will share one key.
+
+Identity controls added by ADR-009 / `admin-identity-and-access-control` (phase 1).
+
+| Variable | Required | Default | Notes |
+|---|---|---|---|
+| `AFM_LOGIN_RATE_LIMIT_PER_MINUTE` | no | `10` | Per-IP login attempts per minute, independent of the write/read buckets above. |
+| `AFM_BOOTSTRAP_ADMIN_USERNAME` | **together with the password below, only if no admin account exists yet** | *(unset)* | Creates the first admin account on boot. An unset pair is not an error — the admin panel is simply unreachable until one is set and the service restarted. Setting only one of the pair **refuses startup**. |
+| `AFM_BOOTSTRAP_ADMIN_PASSWORD` | see above | *(unset)* | At least 8 characters, or startup is refused. Never printed to stdout, never logged. The admin database file (plus its `-wal`/`-shm` sidecars) lives in `AFM_DATA_DIR`, alongside `metadata.json`/`settings.json` — back it up the same way. |
 
 - **Precedence:** a variable already in the process environment always wins. `dotenv` only fills
   unset variables, so a stray `.env` in a working directory can never override the `EnvironmentFile`.

@@ -9,6 +9,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { execFileSync } = require('node:child_process');
+const { applyBootstrapEnv, redirectAdminDb, login: authLogin } = require('../helpers/authenticated');
 
 /**
  * End-to-end checks against a LIVE server.
@@ -52,9 +53,12 @@ process.env.PORT = '0';
 const MetadataService = require('../../src/services/MetadataService');
 MetadataService.dbPath = path.join(TMP, 'metadata.json');
 MetadataService.cache = null;
+applyBootstrapEnv();
+redirectAdminDb(path.join(TMP, 'admin.sqlite'));
 
 let server;
 let port;
+let authHeaders = {};
 
 /** Always sets Content-Length. Omitting it means the body is never parsed. */
 function call(method, pathname, body) {
@@ -62,10 +66,11 @@ function call(method, pathname, body) {
         const payload = body === undefined ? null : JSON.stringify(body);
         const headers = payload
             ? {
+                ...authHeaders,
                 'Content-Type': 'application/json',
                 'Content-Length': Buffer.byteLength(payload),
             }
-            : {};
+            : { ...authHeaders };
 
         const req = http.request(
             { host: '127.0.0.1', port, path: pathname, method, agent: false, headers },
@@ -95,6 +100,7 @@ before(async () => {
         server.once('listening', resolve);
     });
     port = server.address().port;
+    authHeaders = (await authLogin(port)).headers;
 });
 
 after(async () => {
@@ -108,6 +114,9 @@ after(async () => {
     else process.env.STORAGE_ROOT = ORIGINAL_ROOT;
     if (ORIGINAL_PORT === undefined) delete process.env.PORT;
     else process.env.PORT = ORIGINAL_PORT;
+    // Close the admin-db connection before recursively removing TMP: on Windows an
+    // open node:sqlite handle (WAL file) makes the directory undeletable (EPERM).
+    require('../../src/db/connection').reset();
     fs.rmSync(TMP, { recursive: true, force: true });
 });
 

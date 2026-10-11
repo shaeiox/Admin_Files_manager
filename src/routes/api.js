@@ -5,6 +5,9 @@ const express = require('express');
 const fsRoutes = require('./fs.routes');
 const dashboardRoutes = require('./dashboard.routes');
 const settingsRoutes = require('./settings.routes');
+const authRoutes = require('./auth.routes');
+const { authenticate } = require('../middlewares/authenticate');
+const csrf = require('../middlewares/csrf');
 
 /**
  * The API surface, assembled once (api-v1-versioning-and-boundary, ADR-007).
@@ -48,6 +51,17 @@ router.use((req, res, next) => {
 router.get('/health', (req, res) => {
     res.json({ success: true, message: 'Dimension API is running', apiVersion: API_VERSION });
 });
+
+// Auth routes self-gate (login is public; logout/me require a session) and
+// must stay mounted BEFORE the blanket `authenticate` below, or login could
+// never be reached (ADR-009).
+router.use('/auth', authRoutes);
+
+// Everything below requires a session - applied once, so /api/v1 and /api
+// are secured identically (AGENTS.md rule 4a). /health and /auth/login stay
+// reachable with no session.
+router.use(authenticate);
+router.use(csrf);
 
 router.use('/fs', fsRoutes);
 router.use('/dashboard', dashboardRoutes);

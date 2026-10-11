@@ -1,5 +1,19 @@
 # Proposal
 
+> **Scope note (narrowed, not withdrawn).** Implementation of this change has not started. The
+> identity/authentication/persistence work below is being pursued first in a smaller, admin-only
+> shape — see `openspec/changes/admin-identity-and-access-control/` — because the data model the
+> product actually needs (one shared file pool with per-file publication policy and per-user
+> grants, tracked in `Users`/`Sessions`/`Files`/`FileAccessPolicies`/`UserFilePermissions`/
+> `AuditLogs`) does not match this proposal's multi-**tenant** shape (a `Tenant` entity owning a
+> subtree). The `identity/tenancy` capability, the explicit-root `PathService` refactor, the
+> tenant-scoped modifications to the dashboard/filesystem capabilities, and the nginx
+> proxy-bypass-removal group below are deferred pending a decision — not yet made — on whether and
+> how the separate Files portal (`files.cloudavid.com`, static today) will consume this app's
+> identity and policy data. The `persistence/database` and `identity/authentication` decisions
+> below are reused largely as-is by the admin-only change; everything else here stays a recorded,
+> unimplemented proposal rather than current direction.
+
 ## Why
 
 The application has **no identity, no authorization, and no tenant boundary**. There is no

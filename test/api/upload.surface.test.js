@@ -27,6 +27,7 @@ const path = require('node:path');
 const http = require('node:http');
 const net = require('node:net');
 const { spawn } = require('node:child_process');
+const { applyBootstrapEnv, redirectAdminDb, login: authLogin } = require('../helpers/authenticated');
 
 const REPO_DIR = path.resolve(__dirname, '..', '..');
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'afm-upsurf-'));
@@ -50,15 +51,23 @@ process.env.UPLOAD_MAX_BYTES = String(UPLOAD_LIMIT);
 const MetadataService = require('../../src/services/MetadataService');
 MetadataService.dbPath = path.join(TMP, 'metadata.json');
 MetadataService.cache = null;
+applyBootstrapEnv();
+redirectAdminDb(path.join(TMP, 'admin.sqlite'));
 
 let server;
 let port;
+let authHeaders = {};
+// The last describe below boots a SECOND, separate server (a child process on
+// its own port, its own admin.sqlite under its own default data dir) - it needs
+// its own session, captured once that child is up and logged in.
+let childAuthHeaders = {};
 
 /* ── transport ── */
 
 function send(targetPort, method, pathname, { body, headers = {} } = {}) {
     return new Promise((resolve, reject) => {
-        const finalHeaders = { ...headers };
+        const auth = targetPort === port ? authHeaders : childAuthHeaders;
+        const finalHeaders = { ...auth, ...headers };
         if (body !== undefined) finalHeaders['Content-Length'] = Buffer.byteLength(body);
         const req = http.request(
             { host: '127.0.0.1', port: targetPort, path: pathname, method, agent: false, headers: finalHeaders },
@@ -126,6 +135,7 @@ before(async () => {
         server.once('listening', resolve);
     });
     port = server.address().port;
+    authHeaders = (await authLogin(port)).headers;
 });
 
 after(async () => {
@@ -138,6 +148,10 @@ after(async () => {
     restore('STORAGE_ROOT', ORIGINAL_ROOT);
     restore('PORT', ORIGINAL_PORT);
     restore('UPLOAD_MAX_BYTES', ORIGINAL_LIMIT);
+    // Close the admin-db connection before recursively removing TMP: on Windows an
+    // open node:sqlite handle (WAL file) makes the directory undeletable (EPERM).
+    // The child process spawned below closes its own handle when it exits.
+    require('../../src/db/connection').reset();
     fs.rmSync(TMP, { recursive: true, force: true });
 });
 
@@ -307,6 +321,11 @@ describe('an unset environment selector discloses nothing', () => {
             child.once('exit', (code) => { clearTimeout(timer); reject(new Error(`server exited ${code}:\n${out}`)); });
         });
         assert.match(out, /Environment: development/, 'the unset selector really is read as the development default');
+
+        // A separate server, separate admin.sqlite (AFM_BOOTSTRAP_ADMIN_USERNAME/
+        // PASSWORD are inherited via `env = {...process.env}` above, so the same
+        // bootstrap admin exists here too) - its own session is required.
+        childAuthHeaders = (await authLogin(childPort)).headers;
 
         const rejected = await postUpload(childPort, [field('destination', '/target'), file('bad..name')]);
         assert.equal(rejected.status, 400);

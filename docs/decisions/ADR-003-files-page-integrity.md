@@ -132,6 +132,23 @@ required follow-up; none is closed by this change.
 > stopped the read boundary from following symbolic links out of the root, and removed `NODE_ENV`
 > from `GET /api/v1/health`.
 
+> **Status update — ADR-009 / `admin-identity-and-access-control` phase 1 (2026-10-11).**
+>
+> - **No authentication — CLOSED, scoped to a single-tenant, flat-authorization slice.** Every
+>   endpoint except `GET /health` and `POST /auth/login` now requires a session (`afm_session`
+>   cookie or `Authorization: Bearer`), and every non-GET request requires a matching CSRF header.
+>   Login failures are throttled and return an identical response whether the account doesn't exist
+>   or the password is wrong. **CSRF protection — CLOSED** alongside it, as the row above
+>   anticipated ("with no session there is nothing to forge yet" no longer applies).
+> - **What this does NOT close:** there is no permission catalogue (any active session has today's
+>   full capability set — single-tier admin/user role, not per-resource authorization), no per-file
+>   access-policy enforcement against a real download, and no decision on how the separate Files
+>   portal will consume this identity data. See ADR-009 and
+>   `openspec/changes/admin-identity-and-access-control/`.
+> - **The nginx `auth_basic` gate stays in place for now.** Removing it is a separate, staged,
+>   runtime-verified step after this application-level authentication is deployed and confirmed
+>   enforcing — not a consequence of this status update.
+
 ## Consequences
 
 **Positive**

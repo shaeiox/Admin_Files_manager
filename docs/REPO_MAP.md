@@ -234,6 +234,12 @@ both prefixes at once — never as a separate `app.use` in `server.js`
   except the download stream (`fs.createReadStream(stats.securePath)`), which is mediated by
   `PathService`. Multer's storage engine, staging and placement live in `UploadService`.
 - Frontend page modules depend on `app.js` + `api.js`; they must not duplicate API calls.
+- **Planned (`openspec/changes/admin-identity-and-access-control/`, not yet implemented):** new
+  `src/db/` repositories (`UserRepository`, `SessionRepository`, `FileAccessPolicyRepository`,
+  `UserFilePermissionRepository`, `AuditLogRepository`) will own a `node:sqlite` database the same
+  way `MetadataService`/`SettingsService` each own their JSON file — a new store, not a
+  replacement of either existing one. New `src/middlewares/authenticate.js` and `csrf.js` will sit
+  in front of every router mounted in `src/routes/api.js` except `/health`.
 
 ## Read Path (dashboard aggregation)
 
@@ -378,3 +384,6 @@ Rules worth knowing before you touch this path:
 | Test for an endpoint payload | `test/api/<area>.contract.test.js` |
 | Test for frontend helpers | `test/frontend/<module>.test.js` (no browser; real `app.js` + the module in a `vm` context with stub DOM/API — see `files.test.js`) |
 | Record a decision | `docs/decisions/ADR-NNN-*.md` + a pointer from this map |
+| New admin/identity endpoint *(planned, `openspec/changes/admin-identity-and-access-control/`)* | `src/routes/admin.routes.js` + a controller, mounted inside `src/routes/api.js`; gate with `requireAdmin` if admin-only |
+| New DB-backed table/migration *(planned, same change)* | `src/db/` schema step + a named repository; never raw SQL in a controller/service |
+| New admin page *(planned, same change)* | `public/admin.html` + `public/assets/js/admin.js`, gated on `document.body.dataset.page === 'admin'`, registered in `router.js`'s `PAGES`/`MODULES` |

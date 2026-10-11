@@ -29,6 +29,9 @@ const SECURITY_VARS = [
     'AFM_UPLOAD_MAX_CONCURRENT',
     'AFM_RATE_LIMIT_WRITE_PER_MINUTE',
     'AFM_RATE_LIMIT_READ_PER_MINUTE',
+    'AFM_LOGIN_RATE_LIMIT_PER_MINUTE',
+    'AFM_BOOTSTRAP_ADMIN_USERNAME',
+    'AFM_BOOTSTRAP_ADMIN_PASSWORD',
 ];
 
 describe('every security variable is documented for the operator', () => {
@@ -82,10 +85,13 @@ describe('the contract no longer claims the closed gaps are open', () => {
         assert.match(contracts, /507/);
     });
 
-    test('the unauthenticated API is STILL documented as the open Critical', () => {
-        assert.match(contracts, /The API is unauthenticated/i);
-        assert.match(contracts, /required before the service is exposed beyond localhost|before the service is reachable beyond localhost/i,
-            'the localhost-only requirement must not be quietly dropped');
+    test('the API is now documented as authenticated (ADR-009), with what remains open stated plainly', () => {
+        assert.match(contracts, /The API is authenticated/i);
+        assert.ok(!/The API is unauthenticated/i.test(contracts),
+            'CONTRACTS.md still says the API is unauthenticated');
+        assert.match(contracts, /CSRF defence is in place/i);
+        assert.match(contracts, /Still open:[\s\S]{0,400}permission catalogue/i,
+            'the remaining gaps (permission catalogue, per-file enforcement, Files-portal decision) must stay documented, not implied as closed');
     });
 
     test('the health response no longer documents an env field', () => {
@@ -126,6 +132,14 @@ describe('ADR-003 records what was closed without rewriting its history', () => 
 
     test('a dated status update records which rows moved', () => {
         assert.match(adr, /Status update/);
-        assert.match(adr, /No authentication[\s\S]{0,40}STILL OPEN/i);
+        assert.match(adr, /No authentication[\s\S]{0,40}STILL OPEN/i,
+            'the api-security-hardening-era snapshot must survive verbatim');
+    });
+
+    test('a later status update records that authentication closed, without rewriting the earlier one', () => {
+        assert.match(adr, /No authentication — CLOSED/i);
+        assert.match(adr, /scoped to a single-tenant, flat-authorization slice/i);
+        assert.match(adr, /auth_basic.* gate stays in place/i,
+            'closing app-level auth must not be conflated with removing the nginx gate');
     });
 });

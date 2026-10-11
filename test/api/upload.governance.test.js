@@ -21,6 +21,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
+const { applyBootstrapEnv, redirectAdminDb, login: authLogin } = require('../helpers/authenticated');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'afm-upload-gov-'));
 const ROOT = path.join(TMP, 'root');
@@ -43,11 +44,15 @@ const MetadataService = require('../../src/services/MetadataService');
 MetadataService.dbPath = path.join(TMP, 'metadata.json');
 MetadataService.cache = null;
 
+applyBootstrapEnv();
+redirectAdminDb(path.join(TMP, 'admin.sqlite'));
+
 const UploadService = require('../../src/services/UploadService');
 
 let server;
 let port;
 let restoreFreeSpace = null;
+let authHeaders = {};
 
 /** Staging files are dot-prefixed, so readdir sees them. */
 function stagingFiles() {
@@ -68,7 +73,7 @@ function uploadRequest(filename, content = 'PAYLOAD', { fields = {} } = {}) {
     return new Promise((resolve, reject) => {
         const req = http.request({
             host: '127.0.0.1', port, path: '/api/v1/fs/upload', method: 'POST',
-            headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': body.length },
+            headers: { ...authHeaders, 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': body.length },
             agent: false,
         }, (res) => {
             const chunks = [];
@@ -84,6 +89,7 @@ before(async () => {
     server = require('../../server.js');
     await new Promise((resolve) => (server.listening ? resolve() : server.once('listening', resolve)));
     port = server.address().port;
+    authHeaders = (await authLogin(port)).headers;
 });
 
 after(async () => {
@@ -94,6 +100,7 @@ after(async () => {
     if (ORIGINAL_PORT === undefined) delete process.env.PORT; else process.env.PORT = ORIGINAL_PORT;
     if (ORIGINAL_DATA === undefined) delete process.env.AFM_DATA_DIR; else process.env.AFM_DATA_DIR = ORIGINAL_DATA;
     if (ORIGINAL_CONCURRENT === undefined) delete process.env.AFM_UPLOAD_MAX_CONCURRENT; else process.env.AFM_UPLOAD_MAX_CONCURRENT = ORIGINAL_CONCURRENT;
+    require('../../src/db/connection').reset(); // release the sqlite file lock before rmSync (Windows)
     fs.rmSync(TMP, { recursive: true, force: true });
 });
 

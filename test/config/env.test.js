@@ -67,3 +67,36 @@ describe('validateStartup: upload free-space watermark', () => {
         assert.ok(p.some((m) => m.includes('AFM_UPLOAD_FREE_SPACE_BYTES')), p.join('\n'));
     });
 });
+
+describe('validateStartup: bootstrap-admin credentials (ADR-009)', () => {
+    test('neither variable set is not a problem', () => {
+        const p = config.validateStartup({ NODE_ENV: 'development' });
+        assert.ok(!p.some((m) => m.includes('AFM_BOOTSTRAP_ADMIN')), p.join('\n'));
+    });
+
+    test('both variables set with a long-enough password is not a problem', () => {
+        const p = config.validateStartup({
+            AFM_BOOTSTRAP_ADMIN_USERNAME: 'admin',
+            AFM_BOOTSTRAP_ADMIN_PASSWORD: 'a-long-enough-password',
+        });
+        assert.ok(!p.some((m) => m.includes('AFM_BOOTSTRAP_ADMIN')), p.join('\n'));
+    });
+
+    test('username without password is a problem', () => {
+        const p = config.validateStartup({ AFM_BOOTSTRAP_ADMIN_USERNAME: 'admin' });
+        assert.ok(p.some((m) => m.includes('AFM_BOOTSTRAP_ADMIN_USERNAME and AFM_BOOTSTRAP_ADMIN_PASSWORD')), p.join('\n'));
+    });
+
+    test('password without username is a problem', () => {
+        const p = config.validateStartup({ AFM_BOOTSTRAP_ADMIN_PASSWORD: 'a-long-enough-password' });
+        assert.ok(p.some((m) => m.includes('AFM_BOOTSTRAP_ADMIN_USERNAME and AFM_BOOTSTRAP_ADMIN_PASSWORD')), p.join('\n'));
+    });
+
+    test('a password shorter than 8 characters is a problem', () => {
+        const p = config.validateStartup({
+            AFM_BOOTSTRAP_ADMIN_USERNAME: 'admin',
+            AFM_BOOTSTRAP_ADMIN_PASSWORD: 'short',
+        });
+        assert.ok(p.some((m) => m.includes('AFM_BOOTSTRAP_ADMIN_PASSWORD must be at least 8 characters')), p.join('\n'));
+    });
+});

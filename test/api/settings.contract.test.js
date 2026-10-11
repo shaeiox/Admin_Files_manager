@@ -28,6 +28,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
+const { applyBootstrapEnv, redirectAdminDb, login: authLogin } = require('../helpers/authenticated');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'afm-settings-api-'));
 const ROOT = path.join(TMP, 'root');
@@ -46,14 +47,18 @@ const SettingsService = require('../../src/services/SettingsService');
 SettingsService.dbPath = SETTINGS_PATH;
 SettingsService.cache = null;
 
+applyBootstrapEnv();
+redirectAdminDb(path.join(TMP, 'admin.sqlite'));
+
 let server;
 let port;
+let authHeaders = {};
 
 /* ── transport helpers (same shape as fs.contract.test.js) ── */
 
 function send(method, pathname, { body, headers = {} } = {}) {
     return new Promise((resolve, reject) => {
-        const finalHeaders = { ...headers };
+        const finalHeaders = { ...authHeaders, ...headers };
         if (body !== undefined) finalHeaders['Content-Length'] = Buffer.byteLength(body);
         const req = http.request(
             { host: '127.0.0.1', port, path: pathname, method, agent: false, headers: finalHeaders },
@@ -106,6 +111,7 @@ before(async () => {
         server.once('listening', resolve);
     });
     port = server.address().port;
+    authHeaders = (await authLogin(port)).headers;
 });
 
 after(async () => {
@@ -118,6 +124,7 @@ after(async () => {
     else process.env.STORAGE_ROOT = ORIGINAL_ROOT;
     if (ORIGINAL_PORT === undefined) delete process.env.PORT;
     else process.env.PORT = ORIGINAL_PORT;
+    require('../../src/db/connection').reset(); // release the sqlite file lock before rmSync (Windows)
     fs.rmSync(TMP, { recursive: true, force: true });
 });
 

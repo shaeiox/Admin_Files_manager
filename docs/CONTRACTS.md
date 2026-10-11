@@ -47,16 +47,17 @@
   (e.g. `/media/videos/clip.mp4`). The server rejects anything that escapes the root (`403`).
 - **Timestamps:** file `modified` is a **millisecond epoch number**; activity `time` is ms epoch.
 
-### Security posture (ADR-003, extended by api-security-hardening)
+### Security posture (ADR-003, extended by api-security-hardening and ADR-009)
 
-**Still open — recorded decisions, not oversights:**
+**Closed by ADR-009 / `admin-identity-and-access-control` (phase 1):**
 
-- **The API is unauthenticated.** Every endpoint below, including upload, rename, delete, star and
-  `PUT /api/settings`, answers any caller. This is the current design for a trusted, single-operator
-  host. **Authentication is required before the service is exposed beyond localhost** — a follow-up
-  change, and the one remaining Critical.
-- **No CSRF defence.** With no session there is nothing to forge yet, but any future cookie-based
-  session must arrive with token or SameSite protection. Prefer a bearer token.
+- **The API is authenticated.** Every endpoint below, except `GET /health` and `POST /auth/login`,
+  requires a session (`afm_session` cookie or `Authorization: Bearer`). This closes ADR-003 §9's
+  Critical, scoped to single-tenant authentication — see "Auth endpoints (ADR-009)" above.
+- **CSRF defence is in place.** Every non-GET request requires a session-bound `X-CSRF-Token`
+  header, checked before any mutation. **Still open:** a full permission catalogue, per-file access
+  policies enforced against a real download, and the Files-portal integration decision are explicit
+  follow-ups — see `openspec/changes/admin-identity-and-access-control/` and ADR-009.
 
 **Closed by `api-security-hardening`:**
 
@@ -166,6 +167,45 @@ The handler lives in `src/routes/api.js`, not `server.js`.
 environment it is talking to. The sidebar identity block consequently reports an honest absence
 rather than the environment name. `apiVersion` is the deployment activation gate in
 `scripts/deploy.sh` and must not be removed.
+
+### Auth endpoints (ADR-009)
+
+Mounted at `/api/auth` (and `/api/v1/auth`), served by `src/routes/auth.routes.js`. These three
+routes are the only ones reachable without a session besides `GET /health` — every other endpoint
+in this document now requires one. A session is carried either as the `afm_session` cookie
+(`HttpOnly`, `SameSite=Lax`, `Secure` in production) or as `Authorization: Bearer <token>`; both
+resolve to the same session. Every non-GET request — including `/auth/logout` — also requires an
+`X-CSRF-Token` header matching the session's issued token, or it is refused with `403` before any
+state changes.
+
+#### POST /api/auth/login → `200` (mutating envelope)
+
+```json
+{ "success": true, "user": { "id": 1, "username": "admin", "role": "admin" }, "csrfToken": "..." }
+```
+
+A wrong password and a nonexistent username return the **identical** `401` response — the shape
+never discloses which one occurred. Throttled per-IP (`AFM_LOGIN_RATE_LIMIT_PER_MINUTE`, default
+10/minute) independently of the general `/api` rate limiter. After 10 consecutive failures for one
+account, that account is locked for 15 minutes even against its correct password.
+
+#### POST /api/auth/logout → `200` (mutating envelope)
+
+```json
+{ "success": true }
+```
+
+Requires a session and its CSRF token. Revokes exactly the calling session; other sessions for the
+same user are unaffected (bulk revoke is an admin-panel capability, not part of this endpoint).
+
+#### GET /api/auth/me → `200` (bare object — read-only aggregate precedent)
+
+```json
+{ "id": 1, "username": "admin", "role": "admin", "status": "active" }
+```
+
+No `password_hash` or throttle bookkeeping ever leaves `UserService`/`SessionService` — every shape
+returned to a client is stripped of those fields at the service boundary, not the controller.
 
 ### GET /api/dashboard/summary → `200`
 

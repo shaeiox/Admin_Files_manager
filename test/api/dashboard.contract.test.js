@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
+const { applyBootstrapEnv, redirectAdminDb, login: authLogin } = require('../helpers/authenticated');
 
 // One storage root for the whole file, chosen BEFORE anything is required.
 //
@@ -29,6 +30,9 @@ const MetadataService = require('../../src/services/MetadataService');
 MetadataService.dbPath = path.join(TMP, 'metadata.json');
 MetadataService.cache = null;
 
+applyBootstrapEnv();
+redirectAdminDb(path.join(TMP, 'admin.sqlite'));
+
 const ORIGINAL_ROOT = process.env.STORAGE_ROOT;
 const ORIGINAL_PORT = process.env.PORT;
 
@@ -49,11 +53,12 @@ writeFile('media/sub/c.txt', 500);
 
 let server;
 let port;
+let authHeaders = {};
 
 function get(pathname) {
     return new Promise((resolve, reject) => {
         const req = http.get(
-            { host: '127.0.0.1', port, path: pathname, agent: false },
+            { host: '127.0.0.1', port, path: pathname, agent: false, headers: authHeaders },
             (res) => {
                 let body = '';
                 res.on('data', (c) => { body += c; });
@@ -72,7 +77,7 @@ function get(pathname) {
 function request(method, pathname) {
     return new Promise((resolve, reject) => {
         const req = http.request(
-            { host: '127.0.0.1', port, path: pathname, method, agent: false },
+            { host: '127.0.0.1', port, path: pathname, method, agent: false, headers: authHeaders },
             (res) => { res.resume(); resolve({ status: res.statusCode }); }
         );
         req.setTimeout(10000, () => req.destroy(new Error('request timed out')));
@@ -88,6 +93,7 @@ before(async () => {
         server.once('listening', resolve);
     });
     port = server.address().port;
+    authHeaders = (await authLogin(port)).headers;
 });
 
 after(async () => {
@@ -102,6 +108,7 @@ after(async () => {
     else process.env.STORAGE_ROOT = ORIGINAL_ROOT;
     if (ORIGINAL_PORT === undefined) delete process.env.PORT;
     else process.env.PORT = ORIGINAL_PORT;
+    require('../../src/db/connection').reset(); // release the sqlite file lock before rmSync (Windows)
     fs.rmSync(TMP, { recursive: true, force: true });
 });
 

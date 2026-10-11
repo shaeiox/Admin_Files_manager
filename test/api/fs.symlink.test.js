@@ -24,6 +24,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
+const { applyBootstrapEnv, redirectAdminDb, login: authLogin } = require('../helpers/authenticated');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'afm-link-'));
 const ROOT = path.join(TMP, 'root');
@@ -72,11 +73,13 @@ function makeDirLink(name, targetDir) {
 
 let server;
 let port;
+let authHeaders = {};
 
 function request(pathname, { method = 'GET', body = null, headers = {} } = {}) {
     return new Promise((resolve, reject) => {
+        const finalHeaders = { ...authHeaders, ...headers };
         const req = http.request(
-            { host: '127.0.0.1', port, path: pathname, method, headers, agent: false },
+            { host: '127.0.0.1', port, path: pathname, method, headers: finalHeaders, agent: false },
             (res) => {
                 const chunks = [];
                 res.on('data', (c) => chunks.push(c));
@@ -99,9 +102,13 @@ before(async () => {
     const broken = makeDirLink('link-broken', path.join(TMP, 'never-existed'));
     linksAvailable = outside || inside || broken;
 
+    applyBootstrapEnv();
+    redirectAdminDb(path.join(TMP, 'admin.sqlite'));
+
     server = require('../../server.js');
     await new Promise((resolve) => (server.listening ? resolve() : server.once('listening', resolve)));
     port = server.address().port;
+    authHeaders = (await authLogin(port)).headers;
 });
 
 after(async () => {
@@ -109,6 +116,7 @@ after(async () => {
     if (server) await new Promise((r) => server.close(r));
     if (ORIGINAL_ROOT === undefined) delete process.env.STORAGE_ROOT; else process.env.STORAGE_ROOT = ORIGINAL_ROOT;
     if (ORIGINAL_PORT === undefined) delete process.env.PORT; else process.env.PORT = ORIGINAL_PORT;
+    require('../../src/db/connection').reset(); // release the sqlite file lock before rmSync (Windows)
     fs.rmSync(TMP, { recursive: true, force: true });
 });
 
