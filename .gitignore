@@ -6,6 +6,8 @@ yarn-error.log
 # Environment variables (Security: Never commit secrets)
 .env
 .env.local
+.env.*
+!.env.example
 
 # Operating System Files
 .DS_Store
@@ -25,3 +27,6 @@ temp/
 
 # Security-audit skill output (local findings, not a committed artifact)
 docs/security-audit/
+
+# Knowledge-graph output (generated, no LLM cost to rebuild)
+!graphify-out/
