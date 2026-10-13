@@ -363,7 +363,10 @@ There is **no** time-series store, snapshot table, or history file anywhere in t
 - **Every number on the Dashboard is a live measurement at request time.** Refreshing produces new
   readings, never deltas.
 
-### GET /api/fs/tree → `200`
+### GET /api/fs/tree?path=... → `200`
+
+**Query:** `path` (optional, default `/`) - an existing client-path **directory** to root the response
+at. Omitted or `/` behaves exactly as before.
 
 ```json
 [
@@ -373,16 +376,25 @@ There is **no** time-series store, snapshot table, or history file anywhere in t
     "path": "/",
     "icon": "hardDrive",
     "children": [
-      { "id": "/media", "name": "media", "path": "/media", "children": [ /* one more level */ ] }
-    ]
+      { "id": "/media", "name": "media", "path": "/media", "children": [ /* one more level */ ], "childrenLoaded": true }
+    ],
+    "childrenLoaded": true
   }
 ]
 ```
 - Hidden files (dot-prefixed) are excluded; folders sorted by name.
-- **Depth is a constant: exactly two levels below the root** (`fs.controller.js` `scanFolders`
-  stops at `depth > 2`; pinned by `test/api/fs.contract.test.js` and mirrored by `TREE_DEPTH` in
-  `files.js`). A folder deeper than that is not in the tree; the Files page says so and the
-  breadcrumb, which always shows the full path, is the way back up.
+- **Each single response is bounded to exactly two levels below the requested `path`** - unchanged
+  from before (`fs.controller.js` `scanChildren` stops recursing at `depth > 2`; pinned by
+  `test/api/fs.contract.test.js` and mirrored by `TREE_DEPTH` in `files.js`). What changed:
+  **unbounded depth is now reachable** by calling this endpoint again with a deeper node's own
+  `path` - every node carries `childrenLoaded`, and `false` means "not read at this bound, call
+  back with this node's `path` for the next two levels," not "this folder has no subfolders."
+  `true` (even with `children: []`) means the folder really has none, or was unreadable. The
+  Files page's tree does this automatically on expand; nothing is a dead end any more, and the
+  "you are deeper than the tree" breadcrumb note only means "ask for more," not "go no further."
+- A non-existent or non-directory `path` is the caller's error (`404`/`400`), not a silently empty
+  tree - unlike a child folder that goes unreadable mid-walk, which degrades to `childrenLoaded:
+  true, children: []` the same way it always has.
 
 ### GET /api/fs/list → `200`
 

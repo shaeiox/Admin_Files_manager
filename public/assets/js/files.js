@@ -133,6 +133,7 @@ const Files = (() => {
       treeLoaded: false,
       treeError: null,
       expanded: new Set(),      // tree nodes the operator has open; see initExpansion
+      treeLoadingPaths: new Set(), // nodes with a loadTreeChildren() fetch in flight
 
       files: [],
       total: 0,
@@ -147,6 +148,8 @@ const Files = (() => {
       starredOnly: false,
       library: null,
       selected: new Set(),
+      cutPaths: new Set(),      // paths pending a move (Cut) - grayed out until Paste or cancel
+      cutItems: [],             // {name, path, isFolder} snapshot at cut time, for reporting after navigating away
       activeId: null,           // the roving tab stop
       page: 1,
       perPage: 20,
@@ -340,6 +343,17 @@ const Files = (() => {
     if (state.expanded.size === 0) state.expanded.add('/');
   }
 
+  /**
+   * A node is expandable if it has real children already, OR its children
+   * were never read (childrenLoaded === false - the 2-level-per-request cap,
+   * not a confirmed empty folder). The second case is what makes every
+   * subdirectory depth reachable: expanding it fetches the next 2 levels
+   * (loadTreeChildren), and after that it is judged by the same rule again.
+   */
+  function nodeIsExpandable(n) {
+    return !!(n && ((Array.isArray(n.children) && n.children.length > 0) || n.childrenLoaded === false));
+  }
+
   function treeContains(nodes, path) {
     for (const n of nodes || []) {
       if (n.path === path || treeContains(n.children, path)) return true;
@@ -439,32 +453,34 @@ const Files = (() => {
     function walk(nodes, level) {
       return nodes.map(n => {
         const children = Array.isArray(n.children) ? n.children : [];
-        const hasChildren = children.length > 0;
-        const isOpen = hasChildren && state.expanded.has(n.path);
+        const expandable = nodeIsExpandable(n);
+        const isOpen = expandable && state.expanded.has(n.path);
+        const isLoading = isOpen && state.treeLoadingPaths.has(n.path);
         const isActive = n.path === state.currentPath;
-        const groupId = hasChildren ? `tree-group-${++groupSeq}` : '';
+        const groupId = expandable ? `tree-group-${++groupSeq}` : '';
         const name = esc(n.name);
         return `
           <div class="tree-node${isOpen ? ' is-open' : ''}" role="none">
             <div class="tree-item${isActive ? ' is-active' : ''}" role="treeitem" aria-level="${level}"
-              ${hasChildren ? `aria-expanded="${isOpen}" aria-owns="${groupId}"` : ''}
+              ${expandable ? `aria-expanded="${isOpen}" aria-owns="${groupId}"` : ''}
               aria-selected="${isActive}" ${isActive ? 'aria-current="page"' : ''}
               tabindex="${isActive ? 0 : -1}" data-tree-path="${esc(n.path)}" title="${esc(n.path)}">
-              ${hasChildren
-                ? `<button type="button" class="tree-caret" tabindex="-1" data-tree-toggle="${esc(n.path)}" aria-label="${isOpen ? 'Collapse' : 'Expand'} ${name}">${icon('chevronRight', 11)}</button>`
+              ${expandable
+                ? `<button type="button" class="tree-caret${isLoading ? ' is-loading' : ''}" tabindex="-1" data-tree-toggle="${esc(n.path)}" aria-label="${isLoading ? 'Loading' : isOpen ? 'Collapse' : 'Expand'} ${name}">${icon(isLoading ? 'refresh' : 'chevronRight', 11)}</button>`
                 : '<span class="tree-caret is-empty" aria-hidden="true"></span>'}
               <span class="tree-ico" aria-hidden="true">${icon(n.icon || 'folder', 14)}</span>
               <span class="tree-name">${name}</span>
             </div>
-            ${hasChildren ? `<div class="tree-children" role="group" id="${groupId}">${walk(children, level + 1)}</div>` : ''}
+            ${expandable ? `<div class="tree-children" role="group" id="${groupId}">${isLoading && children.length === 0 ? '<div class="tree-note tree-note-loading" aria-hidden="true">Loading…</div>' : walk(children, level + 1)}</div>` : ''}
           </div>`;
       }).join('');
     }
 
     const deepNote = treeContains(state.tree, state.currentPath) ? '' : `
       <p class="tree-note" role="note">
-        The folder tree shows ${TREE_DEPTH} levels below All Files. You are deeper, in
-        <span class="tree-note-path">${esc(state.currentPath)}</span> — use the breadcrumb to move up.
+        The folder tree shows ${TREE_DEPTH} levels at a time below All Files. You are deeper, in
+        <span class="tree-note-path">${esc(state.currentPath)}</span> — use the breadcrumb to move up,
+        or expand folders above to reach it.
       </p>`;
 
     return walk(state.tree, 1) + deepNote;
@@ -549,12 +565,13 @@ const Files = (() => {
     const rows = files.map((f, i) => {
       const t = typeOf(f);
       const isSel = state.selected.has(f.id);
+      const isCut = state.cutPaths.has(f.path);
       const tab = entryTabIndex(state, f);
       const name = esc(f.name);
       const id = esc(f.id);
       return `
-        <tr data-entry data-id="${id}" class="${isSel ? 'is-selected' : ''}" aria-selected="${isSel}" tabindex="${tab}"
-          aria-label="${name}, ${esc(typeLabel(f))}">
+        <tr data-entry data-id="${id}" class="${isSel ? 'is-selected' : ''}${isCut ? ' is-cut' : ''}" aria-selected="${isSel}" tabindex="${tab}"
+          aria-label="${name}, ${esc(typeLabel(f))}${isCut ? ', ready to move' : ''}">
           <td class="col-check">
             <label class="checkbox">
               <input type="checkbox" data-check="${id}" ${isSel ? 'checked' : ''} tabindex="${tab}" aria-label="Select ${name}">
@@ -613,12 +630,13 @@ const Files = (() => {
     const cards = state.files.map((f, i) => {
       const t = typeOf(f);
       const isSel = state.selected.has(f.id);
+      const isCut = state.cutPaths.has(f.path);
       const tab = entryTabIndex(state, f);
       const name = esc(f.name);
       const id = esc(f.id);
       return `
-        <div class="file-card stagger-${staggerIndex(i)}${isSel ? ' is-selected' : ''}" role="row" data-entry data-id="${id}"
-          aria-selected="${isSel}" tabindex="${tab}" aria-label="${name}, ${esc(typeLabel(f))}">
+        <div class="file-card stagger-${staggerIndex(i)}${isSel ? ' is-selected' : ''}${isCut ? ' is-cut' : ''}" role="row" data-entry data-id="${id}"
+          aria-selected="${isSel}" tabindex="${tab}" aria-label="${name}, ${esc(typeLabel(f))}${isCut ? ', ready to move' : ''}">
           <div class="file-card-cell" role="gridcell">
             <div class="file-card-check">
               <label class="checkbox">
@@ -1199,7 +1217,7 @@ const Files = (() => {
      ══════════════════════════════════════════ */
 
   /** Entry-scoped actions need a rendered entry; the rest carry their own scope. */
-  const SCOPED_ACTIONS = new Set(['newFolder', 'renameTree', 'deleteTree', 'bulkDelete', 'bulkStar', 'bulkMove', 'bulkPolicy']);
+  const SCOPED_ACTIONS = new Set(['newFolder', 'renameTree', 'deleteTree', 'bulkDelete', 'bulkStar', 'bulkMove', 'bulkPolicy', 'paste']);
 
   /**
    * @param {string} act
@@ -1219,6 +1237,7 @@ const Files = (() => {
       case 'copyPath': return copyToClipboard(file.path, 'Location copied');
       case 'star': return setStars([file], !file.starred);
       case 'rename': return renameItem(file);
+      case 'cut': return cutItems(state.selected.size ? selectedFiles() : [file]);
       case 'delete': return deleteItems([file]);
       case 'newFolder': return createFolder(typeof id === 'string' && id ? id : state.currentPath);
       case 'renameTree': return renameItem({ name: baseName(id), path: id, isFolder: true });
@@ -1228,8 +1247,9 @@ const Files = (() => {
         const items = selectedFiles();
         return setStars(items, !items.every(f => f.starred));
       }
-      case 'bulkMove': return moveItems(selectedFiles());
+      case 'bulkMove': return cutItems(selectedFiles());
       case 'bulkPolicy': return setAccessPolicy(selectedFiles());
+      case 'paste': return pasteItems();
       default: return undefined;
     }
   }
@@ -1292,7 +1312,7 @@ const Files = (() => {
       { label: file.starred ? 'Unstar' : 'Star', icon: 'star', action: () => setStars([file], !file.starred) },
       { divider: true },
       { label: 'Rename', icon: 'edit', shortcut: 'F2', action: () => renameItem(file) },
-      { label: 'Move to…', icon: 'move', action: () => moveItems([file]) },
+      { label: 'Cut', icon: 'scissors', shortcut: 'Ctrl+X', action: () => cutItems([file]) },
       { label: 'Access policy…', icon: 'lock', action: () => setAccessPolicy([file]) },
       { label: 'Delete permanently', icon: 'trash', danger: true, shortcut: 'Del', action: () => deleteItems([file]) },
     );
@@ -1414,110 +1434,47 @@ const Files = (() => {
     announce(`Deleted ${n} of ${summary.sent}. ${summary.failed.length} could not be deleted.`);
   }
 
-  /* ── move (cross-directory; rename itself stays same-directory only) ── */
+  /* ── cut / paste move (cross-directory; rename itself stays same-directory only) ──
+     Windows-Explorer-style: Cut marks items pending a move (grayed out, never
+     touching the filesystem by itself); Paste in a different folder is what
+     actually calls PUT /fs/move, with destination = the folder being viewed. */
 
-  /** Flatten GET /api/fs/tree. That endpoint stops two levels below the root. */
-  function flattenTree(tree) {
-    const out = [];
-    const walk = (nodes, depth) => {
-      if (!Array.isArray(nodes)) return;
-      for (const node of nodes) {
-        if (!node || typeof node.path !== 'string') continue;
-        out.push({ path: node.path, label: node.path === '/' ? '/ (All Files)' : node.path, depth });
-        walk(node.children, depth + 1);
-      }
-    };
-    walk(tree, 0);
-    return out;
+  /** Shows/hides the toolbar Paste affordance and keeps its count current. */
+  function updatePasteButton() {
+    const btn = $('#btnPaste');
+    const cancelBtn = $('#btnCancelCut');
+    const n = state.cutPaths.size;
+    if (btn) {
+      btn.hidden = n === 0;
+      const countEl = btn.querySelector('.paste-count');
+      if (countEl) countEl.textContent = n > 0 ? `(${n})` : '';
+    }
+    if (cancelBtn) cancelBtn.hidden = n === 0;
   }
 
-  /**
-   * Modal: pick an existing destination folder. A quick-pick select (folders
-   * up to two levels below the root, same bound GET /fs/tree itself has)
-   * fills a text input that stays the single source of truth, so a deeper
-   * folder can still be typed exactly. Resolves the chosen client path, or
-   * null on cancel - the server is still the authority on whether it exists.
-   */
-  function pickMoveDestination(items) {
-    return new Promise(resolve => {
-      const count = items.length;
-      const title = count === 1 ? `Move “${esc(items[0].name)}”` : `Move ${count} items`;
-      const backdrop = el('div', { class: 'modal-backdrop' }, `
-        <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="moveModalTitle">
-          <div class="modal-header">
-            <div>
-              <div class="modal-title" id="moveModalTitle">${title}</div>
-              <div class="modal-subtitle">Choose an existing destination folder.</div>
-            </div>
-            <button class="btn-icon btn-icon-sm" data-act="cancel" aria-label="Cancel">${icon('x', 15)}</button>
-          </div>
-          <div class="modal-body">
-            <div class="field">
-              <label class="field-label" for="moveDestSelect">Quick pick</label>
-              <select class="input" id="moveDestSelect">
-                <option value="">Loading folders…</option>
-              </select>
-            </div>
-            <div class="field">
-              <label class="field-label" for="moveDestInput">Destination folder</label>
-              <input class="input" type="text" id="moveDestInput" placeholder="/folder/path" autocomplete="off">
-            </div>
-            <div class="admin-form-error" id="moveModalError" role="alert" hidden></div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-ghost btn-sm" data-act="cancel">Cancel</button>
-            <button class="btn btn-primary btn-sm" data-act="ok" disabled>Move</button>
-          </div>
-        </div>
-      `);
+  /** Mark items pending a move. Clears any prior pending cut - only one at a time. */
+  function cutItems(items) {
+    if (!items.length) return;
+    state.cutPaths = new Set(items.map(i => i.path));
+    state.cutItems = items.map(i => ({ name: i.name, path: i.path, isFolder: !!i.isFolder }));
+    state.selected = new Set();
+    renderView();
+    updateBulkBar();
+    updatePasteButton();
+    const n = items.length;
+    Toast.info(`${n} ${n === 1 ? 'item is' : 'items are'} ready to move`,
+      'Go to a folder and Paste, or press Escape to cancel.');
+  }
 
-      document.body.appendChild(backdrop);
-      requestAnimationFrame(() => Modal.open(backdrop));
-
-      const select = backdrop.querySelector('#moveDestSelect');
-      const input = backdrop.querySelector('#moveDestInput');
-      const okBtn = backdrop.querySelector('[data-act="ok"]');
-      const errBox = backdrop.querySelector('#moveModalError');
-
-      const finish = val => {
-        Modal.close(backdrop);
-        setTimeout(() => backdrop.remove(), 300);
-        resolve(val);
-      };
-
-      const syncOkState = () => { okBtn.disabled = !input.value.trim().startsWith('/'); };
-      input.addEventListener('input', () => { errBox.hidden = true; syncOkState(); });
-      select.addEventListener('change', () => {
-        if (select.value) input.value = select.value;
-        errBox.hidden = true;
-        syncOkState();
-        input.focus();
-      });
-
-      okBtn.onclick = () => {
-        const dest = input.value.trim();
-        if (!dest.startsWith('/')) {
-          errBox.textContent = 'A destination starts at the storage root, “/”.';
-          errBox.hidden = false;
-          return;
-        }
-        finish(dest);
-      };
-      backdrop.querySelectorAll('[data-act="cancel"]').forEach(b => b.onclick = () => finish(null));
-      backdrop.addEventListener('click', e => { if (e.target === backdrop) finish(null); });
-      input.addEventListener('keydown', e => { if (e.key === 'Enter' && !okBtn.disabled) okBtn.click(); });
-
-      window.API.get('/fs/tree', { silent: true }).then(tree => {
-        const folders = flattenTree(tree);
-        select.innerHTML = '<option value="">Choose a folder…</option>' + folders.map(f =>
-          `<option value="${esc(f.path)}">${'— '.repeat(f.depth)}${esc(f.label)}</option>`
-        ).join('');
-      }).catch(() => {
-        select.innerHTML = '<option value="">Folder list unavailable — type a path below</option>';
-      });
-
-      setTimeout(() => input.focus(), 140);
-    });
+  /** @returns {boolean} whether there was a pending cut to cancel */
+  function cancelCut() {
+    if (state.cutPaths.size === 0) return false;
+    state.cutPaths = new Set();
+    state.cutItems = [];
+    renderView();
+    updatePasteButton();
+    Toast.info('Move cancelled');
+    return true;
   }
 
   function summarizeMove(sentPaths, data) {
@@ -1548,17 +1505,25 @@ const Files = (() => {
     announce(`Moved ${n} of ${summary.sent}. ${summary.failed.length} could not be moved.`);
   }
 
-  async function moveItems(items) {
-    if (!items.length) return;
-    const destination = await pickMoveDestination(items);
-    if (!destination) return;
+  /** Paste the pending cut into the currently displayed folder. */
+  async function pasteItems() {
+    if (state.cutPaths.size === 0) return;
+    const items = state.cutItems;
+    const destination = state.currentPath;
+
+    if (items.every(i => parentPath(i.path) === destination)) {
+      // Nothing would actually move - say so instead of firing a no-op request.
+      const here = destination === '/' ? 'the storage root' : destination;
+      Toast.info('Already there', `${items.length === 1 ? 'It is' : 'They are'} already in ${here}.`);
+      return;
+    }
 
     const paths = items.map(i => i.path);
     let res;
     try {
       res = await window.API.put('/fs/move', { paths, destination });
     } catch {
-      return; // every path failed: api.js shows the reason and nothing was moved
+      return; // every path failed: api.js shows the reason; the cut stays pending so the operator can retry
     }
     const summary = summarizeMove(paths, res && res.data);
     reportMove(summary, items, destination);
@@ -1569,7 +1534,14 @@ const Files = (() => {
       if (entry && syncAfterMutation('rename', entry.oldPath, entry.newPath)) break;
     }
     if (movedFolders.length) loadTree();
-    state.selected = new Set();
+
+    // Only what actually moved comes off the clipboard - a failed item stays
+    // pending so a retry (navigate, Paste again) is all the operator needs.
+    const movedPaths = new Set(summary.moved.map(m => m.oldPath));
+    state.cutPaths = new Set([...state.cutPaths].filter(p => !movedPaths.has(p)));
+    state.cutItems = state.cutItems.filter(i => !movedPaths.has(i.path));
+    updatePasteButton();
+
     loadFiles({ silent: true });
   }
 
@@ -1866,12 +1838,32 @@ const Files = (() => {
    * Escape closes ONLY the topmost layer. Registered in the capture phase so it
    * runs before app.js's global Escape (which closes modals): if a confirm,
    * menu or dropdown is open above the drawer, that layer is the one dismissed.
+   * A pending cut (Cut, no modal or drawer involved) is the lowest-priority
+   * layer - Escape cancels it only once nothing else above it needs closing,
+   * matching Windows Explorer (Esc drops a pending clipboard cut).
    */
   function onEscape(e) {
-    if (e.key !== 'Escape' || !isDrawerOpen()) return;
+    if (e.key !== 'Escape') return;
     const q = sel => document.querySelector && document.querySelector(sel);
     if (q('.modal-backdrop.is-open') || q('.context-menu.is-open') || q('.dropdown-menu.is-open')) return;
-    closeDrawer();
+    if (isDrawerOpen()) return closeDrawer();
+    cancelCut();
+  }
+
+  /**
+   * Ctrl+V / Cmd+V pastes the pending cut into the currently displayed
+   * folder, from anywhere on the page - not just a focused row - mirroring
+   * Explorer, where Paste does not require anything to be selected first.
+   * Skipped while typing in an editable field, where Ctrl+V means paste text.
+   */
+  function onPasteShortcut(e) {
+    if (e.key !== 'v' && e.key !== 'V') return;
+    if (!e.ctrlKey && !e.metaKey) return;
+    const tag = (e.target && e.target.tagName || '').toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+    if (state.cutPaths.size === 0) return;
+    e.preventDefault();
+    pasteItems();
   }
 
   function onDrawerClick(e) {
@@ -2350,6 +2342,10 @@ const Files = (() => {
           e.preventDefault();
           return handleAction('more', id, { anchor: entry });
         }
+        if ((e.key === 'x' || e.key === 'X') && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          return handleAction('cut', id);
+        }
         return undefined;
     }
   }
@@ -2374,15 +2370,46 @@ const Files = (() => {
     if (box) box.classList.add('is-preview-failed');
   }
 
+  /**
+   * Fetch one more bounded level past the 2-level cap for a specific node
+   * (GET /fs/tree?path=...) and merge the result into state.tree in place.
+   * Composable: the fetched node's own leaf children come back marked
+   * childrenLoaded:false too, so expanding again just repeats this call -
+   * every subdirectory depth is reachable, never a dead end.
+   */
+  async function loadTreeChildren(path) {
+    if (state.treeLoadingPaths.has(path)) return;
+    state.treeLoadingPaths.add(path);
+    renderTree();
+    try {
+      const data = await window.API.get(`/fs/tree?path=${encodeURIComponent(path)}`);
+      const fetched = Array.isArray(data) ? data[0] : null;
+      const node = findTreeNode(state.tree, path);
+      if (node && fetched) {
+        node.children = Array.isArray(fetched.children) ? fetched.children : [];
+        node.childrenLoaded = true;
+      }
+    } catch {
+      // api.js already reported the reason; collapse back to "not yet
+      // confirmed" rather than leave an open node with nothing in it, so
+      // expanding again retries instead of looking like a confirmed-empty folder.
+      state.expanded.delete(path);
+    } finally {
+      state.treeLoadingPaths.delete(path);
+      renderTree();
+    }
+  }
+
   function toggleTreeNode(path, open) {
     const node = findTreeNode(state.tree, path);
-    if (!node || !node.children || !node.children.length) return;
+    if (!nodeIsExpandable(node)) return;
     const isOpen = state.expanded.has(path);
     const next = open === undefined ? !isOpen : open;
     if (next === isOpen) return;
     if (next) state.expanded.add(path);
     else state.expanded.delete(path);
     renderTree();
+    if (next && node.childrenLoaded === false) loadTreeChildren(path);
   }
 
   function onTreeClick(e) {
@@ -2407,7 +2434,7 @@ const Files = (() => {
     const visible = visibleTreePaths(state.tree, state.expanded);
     const i = visible.indexOf(path);
     const node = findTreeNode(state.tree, path);
-    const hasChildren = !!(node && node.children && node.children.length);
+    const expandable = nodeIsExpandable(node);
     const go = (p) => { e.preventDefault(); if (p) focusTreeItem(p); };
 
     switch (e.key) {
@@ -2417,12 +2444,13 @@ const Files = (() => {
       case 'End': return go(visible[visible.length - 1]);
       case 'ArrowRight':
         e.preventDefault();
-        if (hasChildren && !state.expanded.has(path)) return toggleTreeNode(path, true);
-        if (hasChildren) return focusTreeItem(node.children[0].path);
+        if (expandable && !state.expanded.has(path)) return toggleTreeNode(path, true);
+        // Still loading, or confirmed empty after the fetch - nothing to focus into yet.
+        if (expandable && node.children && node.children.length) return focusTreeItem(node.children[0].path);
         return undefined;
       case 'ArrowLeft':
         e.preventDefault();
-        if (hasChildren && state.expanded.has(path)) return toggleTreeNode(path, false);
+        if (expandable && state.expanded.has(path)) return toggleTreeNode(path, false);
         if (path !== '/') return focusTreeItem(parentPath(path));
         return undefined;
       case 'Enter':
@@ -2569,6 +2597,8 @@ const Files = (() => {
     bind('#btnRefresh', 'click', () => { loadTree(); loadFiles(); });
     bind('#btnNewFolder', 'click', () => handleAction('newFolder', state.currentPath));
     bind('#btnTreeNewFolder', 'click', () => handleAction('newFolder', state.currentPath));
+    bind('#btnPaste', 'click', () => handleAction('paste'));
+    bind('#btnCancelCut', 'click', cancelCut);
     bind('#btnTopbarUpload', 'click', openFilePicker);
     bind('#btnPageUpload', 'click', openFilePicker);
     bind('#hiddenFileInput', 'change', e => {
@@ -2589,6 +2619,7 @@ const Files = (() => {
     bind('#drawerClose', 'click', closeDrawer);
     bind('#drawerBackdrop', 'click', closeDrawer);
     listenGlobal(document, 'keydown', onEscape, true);
+    listenGlobal(document, 'keydown', onPasteShortcut);
 
     bind('#uploadTray', 'click', e => {
       const cancel = e.target.closest && e.target.closest('[data-upload-cancel]');
@@ -2650,7 +2681,7 @@ const Files = (() => {
       TREE_DEPTH, STAGGER_STEPS, PAGE_SIZES, LIBRARY_VIEWS, TYPE_CHIPS,
       createState, joinPath, parentPath, isSameOrInside, ancestorsOf, rewriteAfterMutation,
       typeOf, typeLabel, pageCount, clampPage, footerRange, buildPageNumbers, pruneSelection,
-      emptyKind, staggerIndex, applyNavigation, initExpansion, treeContains, visibleTreePaths,
+      emptyKind, staggerIndex, applyNavigation, initExpansion, treeContains, visibleTreePaths, nodeIsExpandable,
       listQuery, resolveLibraryView, summarizeDelete, deleteConfirmCopy,
       renderTreeHtml, renderBreadcrumbHtml, renderChipsHtml, renderListHtml, renderGridHtml,
       renderFooterHtml, renderSkeletonHtml, renderEmptyHtml, renderErrorHtml, renderDrawerHtml,
@@ -2661,11 +2692,12 @@ const Files = (() => {
     _controller: {
       getState: () => state,
       setPreviewCapability: (cap) => { previewCapability = cap; },
-      loadTree, loadFiles, navigateTo, handleAction, openDrawer, closeDrawer, onEscape,
-      setSelected, selectAllOnPage, toggleSort, setFilter, setPage, toggleTreeNode,
-      onTreeClick, onBreadcrumbClick, onContainerClick, onContainerKeydown, onDrawerClick, onSearchInput,
+      loadTree, loadFiles, navigateTo, handleAction, openDrawer, closeDrawer, onEscape, onPasteShortcut,
+      setSelected, selectAllOnPage, toggleSort, setFilter, setPage, toggleTreeNode, loadTreeChildren,
+      onTreeClick, onTreeKeydown, onBreadcrumbClick, onContainerClick, onContainerKeydown, onDrawerClick, onSearchInput,
       syncAfterMutation, cancelPendingSearch, runUploads, handleDrop, openBulkDownloadMenu,
       setColumnWidth, resetColumnWidth, onResizeKeydown, onContainerDblClick,
+      cutItems, cancelCut, pasteItems, setAccessPolicy,
     },
   };
 })();

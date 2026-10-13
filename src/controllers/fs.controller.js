@@ -16,49 +16,72 @@ const { mapWithConcurrency } = require('../utils/concurrency');
 const { ZipArchive } = require('archiver');
 
 /**
- * GET /api/fs/tree
- * Returns a 2-level deep folder hierarchy for the sidebar tree.
+ * GET /api/fs/tree?path=...
+ * Returns a 2-level deep folder hierarchy rooted at `path` (default `/`) for
+ * the sidebar tree. Every node also carries `childrenLoaded`: true once its
+ * own children were actually read, false when the walk stopped at this
+ * request's 2-level cap without checking. A node that comes back with
+ * `childrenLoaded: false` may or may not have real children - the client
+ * finds out, and gets one more bounded level, by calling this same endpoint
+ * again with that node's own `path`. This is how the tree supports every
+ * subdirectory depth while keeping each single request's work bounded: full
+ * unlimited depth is a property of repeated, composable 2-level fetches, not
+ * of any one response.
  */
 async function getTree(req, res, next) {
     try {
-        const rootPath = '/';
-        const rootNode = {
-            id: rootPath,
-            name: 'All Files',
-            path: rootPath,
-            icon: 'hardDrive',
-            children: []
-        };
+        const rootPath = req.query.path === undefined ? '/' : req.query.path;
+        if (rootPath !== '/') validateClientPath(rootPath);
 
-        async function scanFolders(clientPath, depth = 1) {
-            if (depth > 2) return [];
+        async function scanChildren(clientPath, depth) {
+            // Past this request's cap: not read here - the caller can ask for
+            // this exact path next, composably, for the next 2 levels.
+            if (depth > 2) return { children: [], childrenLoaded: false };
 
-            try {
-                const items = await FileSystemService.readDirectory(clientPath);
-                const folders = [];
-
-                for (const item of items) {
-                    if (item.name.startsWith('.')) continue;
-
-                    if (item.isDirectory()) {
-                        const childPath = clientPath === '/' ? `/${item.name}` : `${clientPath}/${item.name}`;
-                        folders.push({
-                            id: childPath,
-                            name: item.name,
-                            path: childPath,
-                            children: await scanFolders(childPath, depth + 1)
-                        });
-                    }
+            let items;
+            if (depth === 1) {
+                // The requested root itself: a real failure here (missing,
+                // not a directory, no permission) is the caller's error, not
+                // something to swallow into a silently empty tree.
+                items = await FileSystemService.readDirectory(clientPath);
+            } else {
+                try {
+                    items = await FileSystemService.readDirectory(clientPath);
+                } catch (error) {
+                    console.warn(`[Tree] Could not read ${clientPath}:`, error.message);
+                    return { children: [], childrenLoaded: true }; // confirmed unreadable, not "unknown"
                 }
-
-                return folders.sort((a, b) => a.name.localeCompare(b.name));
-            } catch (error) {
-                console.warn(`[Tree] Could not read ${clientPath}:`, error.message);
-                return [];
             }
+
+            const folders = [];
+            for (const item of items) {
+                if (item.name.startsWith('.')) continue;
+                if (!item.isDirectory()) continue;
+
+                const childPath = clientPath === '/' ? `/${item.name}` : `${clientPath}/${item.name}`;
+                const sub = await scanChildren(childPath, depth + 1);
+                folders.push({
+                    id: childPath,
+                    name: item.name,
+                    path: childPath,
+                    children: sub.children,
+                    childrenLoaded: sub.childrenLoaded,
+                });
+            }
+
+            return { children: folders.sort((a, b) => a.name.localeCompare(b.name)), childrenLoaded: true };
         }
 
-        rootNode.children = await scanFolders(rootPath, 1);
+        const scanned = await scanChildren(rootPath, 1);
+        const rootNode = {
+            id: rootPath,
+            name: rootPath === '/' ? 'All Files' : (path.posix.basename(rootPath) || rootPath),
+            path: rootPath,
+            children: scanned.children,
+            childrenLoaded: scanned.childrenLoaded,
+        };
+        if (rootPath === '/') rootNode.icon = 'hardDrive';
+
         res.json([rootNode]);
     } catch (error) {
         next(error);

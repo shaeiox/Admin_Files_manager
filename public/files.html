@@ -179,6 +179,16 @@
           </div>
 
           <div class="page-actions">
+            <!-- Shown only while a Cut is pending (files.js updatePasteButton); pastes into the
+                 folder currently being viewed. See AGENTS.md-style note in files.js: Cut/Paste
+                 replaces a destination-picker modal with a clipboard-style flow. -->
+            <button type="button" class="btn btn-primary btn-sm" id="btnPaste" hidden>
+              <i data-icon="clipboard" data-icon-size="15"></i>
+              <span>Paste <span class="paste-count"></span></span>
+            </button>
+            <button type="button" class="btn-icon btn-icon-sm" id="btnCancelCut" data-tip="Cancel move" data-tip-pos="bottom" aria-label="Cancel move" hidden>
+              <i data-icon="x" data-icon-size="15"></i>
+            </button>
             <button type="button" class="btn btn-ghost btn-sm" id="btnNewFolder">
               <i data-icon="folderPlus" data-icon-size="15"></i>
               <span>New folder</span>

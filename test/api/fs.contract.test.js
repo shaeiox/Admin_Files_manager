@@ -849,17 +849,62 @@ describe('GET /api/fs/list?starredOnly=true', () => {
    PHASE 3 — the tree depth is a documented, tested constant
    ══════════════════════════════════════════ */
 
-describe('GET /api/fs/tree depth', () => {
-    test('the tree reaches exactly two levels below the root', async () => {
+describe('GET /api/fs/tree depth, and the ?path= escape hatch past it', () => {
+    test('each response reaches exactly two levels below its root, and says what was not scanned', async () => {
         writeFile('deep1/deep2/deep3/deep4/leaf.txt', 'L');
         const tree = await getJson('/api/fs/tree');
         function maxDepth(nodes, depth) {
             return nodes.reduce((m, n) => Math.max(m, depth, maxDepth(n.children || [], depth + 1)), 0);
         }
         assert.equal(maxDepth(tree[0].children, 1), 2);
+        assert.equal(tree[0].childrenLoaded, true);
         const deep1 = tree[0].children.find((n) => n.name === 'deep1');
         assert.deepEqual(deep1.children.map((n) => n.name), ['deep2']);
-        assert.deepEqual(deep1.children[0].children, [], 'deep3 is past the cap');
+        assert.equal(deep1.childrenLoaded, true, 'deep1 itself was read');
+        const deep2 = deep1.children[0];
+        assert.deepEqual(deep2.children, [], 'deep3 is past the cap');
+        assert.equal(deep2.childrenLoaded, false, 'not read - the client asks for it by path to go further');
+    });
+
+    test('?path= re-roots the same 2-level scan at a deeper node, composably, for unlimited depth', async () => {
+        writeFile('deep1/deep2/deep3/deep4/leaf.txt', 'L');
+        const scoped = await getJson('/api/fs/tree?path=' + encodeURIComponent('/deep1/deep2'));
+        assert.equal(scoped.length, 1);
+        assert.equal(scoped[0].id, '/deep1/deep2');
+        assert.equal(scoped[0].name, 'deep2');
+        assert.equal(scoped[0].path, '/deep1/deep2');
+        assert.equal(scoped[0].childrenLoaded, true);
+        assert.deepEqual(scoped[0].children.map((n) => n.name), ['deep3']);
+
+        const deep3 = scoped[0].children[0];
+        assert.deepEqual(deep3.children.map((n) => n.name), ['deep4']);
+        assert.equal(deep3.childrenLoaded, true, 'deep3 was read by this scoped request');
+
+        const deep4 = deep3.children[0];
+        assert.deepEqual(deep4.children, []);
+        assert.equal(deep4.childrenLoaded, false, 'one more level past THIS request\'s own cap - ask again with its path');
+    });
+
+    test('asking for deep4 directly confirms it has no subfolders (a file is not a folder)', async () => {
+        writeFile('deep1/deep2/deep3/deep4/leaf.txt', 'L');
+        const scoped = await getJson('/api/fs/tree?path=' + encodeURIComponent('/deep1/deep2/deep3/deep4'));
+        assert.deepEqual(scoped[0].children, []);
+        assert.equal(scoped[0].childrenLoaded, true, 'now confirmed empty, not unknown');
+    });
+
+    test('a non-existent path is the caller\'s error, not a silently empty tree', async () => {
+        const res = await send('GET', '/api/fs/tree?path=' + encodeURIComponent('/no-such-folder'));
+        assert.equal(res.status, 404);
+    });
+
+    test('a path that is a file, not a folder, is a 400', async () => {
+        const res = await send('GET', '/api/fs/tree?path=' + encodeURIComponent('/a.png'));
+        assert.equal(res.status, 400);
+    });
+
+    test('a traversing path is refused, not resolved outside the root', async () => {
+        const res = await send('GET', '/api/fs/tree?path=' + encodeURIComponent('/../../x'));
+        assert.equal(res.status, 403);
     });
 });
 

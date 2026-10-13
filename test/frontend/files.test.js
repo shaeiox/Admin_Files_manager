@@ -185,7 +185,9 @@ function loadFiles({ routes = {}, location = '', store = {} } = {}) {
   const el = (sel) => (els[sel] ||= new FakeEl(doc, sel));
   for (const sel of ['#filesContainer', '#folderTree', '#breadcrumb', '#filterChips', '#filesSearch', '#bulkBar',
     '#fileDrawer', '#drawerBackdrop', '#filesStatus', '#selectAll', '#pageTitle', '#pageSubtitle', '#sortDropdown',
-    '#sortLabel', '#sortTrigger', '#viewToggle', '.app-shell', '#uploadTray', '#hiddenFileInput']) el(sel);
+    '#sortLabel', '#sortTrigger', '#viewToggle', '.app-shell', '#uploadTray', '#hiddenFileInput',
+    '#btnPaste', '#btnCancelCut']) el(sel);
+  el('#btnPaste').children['.paste-count'] = new FakeEl(doc, '.paste-count');
   const drawer = el('#fileDrawer');
   drawer.children['.drawer-body'] = new FakeEl(doc, '.drawer-body');
   drawer.children['.drawer-footer'] = new FakeEl(doc, '.drawer-footer');
@@ -733,6 +735,104 @@ describe('tree state', () => {
     const crumbs = pure.renderBreadcrumbHtml(state.currentPath);
     assert.equal((crumbs.match(/<button/g) || []).length, 5, 'Files + four segments, each a button');
     assert.match(crumbs, /data-nav-path="\/media\/photos\/2024\/summer"\s*aria-current="page"/);
+  });
+});
+
+describe('the tree reaches every subdirectory depth, not just two levels (lazy expansion)', () => {
+  test('nodeIsExpandable treats childrenLoaded:false as expandable even with an empty children array', () => {
+    const { pure } = loadFiles();
+    assert.equal(pure.nodeIsExpandable({ children: [], childrenLoaded: false }), true);
+    assert.equal(pure.nodeIsExpandable({ children: [], childrenLoaded: true }), false, 'confirmed empty - no arrow');
+    assert.equal(pure.nodeIsExpandable({ children: [{ name: 'x' }] }), true);
+    assert.equal(pure.nodeIsExpandable(null), false);
+  });
+
+  test('renderTreeHtml shows an expand caret for an unscanned node, not the empty marker', () => {
+    const { pure } = loadFiles();
+    const tree = [{
+      id: '/', name: 'All Files', path: '/', icon: 'hardDrive', children: [
+        { id: '/deep', name: 'deep', path: '/deep', children: [], childrenLoaded: false },
+      ],
+    }];
+    const state = pure.createState({ tree, treeLoaded: true, expanded: new Set(['/']) });
+    const out = pure.renderTreeHtml(state);
+    assert.match(out, /data-tree-toggle="\/deep"/);
+    assert.match(out, /aria-label="Expand deep"/);
+  });
+
+  test('a loading node shows a spinning caret, not the static chevron', () => {
+    const { pure } = loadFiles();
+    const tree = [{
+      id: '/', name: 'All Files', path: '/', icon: 'hardDrive', children: [
+        { id: '/deep', name: 'deep', path: '/deep', children: [], childrenLoaded: false },
+      ],
+    }];
+    const state = pure.createState({
+      tree, treeLoaded: true, expanded: new Set(['/', '/deep']), treeLoadingPaths: new Set(['/deep']),
+    });
+    const out = pure.renderTreeHtml(state);
+    assert.match(out, /tree-caret is-loading/);
+    assert.match(out, /aria-label="Loading deep"/);
+  });
+
+  test('expanding an unscanned node fetches its own 2-level subtree by path and merges it in', async () => {
+    const tree = [{
+      id: '/', name: 'All Files', path: '/', icon: 'hardDrive', children: [
+        { id: '/deep', name: 'deep', path: '/deep', children: [], childrenLoaded: false },
+      ],
+    }];
+    const scoped = [{
+      id: '/deep', name: 'deep', path: '/deep', childrenLoaded: true, children: [
+        { id: '/deep/deeper', name: 'deeper', path: '/deep/deeper', children: [], childrenLoaded: false },
+      ],
+    }];
+    const page = await booted({
+      '/fs/tree': (url) => (url.includes('path=') ? scoped : tree),
+    });
+    await page.c.loadTree();
+    page.c.toggleTreeNode('/deep', true);
+    await settleAll();
+    assert.ok(page.calls.get.some((u) => u.startsWith('/fs/tree?path=%2Fdeep')));
+    const out = page.pure.renderTreeHtml(page.state());
+    assert.match(out, /data-tree-path="\/deep\/deeper"/);
+  });
+
+  test('a failed expansion collapses the node back instead of leaving it open and empty', async () => {
+    const tree = [{
+      id: '/', name: 'All Files', path: '/', icon: 'hardDrive', children: [
+        { id: '/deep', name: 'deep', path: '/deep', children: [], childrenLoaded: false },
+      ],
+    }];
+    const page = await booted({
+      '/fs/tree': (url) => (url.includes('path=') ? new Error('boom') : tree),
+    });
+    await page.c.loadTree();
+    page.c.toggleTreeNode('/deep', true);
+    await settleAll();
+    assert.equal(page.state().expanded.has('/deep'), false);
+  });
+
+  test('ArrowRight on an unscanned, unexpanded node expands and fetches rather than assuming empty children', async () => {
+    const tree = [{
+      id: '/', name: 'All Files', path: '/', icon: 'hardDrive', children: [
+        { id: '/deep', name: 'deep', path: '/deep', children: [], childrenLoaded: false },
+      ],
+    }];
+    const scoped = [{ id: '/deep', name: 'deep', path: '/deep', children: [], childrenLoaded: true }];
+    const page = await booted({
+      '/fs/tree': (url) => (url.includes('path=') ? scoped : tree),
+    });
+    await page.c.loadTree();
+    const item = { getAttribute: () => '/deep', closest: () => item };
+    page.c.onTreeKeydown(Object.assign({ key: 'ArrowRight', target: item, preventDefault() {} }));
+    await settleAll();
+    assert.equal(page.state().expanded.has('/deep'), true);
+  });
+
+  test('GET /api/fs/tree?path=... is documented alongside the bare root contract', () => {
+    const CONTRACTS = fs.readFileSync(path.join(ROOT_DIR, 'docs', 'CONTRACTS.md'), 'utf8');
+    assert.match(CONTRACTS, /GET \/api\/fs\/tree\?path=/);
+    assert.match(CONTRACTS, /childrenLoaded/);
   });
 });
 
@@ -1454,23 +1554,145 @@ describe('list columns are fixed-width and resizable', () => {
 });
 
 /* ══════════════════════════════════════════
-   MOVE (cross-directory) + ACCESS POLICY — context menu and bulk bar
+   CUT / PASTE MOVE + ACCESS POLICY — context menu and bulk bar
    ══════════════════════════════════════════ */
 
-describe('move and access policy are wired on both the row context menu and the bulk bar', () => {
-  test('contextItems offers Move and Access policy for both a file and a folder', () => {
-    assert.match(FILES_SRC, /label: 'Move to…', icon: 'move', action: \(\) => moveItems\(\[file\]\)/);
+describe('Cut marks items pending a move; Paste in another folder is what actually moves them', () => {
+  test('contextItems offers Cut and Access policy for both a file and a folder', () => {
+    assert.match(FILES_SRC, /label: 'Cut', icon: 'scissors', shortcut: 'Ctrl\+X', action: \(\) => cutItems\(\[file\]\)/);
     assert.match(FILES_SRC, /label: 'Access policy…', icon: 'lock', action: \(\) => setAccessPolicy\(\[file\]\)/);
   });
 
-  test('the bulk bar buttons exist, are bound exactly once, and dispatch through handleAction', () => {
+  test('the bulk bar Cut button and toolbar Paste/Cancel controls exist, bound once, dispatching through handleAction', () => {
     assert.match(FILES_HTML, /id="bulkMove" data-tip="Move selected" aria-label="Move selected"/);
-    assert.match(FILES_HTML, /id="bulkPolicy" data-tip="Set access policy for selected" aria-label="Set access policy for selected"/);
+    assert.match(FILES_HTML, /id="btnPaste" hidden/);
+    assert.match(FILES_HTML, /id="btnCancelCut"[^>]*hidden/);
     assert.equal((FILES_SRC.match(/#bulkMove/g) || []).length, 1);
-    assert.equal((FILES_SRC.match(/#bulkPolicy/g) || []).length, 1);
-    assert.match(FILES_SRC, /case 'bulkMove': return moveItems\(selectedFiles\(\)\);/);
-    assert.match(FILES_SRC, /case 'bulkPolicy': return setAccessPolicy\(selectedFiles\(\)\);/);
-    assert.ok(FILES_SRC.includes("SCOPED_ACTIONS = new Set(['newFolder', 'renameTree', 'deleteTree', 'bulkDelete', 'bulkStar', 'bulkMove', 'bulkPolicy'])"));
+    assert.equal((FILES_SRC.match(/#btnPaste/g) || []).length, 2, 'bound once, queried once by updatePasteButton');
+    assert.equal((FILES_SRC.match(/#btnCancelCut/g) || []).length, 2);
+    assert.match(FILES_SRC, /case 'bulkMove': return cutItems\(selectedFiles\(\)\);/);
+    assert.match(FILES_SRC, /case 'paste': return pasteItems\(\);/);
+    assert.ok(FILES_SRC.includes("SCOPED_ACTIONS = new Set(['newFolder', 'renameTree', 'deleteTree', 'bulkDelete', 'bulkStar', 'bulkMove', 'bulkPolicy', 'paste'])"));
+  });
+
+  test('[hidden] actually hides Paste/Cancel - .btn/.btn-icon set their own display, which beats the UA default', () => {
+    // Found by hand in the browser: #btnPaste/#btnCancelCut rendered visible on
+    // a fresh load despite the `hidden` attribute, because components.css's
+    // `.btn { display: inline-flex }` (author stylesheet) always wins over the
+    // UA stylesheet's `[hidden] { display: none }`, regardless of specificity -
+    // the same reason admin.css/settings.css/uploads.css each need this same
+    // kind of override for their own styled [hidden] controls.
+    assert.match(FILES_CSS, /#btnPaste\[hidden\][\s\S]{0,40}#btnCancelCut\[hidden\][\s\S]{0,20}\{\s*display:\s*none;?\s*\}/);
+  });
+
+  test('cutItems marks the pending paths, clears selection, and the row renders grayed out (is-cut)', async () => {
+    const page = await booted();
+    page.c.setSelected('/a.ts', true);
+    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    assert.deepEqual([...page.state().cutPaths], ['/a.ts']);
+    assert.equal(page.state().selected.size, 0, 'selection is cleared on cut, so the two highlight concepts never stack');
+    assert.equal(page.els['#btnPaste'].hidden, false);
+    assert.equal(page.els['#btnCancelCut'].hidden, false);
+    const info = page.toasts.find(t => t.type === 'info' && /ready to move/.test(t.t));
+    assert.ok(info, 'a toast explains what to do next');
+    const out = page.pure.renderListHtml(page.state());
+    assert.match(out, /data-id="\/a\.ts"[^>]*class="[^"]*is-cut/);
+    assert.match(out, /a\.ts, [^"]*, ready to move/);
+  });
+
+  test('a second Cut replaces the first - only one pending move at a time', async () => {
+    const page = await booted();
+    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    page.c.cutItems([{ name: 'b.png', path: '/b.png', isFolder: false }]);
+    assert.deepEqual([...page.state().cutPaths], ['/b.png']);
+  });
+
+  test('cancelCut clears the pending cut and hides Paste; Escape cancels it when nothing else is open', async () => {
+    const page = await booted();
+    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    assert.equal(page.c.cancelCut(), true);
+    assert.equal(page.state().cutPaths.size, 0);
+    assert.equal(page.els['#btnPaste'].hidden, true);
+    assert.equal(page.c.cancelCut(), false, 'nothing pending: a no-op, not a second cancellation toast');
+
+    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    page.c.onEscape({ key: 'Escape' });
+    assert.equal(page.state().cutPaths.size, 0, 'Escape cancelled the pending cut');
+  });
+
+  test('paste goes through PUT /fs/move, destination = the currently displayed folder', async () => {
+    const page = await booted({
+      'PUT /fs/move': { success: true, data: { moved: [{ oldPath: '/a.ts', newPath: '/docs/a.ts' }], failed: [] } },
+    });
+    page.c.navigateTo('/docs');
+    await settleAll();
+    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    await page.c.pasteItems();
+    await settleAll();
+    assert.deepEqual(plain(page.calls.put[0]), { url: '/fs/move', body: { paths: ['/a.ts'], destination: '/docs' } });
+    assert.equal(page.state().cutPaths.size, 0, 'moved successfully: nothing stays pending');
+    const ok = page.toasts.find(t => t.type === 'success' && /Moved 1 item/.test(t.t));
+    assert.ok(ok);
+  });
+
+  test('pasting into the folder an item is already in is a no-op with a message, no request sent', async () => {
+    const page = await booted();
+    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]); // currentPath is '/': same parent
+    await page.c.pasteItems();
+    await settleAll();
+    assert.equal(page.calls.put.length, 0, 'no PUT /fs/move fired');
+    assert.ok(page.toasts.some(t => t.type === 'info' && /Already there/.test(t.t)));
+    assert.equal(page.state().cutPaths.size, 1, 'still pending - nothing happened to cancel it');
+  });
+
+  test('a partial paste keeps only the failed item pending, so pasting again retries just that one', async () => {
+    const page = await booted({
+      'PUT /fs/move': {
+        success: true,
+        data: {
+          moved: [{ oldPath: '/a.ts', newPath: '/docs/a.ts' }],
+          failed: [{ path: '/b.png', error: 'Item not found: /b.png', statusCode: 404 }],
+        },
+      },
+    });
+    page.c.navigateTo('/docs');
+    await settleAll();
+    page.c.cutItems([
+      { name: 'a.ts', path: '/a.ts', isFolder: false },
+      { name: 'b.png', path: '/b.png', isFolder: false },
+    ]);
+    await page.c.pasteItems();
+    await settleAll();
+    assert.deepEqual([...page.state().cutPaths], ['/b.png']);
+    const warn = page.toasts.find(t => t.type === 'warning');
+    assert.match(warn.t, /Moved 1 of 2/);
+  });
+
+  test('Ctrl+X cuts the focused entry, or the full selection when one is active', async () => {
+    const page = await booted();
+    const entryEl = { getAttribute: (k) => (k === 'data-id' ? '/a.ts' : null), closest(sel) { return sel === '[data-entry]' ? this : null; } };
+    const key = (extra = {}) => Object.assign({ key: 'x', ctrlKey: true, preventDefault() {}, target: entryEl }, extra);
+    page.c.onContainerKeydown(key());
+    assert.deepEqual([...page.state().cutPaths], ['/a.ts']);
+  });
+
+  test('Ctrl+V pastes when a cut is pending, and is ignored while typing in a field', async () => {
+    const page = await booted({
+      'PUT /fs/move': { success: true, data: { moved: [{ oldPath: '/a.ts', newPath: '/docs/a.ts' }], failed: [] } },
+    });
+    page.c.navigateTo('/docs');
+    await settleAll();
+    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+
+    const inputTarget = { tagName: 'INPUT' };
+    page.c.onPasteShortcut({ key: 'v', ctrlKey: true, target: inputTarget, preventDefault() {} });
+    assert.equal(page.calls.put.length, 0, 'typing into a field is not a paste shortcut');
+
+    let prevented = 0;
+    page.c.onPasteShortcut({ key: 'v', ctrlKey: true, target: {}, preventDefault() { prevented++; } });
+    await settleAll();
+    assert.equal(prevented, 1);
+    assert.equal(page.calls.put.length, 1);
   });
 
   test('move goes through PUT /fs/move and policy through PUT /admin/files/policy - no new endpoint invented', () => {
@@ -1479,19 +1701,9 @@ describe('move and access policy are wired on both the row context menu and the 
     assert.doesNotMatch(FILES_SRC, /\bfetch\(/);
   });
 
-  test('the move and access-policy modals escape the item name before it reaches markup', () => {
-    assert.match(FILES_SRC, /Move .\$\{esc\(items\[0\]\.name\)\}/);
-    assert.match(FILES_SRC, /Access policy — \$\{esc\(items\[0\]\.name\)\}/);
-    assert.doesNotMatch(FILES_SRC, /Move .\$\{items\[0\]\.name\}/);
-    assert.doesNotMatch(FILES_SRC, /Access policy — \$\{items\[0\]\.name\}/);
-  });
-
-  test('the move destination picker escapes every folder path it lists', () => {
-    const fn = FILES_SRC.slice(FILES_SRC.indexOf('function pickMoveDestination'), FILES_SRC.indexOf('function summarizeMove'));
-    assert.doesNotMatch(fn, /\$\{f\.path\}/);
-    assert.doesNotMatch(fn, /\$\{f\.label\}/);
-    assert.match(fn, /esc\(f\.path\)/);
-    assert.match(fn, /esc\(f\.label\)/);
+  test('the access-policy modal escapes the item name before it reaches markup', () => {
+    assert.match(FILES_SRC, /Access policy — \${esc\(items\[0\]\.name\)}/);
+    assert.doesNotMatch(FILES_SRC, /Access policy — \${items\[0\]\.name}/);
   });
 
   test('a bulk policy apply reports its own summary instead of letting each call toast separately', () => {

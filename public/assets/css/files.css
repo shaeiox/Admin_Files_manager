@@ -7,6 +7,16 @@
    TOOLBAR
    ══════════════════════════════════════════ */
 
+/* .btn/.btn-icon set their own `display` (components.css), which an author
+   stylesheet always wins over the UA default `[hidden] { display: none }` -
+   same reason admin.css/settings.css/uploads.css each carry this same kind of
+   rule for their own styled [hidden] controls. Without it, Paste/Cancel
+   (shown only while a Cut is pending) would render visible from page load. */
+#btnPaste[hidden],
+#btnCancelCut[hidden] {
+  display: none;
+}
+
 /* Height the sticky toolbar occupies, so the sticky tree panel sits below it
    instead of sliding underneath (one row of 36px controls + padding + margin). */
 body[data-page="files"] {
@@ -305,6 +315,18 @@ body[data-page="files"] {
 
 .files-table tbody tr.is-selected:hover {
   background: rgba(107, 98, 242, 0.14);
+}
+
+/* Pending a move (Cut) - dimmed like Windows Explorer's cut icon, a visual
+   "this is leaving" state distinct from selection, which it can coexist with. */
+.files-table tbody tr.is-cut,
+.file-card.is-cut {
+  opacity: 0.5;
+}
+
+.files-table tbody tr.is-cut:hover,
+.file-card.is-cut:hover {
+  opacity: 0.75;
 }
 
 .files-table tbody tr:last-child td { border-bottom: none; }
@@ -669,6 +691,18 @@ tr:focus-within .row-actions { opacity: 1; }
 
 .tree-caret.is-empty { visibility: hidden; }
 
+/* A node past the per-request depth cap, mid-fetch for its next 2 levels
+   (loadTreeChildren) - the chevron swaps for a spinning refresh glyph rather
+   than a static rotate, so "loading" reads differently from "open". */
+.tree-caret.is-loading {
+  color: var(--accent-primary);
+  animation: spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree-caret.is-loading { animation: none; }
+}
+
 .tree-ico {
   width: 15px;
   height: 15px;
@@ -714,6 +748,10 @@ tr:focus-within .row-actions { opacity: 1; }
 .tree-note-path {
   color: var(--text-secondary);
   word-break: break-all;
+}
+
+.tree-note-loading {
+  margin: var(--spacing-4) 0 var(--spacing-4) var(--spacing-8);
 }
 
 .tree-skeleton {
