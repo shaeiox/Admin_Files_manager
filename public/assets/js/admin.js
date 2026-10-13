@@ -11,7 +11,7 @@
 
 const Admin = (() => {
 
-    const { $, $$, Toast, Modal, escapeHtml } = window.AFM;
+    const { $, $$, Toast, Modal, escapeHtml, icon } = window.AFM;
 
     /* ══════════════════════════════════════════
        STATE
@@ -80,26 +80,42 @@ const Admin = (() => {
 
         body.innerHTML = state.users.map((user) => {
             const created = user.created_at ? new Date(user.created_at).toLocaleString() : '—';
+            const name = escapeHtml(user.username);
             const roleBadge = user.role === 'admin'
                 ? '<span class="admin-badge">Admin</span>'
                 : '<span class="admin-badge is-muted">User</span>';
             const statusBadge = user.status === 'active'
-                ? '<span class="admin-badge">Active</span>'
+                ? '<span class="admin-badge admin-badge-ok">Active</span>'
                 : '<span class="admin-badge is-muted">Disabled</span>';
-            const toggleLabel = user.status === 'active' ? 'Disable' : 'Enable';
-            const toggleStatus = user.status === 'active' ? 'disabled' : 'active';
+            const isActive = user.status === 'active';
+            const toggleStatus = isActive ? 'disabled' : 'active';
+            const toggleLabel = isActive ? 'Disable account' : 'Enable account';
+            const toggleIcon = isActive ? 'userX' : 'userCheck';
 
+            // Icon buttons with a data-tip label (house convention, AGENTS.md
+            // 10a: row actions inside a scroll container use data-tip-pos="bottom"
+            // so the tip opens downward, never clipping against the table header).
+            // Delete is visually distinct (admin-danger-icon) - a destructive,
+            // irreversible action must not look identical to the others.
             return `
-                <tr${user.status !== 'active' ? ' class="admin-row-disabled"' : ''} data-user-id="${user.id}">
-                    <td>${escapeHtml(user.username)}</td>
+                <tr${!isActive ? ' class="admin-row-disabled"' : ''} data-user-id="${user.id}">
+                    <td>${name}</td>
                     <td>${roleBadge}</td>
                     <td>${statusBadge}</td>
                     <td>${escapeHtml(created)}</td>
-                    <td>
-                        <button class="btn btn-ghost btn-sm" data-action="toggle-status" data-status="${toggleStatus}" data-id="${user.id}" data-username="${escapeHtml(user.username)}">${toggleLabel}</button>
-                        <button class="btn btn-ghost btn-sm" data-action="reset-password" data-id="${user.id}" data-username="${escapeHtml(user.username)}">Reset password</button>
-                        <button class="btn btn-ghost btn-sm" data-action="revoke-sessions" data-id="${user.id}" data-username="${escapeHtml(user.username)}">Revoke sessions</button>
-                        <button class="btn btn-ghost btn-sm" data-action="delete-user" data-id="${user.id}" data-username="${escapeHtml(user.username)}">Delete</button>
+                    <td class="admin-row-actions">
+                        <button class="btn-icon btn-icon-sm" data-action="toggle-status" data-status="${toggleStatus}" data-id="${user.id}" data-username="${name}" data-tip="${toggleLabel}" data-tip-pos="bottom" aria-label="${toggleLabel} for ${name}">
+                            ${icon(toggleIcon, 15)}
+                        </button>
+                        <button class="btn-icon btn-icon-sm" data-action="reset-password" data-id="${user.id}" data-username="${name}" data-tip="Reset password" data-tip-pos="bottom" aria-label="Reset password for ${name}">
+                            ${icon('key', 15)}
+                        </button>
+                        <button class="btn-icon btn-icon-sm" data-action="revoke-sessions" data-id="${user.id}" data-username="${name}" data-tip="Revoke sessions" data-tip-pos="bottom" aria-label="Revoke sessions for ${name}">
+                            ${icon('logout', 15)}
+                        </button>
+                        <button class="btn-icon btn-icon-sm admin-danger-icon" data-action="delete-user" data-id="${user.id}" data-username="${name}" data-tip="Delete account" data-tip-pos="bottom" aria-label="Delete account for ${name}">
+                            ${icon('trash', 15)}
+                        </button>
                     </td>
                 </tr>
             `;
@@ -221,16 +237,52 @@ const Admin = (() => {
             return;
         }
 
-        body.innerHTML = state.policies.map((policy) => `
-            <tr data-policy-path="${escapeHtml(policy.client_path)}">
-                <td>${escapeHtml(policy.client_path)}</td>
-                <td><span class="admin-badge">${escapeHtml(policy.access_mode)}</span></td>
-                <td>${policy.is_published ? 'Yes' : 'No'}</td>
-                <td>${policy.is_locked ? 'Yes' : 'No'}</td>
-                <td><button class="btn btn-ghost btn-sm" data-action="manage-permissions" data-path="${escapeHtml(policy.client_path)}">Manage</button></td>
-                <td><button class="btn btn-ghost btn-sm" data-action="delete-policy" data-path="${escapeHtml(policy.client_path)}">Delete</button></td>
-            </tr>
-        `).join('');
+        body.innerHTML = state.policies.map((policy) => {
+            const pathEsc = escapeHtml(policy.client_path);
+            const publishedBadge = policy.is_published
+                ? '<span class="admin-badge admin-badge-ok">Published</span>'
+                : '<span class="admin-badge is-muted">Unpublished</span>';
+            const lockedBadge = policy.is_locked
+                ? '<span class="admin-badge admin-badge-warn">Locked</span>'
+                : '<span class="admin-badge is-muted">Unlocked</span>';
+            return `
+                <tr data-policy-path="${pathEsc}">
+                    <td class="admin-path-cell">${pathEsc}</td>
+                    <td><span class="admin-badge">${escapeHtml(policy.access_mode)}</span></td>
+                    <td>${publishedBadge}</td>
+                    <td>${lockedBadge}</td>
+                    <td class="admin-row-actions">
+                        <button class="btn-icon btn-icon-sm" data-action="edit-policy" data-path="${pathEsc}" data-tip="Edit policy" data-tip-pos="bottom" aria-label="Edit policy for ${pathEsc}">
+                            ${icon('edit', 15)}
+                        </button>
+                        <button class="btn-icon btn-icon-sm" data-action="manage-permissions" data-path="${pathEsc}" data-tip="Manage permissions" data-tip-pos="bottom" aria-label="Manage permissions for ${pathEsc}">
+                            ${icon('userCheck', 15)}
+                        </button>
+                        <button class="btn-icon btn-icon-sm admin-danger-icon" data-action="delete-policy" data-path="${pathEsc}" data-tip="Remove policy" data-tip-pos="bottom" aria-label="Remove policy for ${pathEsc}">
+                            ${icon('trash', 15)}
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Pre-fills the "Set a policy" form with an existing row's current
+     * values and scrolls it into view. Without this, re-saving a policy to
+     * change just one field (e.g. access mode) would silently reset
+     * Published/Locked to unchecked - a checkbox has no "leave unset" state,
+     * unlike the API's own partial-update semantics.
+     */
+    function handleEditPolicy(path) {
+        const policy = state.policies.find((p) => p.client_path === path);
+        if (!policy) return;
+        document.getElementById('policyPath').value = policy.client_path;
+        document.getElementById('policyAccessMode').value = policy.access_mode;
+        document.getElementById('policyPublished').checked = policy.is_published === 1;
+        document.getElementById('policyLocked').checked = policy.is_locked === 1;
+        document.getElementById('setPolicyForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        document.getElementById('policyAccessMode').focus();
     }
 
     async function handleSetPolicy(event) {
@@ -301,12 +353,16 @@ const Admin = (() => {
             }
             body.innerHTML = permissions.map((perm) => {
                 const user = state.users.find((u) => u.id === perm.user_id);
-                const username = user ? user.username : `#${perm.user_id}`;
+                const username = escapeHtml(user ? user.username : `#${perm.user_id}`);
                 return `
                     <tr>
-                        <td>${escapeHtml(username)}</td>
+                        <td>${username}</td>
                         <td><span class="admin-badge${perm.permission === 'deny' ? ' is-muted' : ''}">${escapeHtml(perm.permission)}</span></td>
-                        <td><button class="btn btn-ghost btn-sm" data-action="revoke-permission" data-user-id="${perm.user_id}">Revoke</button></td>
+                        <td class="admin-row-actions">
+                            <button class="btn-icon btn-icon-sm admin-danger-icon" data-action="revoke-permission" data-user-id="${perm.user_id}" data-tip="Revoke" data-tip-pos="bottom" aria-label="Revoke permission for ${username}">
+                                ${icon('trash', 15)}
+                            </button>
+                        </td>
                     </tr>
                 `;
             }).join('');
@@ -389,6 +445,7 @@ const Admin = (() => {
                 const btn = e.target.closest('button[data-action]');
                 if (!btn) return;
                 const path = btn.dataset.path;
+                if (btn.dataset.action === 'edit-policy') return handleEditPolicy(path);
                 if (btn.dataset.action === 'manage-permissions') return showPermissionsPanel(path);
                 if (btn.dataset.action === 'delete-policy') return handleDeletePolicy(path);
             });
@@ -441,5 +498,11 @@ const Admin = (() => {
         _internal: { renderUsersTable, renderPoliciesTable },
     };
 })();
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.body.dataset.page === 'admin') {
+        Admin.init();
+    }
+});
 
 window.Admin = Admin;

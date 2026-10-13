@@ -432,14 +432,18 @@
   white-space: nowrap;
 }
 
+/* text-secondary, not text-tertiary: at this card's 12-13px size,
+   text-tertiary (#686868 on dark) falls under WCAG AA's 4.5:1 body-text
+   contrast minimum - text-secondary clears it with headroom in both themes. */
 .storage-pct {
-  font-size: 11px;
-  color: var(--text-tertiary);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
 .storage-bar {
-  height: 6px;
+  height: 8px;
   border-radius: var(--radius-pill);
   background: var(--bg-progress-track);
   overflow: hidden;
@@ -449,9 +453,27 @@
 .storage-fill {
   height: 100%;
   border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, #f59e0b, #7c3aed 60%, #2563eb);
-  transition: width var(--transition-slow);
+  /* Default (no reading yet / severity not applied): the brand accent, not
+     a decorative rainbow unrelated to the actual number. */
+  background: var(--accent-primary);
+  transition: width var(--transition-slow), background-color var(--transition-base);
   position: relative;
+}
+
+/* Severity scale (ui-ux-pro-max pass): color now reports the actual reading
+   instead of a fixed gradient, so "almost full" is visible at a glance
+   without reading the percentage - the same green/amber/red convention
+   every other capacity meter uses. Semantic tokens only, no raw hex. */
+.storage-fill[data-severity="ok"] {
+  background: var(--color-success);
+}
+
+.storage-fill[data-severity="warning"] {
+  background: var(--color-warning);
+}
+
+.storage-fill[data-severity="critical"] {
+  background: var(--color-error);
 }
 
 .storage-fill::after {
@@ -466,9 +488,19 @@
   animation: shimmer 2.4s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .storage-fill::after {
+    animation: none;
+  }
+
+  .storage-fill {
+    transition: none;
+  }
+}
+
 .storage-meta {
-  font-size: 11px;
-  color: var(--text-tertiary);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }

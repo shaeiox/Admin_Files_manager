@@ -5,6 +5,16 @@
    Reuses settings.css's .settings-layout/.settings-nav/.settings-pane/
    .sg-head/.sg-body shell — only the admin-specific pieces (notice, inline
    forms, tables) live here.
+
+   UI/UX pass notes (ui-ux-pro-max): touch targets on row actions moved from
+   cramped text buttons to spaced 28px icon buttons with data-tip labels
+   (matches the house pattern already used on Files/Uploads); destructive
+   actions (delete, revoke) get a visually distinct red treatment so they are
+   never confusable with a neutral action at a glance; status/role/access
+   badges use semantic success/warning tokens instead of a single flat color
+   so the table is scannable without reading every cell; every control keeps
+   the existing :focus-visible ring (base.css) and data-tip reads on
+   keyboard focus too (components.css).
    ============================================ */
 
 .admin-notice {
@@ -18,48 +28,66 @@
   background: var(--bg-badge);
   color: var(--text-secondary);
   font-size: var(--text-body-sm);
+  line-height: 1.5;
 }
 
 .admin-notice[hidden] { display: none; }
+
+.admin-notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent-primary);
+}
 
 .admin-inline-form {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--spacing-12);
+  gap: var(--spacing-16);
   margin-bottom: var(--spacing-12);
 }
 
 .admin-inline-form .field {
-  min-width: 160px;
+  min-width: 180px;
   margin-bottom: 0;
 }
 
-.admin-checkbox-field {
+/* The switch field aligns its baseline with the text inputs beside it
+   (both sit on an "align-items: flex-end" row), so the track needs a
+   little breathing room above it to read as the same height as an input. */
+.admin-switch-field {
   display: flex;
   align-items: center;
+  padding-bottom: 10px;
 }
 
-.admin-checkbox-field label {
+.admin-switch-label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-10);
   font-size: var(--text-body-sm);
-  color: var(--text-secondary);
-  white-space: nowrap;
+  color: var(--text-primary);
+  cursor: pointer;
+  /* The whole label - switch + text - is the click target, well past the
+     44px minimum in width; height is bounded by the 22px track, which is
+     why the label's own padding (below) extends the hit area vertically. */
+  padding: 6px 0;
 }
 
 .admin-form-error {
   font-size: var(--text-body-sm);
+  line-height: 1.5;
   color: var(--color-error);
   background: var(--color-error-bg);
   border: 1px solid var(--color-error-border);
-  border-radius: var(--radius-md, 8px);
-  padding: 8px 12px;
-  margin-top: 4px;
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  margin-top: var(--spacing-8);
 }
 
 .admin-form-error[hidden] { display: none; }
+
+/* ── Tables ── */
 
 .admin-table {
   width: 100%;
@@ -69,43 +97,117 @@
 
 .admin-table th {
   text-align: left;
-  padding: 8px 10px;
+  padding: 10px 12px;
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
+  font-size: var(--text-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border-card);
 }
 
 .admin-table td {
-  padding: 8px 10px;
+  padding: 12px;
   border-bottom: 1px solid var(--border-secondary);
   vertical-align: middle;
+  color: var(--text-primary);
+}
+
+.admin-table tbody tr {
+  transition: background-color var(--transition-fast);
+}
+
+.admin-table tbody tr:hover {
+  background: var(--bg-hover);
 }
 
 .admin-table-empty td {
   color: var(--text-secondary);
   text-align: center;
-  padding: 20px 10px;
-}
-
-.admin-table .btn-icon-sm {
-  margin-right: 4px;
+  padding: 28px 10px;
 }
 
 .admin-row-disabled td {
   opacity: 0.55;
 }
 
+.admin-path-cell {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+/* Icon-button row actions: a visible 8px+ gap keeps adjacent 28px targets
+   from being mis-tapped (touch-target spacing guideline), and nowrap keeps
+   the four-action group from wrapping awkwardly at narrower widths. */
+.admin-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  flex-wrap: nowrap;
+}
+
+/* Destructive actions (delete account, remove policy, revoke permission)
+   read as red by default, not only on hover - a safety affordance, not a
+   decoration: the whole point is to be distinguishable at a glance from the
+   three neutral actions beside it before the pointer ever reaches it. */
+.admin-danger-icon {
+  color: var(--color-error);
+}
+
+.admin-danger-icon:hover {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+/* ── Badges ── */
+
 .admin-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-medium);
   background: var(--bg-badge);
   color: var(--accent-primary);
+  white-space: nowrap;
 }
 
 .admin-badge.is-muted {
   background: var(--bg-tertiary);
   color: var(--text-secondary);
+}
+
+.admin-badge-ok {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.admin-badge-warn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+/* ── Responsive: inline forms and row actions stack cleanly on narrow viewports ── */
+@media (max-width: 640px) {
+  .admin-inline-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-inline-form .field {
+    min-width: 0;
+  }
+
+  .admin-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-table tbody tr {
+    transition: none;
+  }
 }

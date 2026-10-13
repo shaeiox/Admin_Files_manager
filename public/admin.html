@@ -305,11 +305,23 @@
                         <option value="public">Public</option>
                       </select>
                     </div>
-                    <div class="field admin-checkbox-field">
-                      <label><input type="checkbox" id="policyPublished"> Published</label>
+                    <div class="field admin-switch-field">
+                      <label class="admin-switch-label">
+                        <span class="switch">
+                          <input type="checkbox" id="policyPublished">
+                          <span class="track" aria-hidden="true"></span>
+                        </span>
+                        <span>Published</span>
+                      </label>
                     </div>
-                    <div class="field admin-checkbox-field">
-                      <label><input type="checkbox" id="policyLocked"> Locked</label>
+                    <div class="field admin-switch-field">
+                      <label class="admin-switch-label">
+                        <span class="switch">
+                          <input type="checkbox" id="policyLocked">
+                          <span class="track" aria-hidden="true"></span>
+                        </span>
+                        <span>Locked</span>
+                      </label>
                     </div>
                     <button type="submit" class="btn btn-primary btn-sm">
                       <i data-icon="save" data-icon-size="14"></i>

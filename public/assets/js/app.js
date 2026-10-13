@@ -75,6 +75,7 @@ const Icons = {
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
   userCheck: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>',
+  userX: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" x2="22" y1="8" y2="13"/><line x1="22" x2="17" y1="8" y2="13"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
@@ -914,9 +915,18 @@ function finiteOrNull(value) {
  * `storage` payload. Pure - no DOM, no request - so it can be reasoned about
  * without a browser.
  * @param {object|null} storage - {treeBytes, usedBytes, totalBytes, volumeAvailable, truncated}
+ * `severity` turns the raw percentage into the three-step signal the card's
+ * color actually conveys ('ok' | 'warning' | 'critical') - computed here,
+ * once, so the DOM writer and any test never have to re-derive a threshold.
+ * Unavailable storage carries no severity: there is nothing to grade.
+ *
  * @returns {{available: boolean, pctText: string, fillWidth: string,
- *            meta: string, state: 'measured'|'unavailable'}}
+ *            meta: string, state: 'measured'|'unavailable',
+ *            severity: 'ok'|'warning'|'critical'|null, pctValue: number|null}}
  */
+const STORAGE_WARNING_PCT = 75;
+const STORAGE_CRITICAL_PCT = 90;
+
 function resolveStorageDisplay(storage) {
   const s = (storage && typeof storage === 'object') ? storage : {};
   const used = finiteOrNull(s.usedBytes);
@@ -932,16 +942,21 @@ function resolveStorageDisplay(storage) {
       fillWidth: '0%',
       meta: UNAVAILABLE_VOLUME_META,
       state: 'unavailable',
+      severity: null,
+      pctValue: null,
     };
   }
 
   const pct = (used / total) * 100;
+  const severity = pct >= STORAGE_CRITICAL_PCT ? 'critical' : pct >= STORAGE_WARNING_PCT ? 'warning' : 'ok';
   return {
     available: true,
     pctText: pct.toFixed(1) + '%',
     fillWidth: pct + '%',
     meta: `${Format.bytes(used, 0)} of ${Format.bytes(total, 0)} used`,
     state: 'measured',
+    severity,
+    pctValue: pct,
   };
 }
 
@@ -1030,6 +1045,7 @@ function updateUserUI(health) {
 
 function updateStorageUI(storage) {
   const view = resolveStorageDisplay(storage);
+  const barEl = document.querySelector('.storage-bar');
   const pctEl = document.querySelector('.storage-pct');
   const fillEl = document.querySelector('.storage-fill');
   const metaEl = document.querySelector('.storage-meta');
@@ -1039,6 +1055,12 @@ function updateStorageUI(storage) {
   pctEl.textContent = view.pctText;
   fillEl.style.width = view.fillWidth;
   fillEl.setAttribute('data-state', view.state);
+  // 'ok'/'warning'/'critical' or removed entirely when unavailable - CSS
+  // keys the fill color off this attribute; a missing attribute keeps the
+  // unavailable outline treatment below from being overridden by a stale
+  // severity color.
+  if (view.severity) fillEl.setAttribute('data-severity', view.severity);
+  else fillEl.removeAttribute('data-severity');
 
   // Distinguishable unavailable style: drop the gradient fill and outline the
   // empty track instead, so an unmeasured bar cannot be mistaken for a filled
@@ -1047,6 +1069,23 @@ function updateStorageUI(storage) {
   fillEl.style.boxShadow = view.available ? '' : 'inset 0 0 0 1px var(--border-secondary)';
 
   metaEl.textContent = view.meta;
+
+  // Assistive tech gets the same reading sighted users see, including the
+  // honest "unavailable" case (no aria-valuenow at all, per the ARIA
+  // progressbar spec, rather than a misleading 0).
+  if (barEl) {
+    barEl.setAttribute('role', 'progressbar');
+    barEl.setAttribute('aria-label', 'Storage used');
+    barEl.setAttribute('aria-valuemin', '0');
+    barEl.setAttribute('aria-valuemax', '100');
+    if (view.available) {
+      barEl.setAttribute('aria-valuenow', String(Math.round(view.pctValue)));
+      barEl.setAttribute('aria-valuetext', view.meta);
+    } else {
+      barEl.removeAttribute('aria-valuenow');
+      barEl.setAttribute('aria-valuetext', 'Unavailable');
+    }
+  }
 }
 
 /**

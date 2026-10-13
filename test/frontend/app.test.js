@@ -39,6 +39,7 @@ function stubElement() {
         style: {},
         attributes: {},
         setAttribute(name, value) { this.attributes[name] = String(value); },
+        removeAttribute(name) { delete this.attributes[name]; },
     };
 }
 
@@ -55,6 +56,7 @@ function mountSidebar(nodes) {
 
 function sidebarNodes() {
     return mountSidebar({
+        '.storage-bar': stubElement(),
         '.storage-pct': stubElement(),
         '.storage-fill': stubElement(),
         '.storage-meta': stubElement(),
@@ -135,6 +137,28 @@ describe('resolveStorageDisplay - a measured volume', () => {
     });
 });
 
+describe('resolveStorageDisplay - severity thresholds (ui-ux-pro-max pass)', () => {
+    test('under 75% is "ok"', () => {
+        assert.equal(resolveStorageDisplay(volumeFixture({ usedBytes: 100 * GIB })).severity, 'ok');
+        assert.equal(resolveStorageDisplay(volumeFixture({ usedBytes: 374 * GIB })).severity, 'ok');
+    });
+
+    test('75% up to (not including) 90% is "warning"', () => {
+        assert.equal(resolveStorageDisplay(volumeFixture({ usedBytes: 375 * GIB })).severity, 'warning');
+        assert.equal(resolveStorageDisplay(volumeFixture({ usedBytes: 449 * GIB })).severity, 'warning');
+    });
+
+    test('90% and above is "critical"', () => {
+        assert.equal(resolveStorageDisplay(volumeFixture({ usedBytes: 450 * GIB })).severity, 'critical');
+        assert.equal(resolveStorageDisplay(volumeFixture({ usedBytes: 500 * GIB })).severity, 'critical');
+    });
+
+    test('pctValue is the raw number fillWidth/pctText are derived from', () => {
+        const view = resolveStorageDisplay(volumeFixture({}));
+        assert.equal(view.pctValue, 50);
+    });
+});
+
 /* ══════════════════════════════════════════
    SEAM 1 - every unavailable path
    ══════════════════════════════════════════ */
@@ -181,6 +205,8 @@ describe('resolveStorageDisplay - unavailable states never render a figure', () 
             assert.equal(view.fillWidth, '0%', 'the bar is empty');
             assert.match(view.meta, /unavailable/i, 'the meta text names the absence');
             assert.equal(view.state, 'unavailable', 'carries a state for styling');
+            assert.equal(view.severity, null, 'no severity grade for an unmeasured reading');
+            assert.equal(view.pctValue, null);
         });
 
         test(`${label} -> renders neither "0.0%" nor "0 B of 0 B"`, () => {
@@ -254,6 +280,23 @@ describe('updateStorageUI - sidebar volume card', () => {
         assert.equal(nodes['.storage-fill'].attributes['data-state'], 'measured');
     });
 
+    test('writes the severity grade CSS keys the fill color off (ui-ux-pro-max pass)', () => {
+        const nodes = sidebarNodes();
+        updateStorageUI(volumeFixture({ usedBytes: 460 * GIB })); // 92% -> critical
+        assert.equal(nodes['.storage-fill'].attributes['data-severity'], 'critical');
+    });
+
+    test('exposes an ARIA progressbar on .storage-bar, reachable by assistive tech', () => {
+        const nodes = sidebarNodes();
+        updateStorageUI(volumeFixture({}));
+        const bar = nodes['.storage-bar'];
+        assert.equal(bar.attributes.role, 'progressbar');
+        assert.equal(bar.attributes['aria-valuemin'], '0');
+        assert.equal(bar.attributes['aria-valuemax'], '100');
+        assert.equal(bar.attributes['aria-valuenow'], '50');
+        assert.equal(bar.attributes['aria-valuetext'], '250 GB of 500 GB used');
+    });
+
     test('an unavailable volume paints no figure anywhere in the card', () => {
         const nodes = sidebarNodes();
         updateStorageUI(volumeFixture({ volumeAvailable: false, usedBytes: null, totalBytes: null }));
@@ -261,6 +304,9 @@ describe('updateStorageUI - sidebar volume card', () => {
         assert.equal(nodes['.storage-pct'].textContent, UNAVAILABLE_MARK);
         assert.equal(nodes['.storage-fill'].style.width, '0%');
         assert.equal(nodes['.storage-meta'].textContent, 'Volume usage unavailable');
+        assert.equal(nodes['.storage-fill'].attributes['data-severity'], undefined, 'no severity color for an unmeasured reading');
+        assert.equal(nodes['.storage-bar'].attributes['aria-valuenow'], undefined, 'never a fabricated 0 for assistive tech either');
+        assert.equal(nodes['.storage-bar'].attributes['aria-valuetext'], 'Unavailable');
 
         const onScreen = [
             nodes['.storage-pct'].textContent,
@@ -286,6 +332,8 @@ describe('updateStorageUI - sidebar volume card', () => {
         assert.equal(nodes['.storage-fill'].style.background, '', 'gradient restored');
         assert.equal(nodes['.storage-fill'].style.boxShadow, '', 'outline removed');
         assert.equal(nodes['.storage-fill'].attributes['data-state'], 'measured');
+        assert.equal(nodes['.storage-fill'].attributes['data-severity'], 'ok');
+        assert.equal(nodes['.storage-bar'].attributes['aria-valuenow'], '50');
     });
 
     test('a page without the volume card does not throw', () => {

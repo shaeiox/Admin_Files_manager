@@ -50,6 +50,15 @@ describe('admin.html is registered as a real page', () => {
     test('destroy() removes every listener init() registered on document/window', () => {
         assert.match(ADMIN_JS, /globalListeners\.forEach\(\(\[target, type, handler\]\) => target\.removeEventListener\(type, handler\)\)/);
     });
+
+    // A direct load/refresh of admin.html never goes through router.js's
+    // client-side navigation (which is the only other place that calls
+    // Admin.init()) - without this, Users/Policies stay stuck on "Loading..."
+    // forever on first visit. Every other page module has this same guard
+    // (settings.js, dashboard.js, files.js, uploads.js).
+    test('self-initializes on a hard page load, like every other page module', () => {
+        assert.match(ADMIN_JS, /document\.addEventListener\('DOMContentLoaded',\s*\(\)\s*=>\s*\{\s*if\s*\(document\.body\.dataset\.page === 'admin'\)\s*\{\s*Admin\.init\(\);/);
+    });
 });
 
 describe('every API call goes through window.API, never ad hoc', () => {
@@ -99,20 +108,91 @@ describe('every filesystem/account-derived value is escaped before it reaches ma
         return ADMIN_JS.slice(start, i + 1);
     }
 
-    test('username is never interpolated into innerHTML markup without escapeHtml', () => {
-        for (const fn of ['renderUsersTable', 'populateGrantUserSelect', 'loadPermissions']) {
-            const body = functionBody(fn);
-            const raw = [...body.matchAll(/\$\{(?!escapeHtml\()[^}]*username[^}]*\}/g)];
-            assert.deepEqual(raw.map((m) => m[0]), [], `${fn}: an unescaped username interpolation exists`);
+    test('populateGrantUserSelect escapes username inline', () => {
+        const body = functionBody('populateGrantUserSelect');
+        const raw = [...body.matchAll(/\$\{(?!escapeHtml\()[^}]*username[^}]*\}/g)];
+        assert.deepEqual(raw.map((m) => m[0]), [], 'an unescaped username interpolation exists');
+    });
+
+    test('renderUsersTable escapes the username once into a reused variable, not inline per use', () => {
+        // Repeated across 5+ attributes/cells (name, aria-labels, data-username);
+        // escaping once and reusing it is both correct and the one-line-per-value
+        // AFM.escapeHtml discipline every other render function in this file follows.
+        const body = functionBody('renderUsersTable');
+        assert.match(body, /const\s+name\s*=\s*escapeHtml\(user\.username\)/);
+        // And every later use is the escaped variable, not the raw property again.
+        assert.doesNotMatch(body, /\$\{user\.username\}/);
+    });
+
+    test('loadPermissions escapes the resolved username once into a reused variable', () => {
+        const body = functionBody('loadPermissions');
+        assert.match(body, /const\s+username\s*=\s*escapeHtml\(/);
+        assert.doesNotMatch(body, /\$\{user\.username\}/);
+        assert.doesNotMatch(body, /\$\{user \? user\.username/);
+    });
+
+    test('renderPoliciesTable escapes client_path once into a reused variable', () => {
+        const body = functionBody('renderPoliciesTable');
+        assert.match(body, /const\s+pathEsc\s*=\s*escapeHtml\(policy\.client_path\)/);
+        assert.doesNotMatch(body, /\$\{policy\.client_path\}/);
+    });
+});
+
+describe('destructive actions are visually distinct, not just same-colored buttons (ui-ux-pro-max pass)', () => {
+    test('delete/revoke actions carry the admin-danger-icon class', () => {
+        for (const action of ['delete-user', 'delete-policy', 'revoke-permission']) {
+            const re = new RegExp(`class="[^"]*admin-danger-icon[^"]*"[^>]*data-action="${action}"`);
+            assert.match(ADMIN_JS, re, `${action} is styled as a destructive action`);
         }
     });
 
-    test('client_path is never interpolated into innerHTML markup without escapeHtml', () => {
-        for (const fn of ['renderPoliciesTable']) {
-            const body = functionBody(fn);
-            const raw = [...body.matchAll(/\$\{(?!escapeHtml\()[^}]*client_path[^}]*\}/g)];
-            assert.deepEqual(raw.map((m) => m[0]), [], `${fn}: an unescaped client_path interpolation exists`);
+    test('non-destructive row actions do not carry the danger class', () => {
+        for (const action of ['toggle-status', 'reset-password', 'revoke-sessions', 'manage-permissions', 'edit-policy']) {
+            const re = new RegExp(`class="[^"]*admin-danger-icon[^"]*"[^>]*data-action="${action}"`);
+            assert.doesNotMatch(ADMIN_JS, re, `${action} should not read as destructive`);
         }
+    });
+
+    test('admin.css gives admin-danger-icon a non-hover, default red treatment', () => {
+        const css = read('public', 'assets', 'css', 'admin.css');
+        assert.match(css, /\.admin-danger-icon\s*\{[^}]*color:\s*var\(--color-error\)/s);
+    });
+});
+
+describe('every row-action icon button declares an aria-label and a bottom-placed tip (AGENTS.md 10a)', () => {
+    test('every data-action button in admin.js has both', () => {
+        const buttons = [...ADMIN_JS.matchAll(/<button class="btn-icon btn-icon-sm[^>]*data-action="[a-z-]+"[^>]*>/g)].map((m) => m[0]);
+        assert.ok(buttons.length >= 7, `expected several row-action buttons, found ${buttons.length}`);
+        for (const btn of buttons) {
+            assert.match(btn, /aria-label="/, `missing aria-label: ${btn}`);
+            assert.match(btn, /data-tip="/, `missing data-tip: ${btn}`);
+            assert.match(btn, /data-tip-pos="bottom"/, `missing data-tip-pos="bottom": ${btn}`);
+        }
+    });
+});
+
+describe('Published/Locked use the shared switch component, not raw checkboxes (ui-ux-pro-max pass)', () => {
+    test('admin.html reuses the existing .switch/.track pattern (uploads.html precedent)', () => {
+        assert.match(ADMIN_HTML, /id="policyPublished"[\s\S]{0,80}<span class="track" aria-hidden="true">/);
+        assert.match(ADMIN_HTML, /id="policyLocked"[\s\S]{0,80}<span class="track" aria-hidden="true">/);
+    });
+
+    test('no bare, unlabelled checkbox remains for these two fields', () => {
+        assert.doesNotMatch(ADMIN_HTML, /<input type="checkbox" id="policyPublished">\s*Published/);
+        assert.doesNotMatch(ADMIN_HTML, /<input type="checkbox" id="policyLocked">\s*Locked/);
+    });
+});
+
+describe('editing an existing policy does not silently reset Published/Locked to off', () => {
+    test('handleEditPolicy pre-fills the form from the clicked row, including both flags', () => {
+        assert.match(ADMIN_JS, /function handleEditPolicy\(path\)/);
+        assert.match(ADMIN_JS, /policyPublished'\)\.checked = policy\.is_published === 1/);
+        assert.match(ADMIN_JS, /policyLocked'\)\.checked = policy\.is_locked === 1/);
+    });
+
+    test('the policies table offers an edit action wired to it', () => {
+        assert.match(ADMIN_JS, /data-action="edit-policy"/);
+        assert.match(ADMIN_JS, /btn\.dataset\.action === 'edit-policy'.*handleEditPolicy/);
     });
 });
 
