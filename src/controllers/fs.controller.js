@@ -369,6 +369,65 @@ async function moveItems(req, res, next) {
 }
 
 /**
+ * POST /api/fs/copy
+ * Body: { paths: ["/media/a.txt", "/media/folder-b"], destination: "/archive" }
+ * Bulk, same partial-failure contract as PUT /api/fs/move and DELETE
+ * /api/fs/delete: a 200 can still carry per-item failures in data.failed.
+ * The source is left in place; a copy is a new item, so unlike move it
+ * carries no metadata/access-policy migration.
+ */
+async function copyItems(req, res, next) {
+    try {
+        const { paths, destination } = req.body || {};
+
+        if (!Array.isArray(paths) || paths.length === 0) {
+            throw new AppError('At least one path must be provided.', 400);
+        }
+        if (paths.length > 500) {
+            throw new AppError('Too many items in a single request (max 500).', 400);
+        }
+        validateClientPath(destination);
+
+        const results = { copied: [], failed: [] };
+
+        for (const clientPath of paths) {
+            try {
+                validateClientPath(clientPath);
+                const { sourcePath, newPath } = await FileSystemService.copy(clientPath, destination);
+
+                MetadataService.addActivity({
+                    type: 'edit',
+                    user: 'system',
+                    action: 'copied',
+                    target: path.posix.basename(newPath),
+                    folder: path.posix.dirname(newPath),
+                }).catch(() => { });
+
+                results.copied.push({ sourcePath, newPath });
+            } catch (err) {
+                results.failed.push({
+                    path: clientPath,
+                    error: err.message,
+                    statusCode: err.statusCode || 500,
+                });
+            }
+        }
+
+        if (results.copied.length === 0 && results.failed.length > 0) {
+            const firstErr = results.failed[0];
+            throw new AppError(firstErr.error, firstErr.statusCode);
+        }
+
+        res.json({
+            success: true,
+            data: results,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
  * DELETE /api/fs/delete
  * Body: { paths: ["/media/a.txt", "/media/folder-b"] }
  */
@@ -638,6 +697,7 @@ module.exports = {
     createFolder,
     renameItem,
     moveItems,
+    copyItems,
     deleteItems,
     downloadFile,
     uploadFile,

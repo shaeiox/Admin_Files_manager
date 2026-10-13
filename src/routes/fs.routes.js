@@ -20,6 +20,7 @@ router.post('/star', fsController.setStar);
 router.post('/download-zip', fsController.downloadZip);
 router.put('/rename', fsController.renameItem);
 router.put('/move', fsController.moveItems);
+router.post('/copy', fsController.copyItems);
 router.delete('/delete', fsController.deleteItems);
 
 module.exports = router;

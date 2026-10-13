@@ -64,7 +64,7 @@ test('grid more-actions control matches its list counterpart', () => {
 test('bulk bar buttons intentionally keep the default above placement', () => {
   // The bulk bar floats near the viewport bottom; a bottom-opening tooltip
   // would clip. Guard against someone "fixing" this uniformly.
-  for (const id of ['bulkDownload', 'bulkStar', 'bulkMove', 'bulkPolicy', 'bulkDelete', 'bulkClear']) {
+  for (const id of ['bulkDownload', 'bulkStar', 'bulkMove', 'bulkCopy', 'bulkPolicy', 'bulkDelete', 'bulkClear']) {
     const m = FILES_HTML.match(new RegExp(`id="${id}" data-tip="[^"]+"`));
     assert.ok(m, `${id} has a tip`);
     assert.doesNotMatch(m[0], /data-tip-pos="bottom"/);

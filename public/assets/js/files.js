@@ -148,8 +148,9 @@ const Files = (() => {
       starredOnly: false,
       library: null,
       selected: new Set(),
-      cutPaths: new Set(),      // paths pending a move (Cut) - grayed out until Paste or cancel
-      cutItems: [],             // {name, path, isFolder} snapshot at cut time, for reporting after navigating away
+      clipboardMode: null,       // null | 'cut' | 'copy' - what Paste will do
+      clipboardPaths: new Set(), // paths pending the clipboard op (cut: grayed out; copy: not, like Explorer)
+      clipboardItems: [],        // {name, path, isFolder} snapshot at cut/copy time, for reporting after navigating away
       activeId: null,           // the roving tab stop
       page: 1,
       perPage: 20,
@@ -565,7 +566,7 @@ const Files = (() => {
     const rows = files.map((f, i) => {
       const t = typeOf(f);
       const isSel = state.selected.has(f.id);
-      const isCut = state.cutPaths.has(f.path);
+      const isCut = state.clipboardMode === 'cut' && state.clipboardPaths.has(f.path);
       const tab = entryTabIndex(state, f);
       const name = esc(f.name);
       const id = esc(f.id);
@@ -630,7 +631,7 @@ const Files = (() => {
     const cards = state.files.map((f, i) => {
       const t = typeOf(f);
       const isSel = state.selected.has(f.id);
-      const isCut = state.cutPaths.has(f.path);
+      const isCut = state.clipboardMode === 'cut' && state.clipboardPaths.has(f.path);
       const tab = entryTabIndex(state, f);
       const name = esc(f.name);
       const id = esc(f.id);
@@ -1217,7 +1218,7 @@ const Files = (() => {
      ══════════════════════════════════════════ */
 
   /** Entry-scoped actions need a rendered entry; the rest carry their own scope. */
-  const SCOPED_ACTIONS = new Set(['newFolder', 'renameTree', 'deleteTree', 'bulkDelete', 'bulkStar', 'bulkMove', 'bulkPolicy', 'paste']);
+  const SCOPED_ACTIONS = new Set(['newFolder', 'renameTree', 'deleteTree', 'bulkDelete', 'bulkStar', 'bulkMove', 'bulkCopy', 'bulkPolicy', 'paste']);
 
   /**
    * @param {string} act
@@ -1238,6 +1239,7 @@ const Files = (() => {
       case 'star': return setStars([file], !file.starred);
       case 'rename': return renameItem(file);
       case 'cut': return cutItems(state.selected.size ? selectedFiles() : [file]);
+      case 'copy': return copyItems(state.selected.size ? selectedFiles() : [file]);
       case 'delete': return deleteItems([file]);
       case 'newFolder': return createFolder(typeof id === 'string' && id ? id : state.currentPath);
       case 'renameTree': return renameItem({ name: baseName(id), path: id, isFolder: true });
@@ -1248,6 +1250,7 @@ const Files = (() => {
         return setStars(items, !items.every(f => f.starred));
       }
       case 'bulkMove': return cutItems(selectedFiles());
+      case 'bulkCopy': return copyItems(selectedFiles());
       case 'bulkPolicy': return setAccessPolicy(selectedFiles());
       case 'paste': return pasteItems();
       default: return undefined;
@@ -1313,6 +1316,7 @@ const Files = (() => {
       { divider: true },
       { label: 'Rename', icon: 'edit', shortcut: 'F2', action: () => renameItem(file) },
       { label: 'Cut', icon: 'scissors', shortcut: 'Ctrl+X', action: () => cutItems([file]) },
+      { label: 'Copy', icon: 'copy', shortcut: 'Ctrl+C', action: () => copyItems([file]) },
       { label: 'Access policy…', icon: 'lock', action: () => setAccessPolicy([file]) },
       { label: 'Delete permanently', icon: 'trash', danger: true, shortcut: 'Del', action: () => deleteItems([file]) },
     );
@@ -1434,16 +1438,21 @@ const Files = (() => {
     announce(`Deleted ${n} of ${summary.sent}. ${summary.failed.length} could not be deleted.`);
   }
 
-  /* ── cut / paste move (cross-directory; rename itself stays same-directory only) ──
-     Windows-Explorer-style: Cut marks items pending a move (grayed out, never
-     touching the filesystem by itself); Paste in a different folder is what
-     actually calls PUT /fs/move, with destination = the folder being viewed. */
+  /* ── cut / copy / paste (cross-directory; rename itself stays same-directory only) ──
+     Windows-Explorer-style clipboard. Cut marks items pending a MOVE, grayed
+     out, never touching the filesystem by itself; Copy marks items pending a
+     DUPLICATE, not grayed out (the original stays fully usable, exactly like
+     Explorer). Only one pending op at a time - a new Cut/Copy replaces
+     whatever was pending. Paste in any folder is what actually calls
+     PUT /fs/move or POST /fs/copy, with destination = the folder being
+     viewed. A copy never leaves the clipboard on its own (repeatable paste,
+     like Explorer); a cut clears once every item has actually moved. */
 
   /** Shows/hides the toolbar Paste affordance and keeps its count current. */
   function updatePasteButton() {
     const btn = $('#btnPaste');
     const cancelBtn = $('#btnCancelCut');
-    const n = state.cutPaths.size;
+    const n = state.clipboardPaths.size;
     if (btn) {
       btn.hidden = n === 0;
       const countEl = btn.querySelector('.paste-count');
@@ -1452,28 +1461,35 @@ const Files = (() => {
     if (cancelBtn) cancelBtn.hidden = n === 0;
   }
 
-  /** Mark items pending a move. Clears any prior pending cut - only one at a time. */
-  function cutItems(items) {
+  /** Mark items pending a clipboard op. Clears whatever was pending before. */
+  function markClipboard(mode, items) {
     if (!items.length) return;
-    state.cutPaths = new Set(items.map(i => i.path));
-    state.cutItems = items.map(i => ({ name: i.name, path: i.path, isFolder: !!i.isFolder }));
+    state.clipboardMode = mode;
+    state.clipboardPaths = new Set(items.map(i => i.path));
+    state.clipboardItems = items.map(i => ({ name: i.name, path: i.path, isFolder: !!i.isFolder }));
     state.selected = new Set();
     renderView();
     updateBulkBar();
     updatePasteButton();
     const n = items.length;
-    Toast.info(`${n} ${n === 1 ? 'item is' : 'items are'} ready to move`,
+    const verb = mode === 'copy' ? 'copy' : 'move';
+    Toast.info(`${n} ${n === 1 ? 'item is' : 'items are'} ready to ${verb}`,
       'Go to a folder and Paste, or press Escape to cancel.');
   }
 
-  /** @returns {boolean} whether there was a pending cut to cancel */
-  function cancelCut() {
-    if (state.cutPaths.size === 0) return false;
-    state.cutPaths = new Set();
-    state.cutItems = [];
+  function cutItems(items) { markClipboard('cut', items); }
+  function copyItems(items) { markClipboard('copy', items); }
+
+  /** @returns {boolean} whether there was a pending clipboard op to cancel */
+  function cancelClipboard() {
+    if (state.clipboardPaths.size === 0) return false;
+    const mode = state.clipboardMode;
+    state.clipboardMode = null;
+    state.clipboardPaths = new Set();
+    state.clipboardItems = [];
     renderView();
     updatePasteButton();
-    Toast.info('Move cancelled');
+    Toast.info(mode === 'copy' ? 'Copy cancelled' : 'Move cancelled');
     return true;
   }
 
@@ -1505,31 +1521,76 @@ const Files = (() => {
     announce(`Moved ${n} of ${summary.sent}. ${summary.failed.length} could not be moved.`);
   }
 
-  /** Paste the pending cut into the currently displayed folder. */
+  function summarizeCopy(sentPaths, data) {
+    const copied = Array.isArray(data && data.copied) ? data.copied : [];
+    const failed = Array.isArray(data && data.failed) ? data.failed : [];
+    return {
+      sent: sentPaths.length,
+      copied,
+      failed,
+      kind: failed.length === 0 ? 'complete' : 'partial',
+    };
+  }
+
+  function reportCopy(summary, items, destination) {
+    const nameOf = p => (items.find(i => i.path === p) || { name: baseName(p) }).name;
+    const n = summary.copied.length;
+    if (summary.kind === 'complete') {
+      Toast.success(`Copied ${n} ${n === 1 ? 'item' : 'items'}`, `to ${destination}`);
+      announce(`Copied ${n} ${n === 1 ? 'item' : 'items'} to ${destination}.`);
+      return;
+    }
+    const failures = summary.failed.map(f => `${nameOf(f.path)}: ${f.error || 'not copied'}`).join('; ');
+    Toast.warning(
+      `Copied ${n} of ${summary.sent} — ${summary.failed.length} not copied`,
+      `Not copied: ${failures}`,
+      12000
+    );
+    announce(`Copied ${n} of ${summary.sent}. ${summary.failed.length} could not be copied.`);
+  }
+
+  /** Paste the pending clipboard op (cut or copy) into the currently displayed folder. */
   async function pasteItems() {
-    if (state.cutPaths.size === 0) return;
-    const items = state.cutItems;
+    if (state.clipboardPaths.size === 0) return;
+    const mode = state.clipboardMode;
+    const items = state.clipboardItems;
     const destination = state.currentPath;
 
-    if (items.every(i => parentPath(i.path) === destination)) {
+    if (mode === 'cut' && items.every(i => parentPath(i.path) === destination)) {
       // Nothing would actually move - say so instead of firing a no-op request.
+      // Copy has no such case: pasting a copy into its own folder is a real
+      // name collision, not a no-op, so it is left to the server to refuse.
       const here = destination === '/' ? 'the storage root' : destination;
       Toast.info('Already there', `${items.length === 1 ? 'It is' : 'They are'} already in ${here}.`);
       return;
     }
 
     const paths = items.map(i => i.path);
+    const verb = mode === 'copy' ? 'Copy' : 'Move';
     let res;
     try {
-      res = await window.API.put('/fs/move', { paths, destination }, { silent: true });
+      res = mode === 'copy'
+        ? await window.API.post('/fs/copy', { paths, destination }, { silent: true })
+        : await window.API.put('/fs/move', { paths, destination }, { silent: true });
     } catch (error) {
       // Silent: api.js's generic "Network Error" toast is wrong here - this is
       // the server's own refusal (e.g. a 409 name collision), not a transport
-      // failure. The cut stays pending so the operator can retry after
+      // failure. The clipboard stays pending so the operator can retry after
       // resolving it (rename the item here, or pick a different folder).
-      Toast.error('Move failed', (error && error.message) || 'The item could not be moved.');
+      Toast.error(`${verb} failed`, (error && error.message) || `The item could not be ${mode === 'copy' ? 'copied' : 'moved'}.`);
       return;
     }
+
+    if (mode === 'copy') {
+      const summary = summarizeCopy(paths, res && res.data);
+      reportCopy(summary, items, destination);
+      // A copy never consumes the clipboard - Paste again to duplicate the
+      // same items into another folder, exactly like Explorer's Ctrl+C.
+      if (items.some(i => i.isFolder) && summary.copied.length) loadTree();
+      loadFiles({ silent: true });
+      return;
+    }
+
     const summary = summarizeMove(paths, res && res.data);
     reportMove(summary, items, destination);
 
@@ -1543,8 +1604,9 @@ const Files = (() => {
     // Only what actually moved comes off the clipboard - a failed item stays
     // pending so a retry (navigate, Paste again) is all the operator needs.
     const movedPaths = new Set(summary.moved.map(m => m.oldPath));
-    state.cutPaths = new Set([...state.cutPaths].filter(p => !movedPaths.has(p)));
-    state.cutItems = state.cutItems.filter(i => !movedPaths.has(i.path));
+    state.clipboardPaths = new Set([...state.clipboardPaths].filter(p => !movedPaths.has(p)));
+    state.clipboardItems = state.clipboardItems.filter(i => !movedPaths.has(i.path));
+    if (state.clipboardPaths.size === 0) state.clipboardMode = null;
     updatePasteButton();
 
     loadFiles({ silent: true });
@@ -1843,30 +1905,31 @@ const Files = (() => {
    * Escape closes ONLY the topmost layer. Registered in the capture phase so it
    * runs before app.js's global Escape (which closes modals): if a confirm,
    * menu or dropdown is open above the drawer, that layer is the one dismissed.
-   * A pending cut (Cut, no modal or drawer involved) is the lowest-priority
-   * layer - Escape cancels it only once nothing else above it needs closing,
-   * matching Windows Explorer (Esc drops a pending clipboard cut).
+   * A pending clipboard op (Cut or Copy, no modal or drawer involved) is the
+   * lowest-priority layer - Escape cancels it only once nothing else above it
+   * needs closing, matching Windows Explorer (Esc drops a pending clipboard op).
    */
   function onEscape(e) {
     if (e.key !== 'Escape') return;
     const q = sel => document.querySelector && document.querySelector(sel);
     if (q('.modal-backdrop.is-open') || q('.context-menu.is-open') || q('.dropdown-menu.is-open')) return;
     if (isDrawerOpen()) return closeDrawer();
-    cancelCut();
+    cancelClipboard();
   }
 
   /**
-   * Ctrl+V / Cmd+V pastes the pending cut into the currently displayed
-   * folder, from anywhere on the page - not just a focused row - mirroring
-   * Explorer, where Paste does not require anything to be selected first.
-   * Skipped while typing in an editable field, where Ctrl+V means paste text.
+   * Ctrl+V / Cmd+V pastes the pending clipboard op (cut or copy) into the
+   * currently displayed folder, from anywhere on the page - not just a
+   * focused row - mirroring Explorer, where Paste does not require anything
+   * to be selected first. Skipped while typing in an editable field, where
+   * Ctrl+V means paste text.
    */
   function onPasteShortcut(e) {
     if (e.key !== 'v' && e.key !== 'V') return;
     if (!e.ctrlKey && !e.metaKey) return;
     const tag = (e.target && e.target.tagName || '').toUpperCase();
     if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) return;
-    if (state.cutPaths.size === 0) return;
+    if (state.clipboardPaths.size === 0) return;
     e.preventDefault();
     pasteItems();
   }
@@ -2351,6 +2414,10 @@ const Files = (() => {
           e.preventDefault();
           return handleAction('cut', id);
         }
+        if ((e.key === 'c' || e.key === 'C') && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          return handleAction('copy', id);
+        }
         return undefined;
     }
   }
@@ -2603,7 +2670,7 @@ const Files = (() => {
     bind('#btnNewFolder', 'click', () => handleAction('newFolder', state.currentPath));
     bind('#btnTreeNewFolder', 'click', () => handleAction('newFolder', state.currentPath));
     bind('#btnPaste', 'click', () => handleAction('paste'));
-    bind('#btnCancelCut', 'click', cancelCut);
+    bind('#btnCancelCut', 'click', cancelClipboard);
     bind('#btnTopbarUpload', 'click', openFilePicker);
     bind('#btnPageUpload', 'click', openFilePicker);
     bind('#hiddenFileInput', 'change', e => {
@@ -2615,6 +2682,7 @@ const Files = (() => {
     bind('#bulkDownload', 'click', e => openBulkDownloadMenu(e.currentTarget));
     bind('#bulkStar', 'click', () => handleAction('bulkStar'));
     bind('#bulkMove', 'click', () => handleAction('bulkMove'));
+    bind('#bulkCopy', 'click', () => handleAction('bulkCopy'));
     bind('#bulkPolicy', 'click', () => handleAction('bulkPolicy'));
     bind('#bulkDelete', 'click', () => handleAction('bulkDelete'));
     bind('#bulkClear', 'click', clearSelection);
@@ -2702,7 +2770,7 @@ const Files = (() => {
       onTreeClick, onTreeKeydown, onBreadcrumbClick, onContainerClick, onContainerKeydown, onDrawerClick, onSearchInput,
       syncAfterMutation, cancelPendingSearch, runUploads, handleDrop, openBulkDownloadMenu,
       setColumnWidth, resetColumnWidth, onResizeKeydown, onContainerDblClick,
-      cutItems, cancelCut, pasteItems, setAccessPolicy,
+      cutItems, copyItems, cancelClipboard, pasteItems, setAccessPolicy,
     },
   };
 })();

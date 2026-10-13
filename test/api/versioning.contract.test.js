@@ -271,12 +271,17 @@ describe('the versioned namespace (api-versioning)', () => {
             assert.equal(move.status, 200, `${prefix} move -> ${move.text}`);
             assert.ok(fs.existsSync(path.join(ROOT, `dir-${tag}-dest`, 'moved.txt')));
 
+            const copy = await sendJson('POST', `${prefix}/fs/copy`, { paths: [`/dir-${tag}-dest/moved.txt`], destination: `/dir-${tag}` });
+            assert.equal(copy.status, 200, `${prefix} copy -> ${copy.text}`);
+            assert.ok(fs.existsSync(path.join(ROOT, `dir-${tag}`, 'moved.txt')), 'the copy landed');
+            assert.ok(fs.existsSync(path.join(ROOT, `dir-${tag}-dest`, 'moved.txt')), 'the source of the copy survives');
+
             const del = await sendJson('DELETE', `${prefix}/fs/delete`, { paths: [`/dir-${tag}`, `/dir-${tag}-dest`] });
             assert.equal(del.status, 200, `${prefix} delete -> ${del.text}`);
             assert.equal(fs.existsSync(path.join(ROOT, `dir-${tag}`)), false);
             assert.equal(fs.existsSync(path.join(ROOT, `dir-${tag}-dest`)), false);
 
-            shapes[tag] = [folder, upload, rename, moveDest, move, del].map((r) => [r.status, shapeOf(r.json)]);
+            shapes[tag] = [folder, upload, rename, moveDest, move, copy, del].map((r) => [r.status, shapeOf(r.json)]);
         }
         assert.deepEqual(shapes.v1, shapes.legacy, 'every mutation has one status and one shape on both prefixes');
     });
@@ -501,6 +506,7 @@ describe('the two prefixes are one implementation (legacy-api-compatibility)', (
         'GET /fs/tree',
         'GET /health',
         'GET /settings',
+        'POST /fs/copy',
         'POST /fs/download-zip',
         'POST /fs/folder',
         'POST /fs/star',

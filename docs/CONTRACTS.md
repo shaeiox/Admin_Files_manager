@@ -24,6 +24,7 @@
   | `POST /api/fs/upload` | write | `{ success, data }` |
   | `PUT /api/fs/rename` | write | `{ success, data }` |
   | `PUT /api/fs/move` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
+  | `POST /api/fs/copy` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
   | `DELETE /api/fs/delete` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
   | `POST /api/fs/star` | write | `{ success, data }` |
   | `GET /api/fs/thumbnail/capability` | read | `{ available, formats, maxSize }` — bare object |
@@ -607,6 +608,32 @@ best-effort after disk rename.
   destination is not a folder, or the destination is the item itself or one of its own subfolders · `403`
   moving the storage root itself. Metadata keys and a governed path's access policy migrate best-effort,
   exactly like a rename (`MetadataService.renamePath` / `FileAccessPolicyService.onPathRenamed`).
+
+### POST /api/fs/copy
+
+**Body:** `{ "paths": ["/a.txt", "/b folder"], "destination": "/archive" }` (≤500 paths) → **`200`**
+```json
+{
+  "success": true,
+  "data": {
+    "copied": [ { "sourcePath": "/a.txt", "newPath": "/archive/a.txt" } ],
+    "failed": [ { "path": "/b folder", "error": "An item with this name already exists at the destination.", "statusCode": 409 } ]
+  }
+}
+```
+- Leaves the source in place — unlike `PUT /api/fs/move`. Same destination rules otherwise: must already
+  **exist and be a directory** (no implicit creation), cannot be the item itself or one of its own
+  subfolders, and a name collision at the destination is refused rather than overwritten.
+- **There is no "already there" no-op.** Copying onto the item's own name — including pasting into the
+  same folder it is already in — is just a name collision (`409`); unlike move, copy never has a sensible
+  no-op case, so this is not special-cased.
+- Same partial-failure contract as `PUT /api/fs/move` / `DELETE /api/fs/delete`: read `data.copied` /
+  `data.failed`; total failure (`copied` empty, `failed` non-empty) is a non-2xx with the first error.
+- Errors per item: `404` source or destination missing · `409` name collision at the destination · `400`
+  destination is not a folder, or is the item itself or one of its own subfolders · `403` permission
+  denied. **No metadata or access-policy migration** - a copy is a new item (zero downloads, no star, no
+  policy), not the same item relocated, so `MetadataService.renamePath`/`FileAccessPolicyService.onPathRenamed`
+  are deliberately not called here.
 
 ### DELETE /api/fs/delete
 

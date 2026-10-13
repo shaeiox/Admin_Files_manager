@@ -243,10 +243,68 @@ class FileSystemService {
     }
 
     /**
+     * Copy a file or folder into a different, already-existing directory,
+     * leaving the original in place. Shares move()'s validation (existing
+     * destination directory, no implicit creation, name collision refused,
+     * cannot copy into its own subtree) but duplicates instead of relocating -
+     * there is no "already there" no-op case here: copying onto the item's own
+     * name, including into the same folder, is simply a name collision.
+     *
+     * @param {string} oldClientPath - Existing path (e.g., "/media/old.txt")
+     * @param {string} destinationClientPath - Existing destination DIRECTORY (e.g., "/archive")
+     * @returns {Promise<{sourcePath: string, newPath: string}>}
+     */
+    static async copy(oldClientPath, destinationClientPath) {
+        const path = require('path');
+        const oldSecurePath = PathService.resolveSecurePath(oldClientPath);
+
+        if (!(await this.exists(oldSecurePath))) {
+            throw new AppError('Source item not found.', 404);
+        }
+
+        const destSecurePath = PathService.resolveSecurePath(destinationClientPath);
+        let destStat;
+        try {
+            destStat = await fs.stat(destSecurePath);
+        } catch {
+            throw new AppError('Destination folder not found.', 404);
+        }
+        if (!destStat.isDirectory()) {
+            throw new AppError('Destination is not a folder.', 400);
+        }
+
+        // A folder cannot be copied into itself or one of its own descendants -
+        // fs.cp would recurse into the copy it is still writing.
+        if (destSecurePath === oldSecurePath || destSecurePath.startsWith(oldSecurePath + path.sep)) {
+            throw new AppError('Cannot copy a folder into itself or one of its own subfolders.', 400);
+        }
+
+        const name = path.basename(oldSecurePath);
+        const newSecurePath = path.join(destSecurePath, name);
+
+        if (await this.exists(newSecurePath)) {
+            throw new AppError('An item with this name already exists at the destination.', 409);
+        }
+
+        try {
+            await fs.cp(oldSecurePath, newSecurePath, { recursive: true, errorOnExist: true });
+            return {
+                sourcePath: PathService.toClientPath(oldSecurePath),
+                newPath: PathService.toClientPath(newSecurePath),
+            };
+        } catch (error) {
+            if (error.code === 'EACCES' || error.code === 'EPERM') {
+                throw new AppError('Permission denied to copy item.', 403);
+            }
+            throw new AppError('Failed to copy item on disk.', 500);
+        }
+    }
+
+    /**
      * Permanently remove a file or folder.
      * Uses recursive + force for folders to remove non-empty trees.
-     * 
-     * @param {string} clientPath 
+     *
+     * @param {string} clientPath
      * @returns {Promise<{isDirectory: boolean}>}
      */
     static async remove(clientPath) {

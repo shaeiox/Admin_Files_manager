@@ -1554,25 +1554,29 @@ describe('list columns are fixed-width and resizable', () => {
 });
 
 /* ══════════════════════════════════════════
-   CUT / PASTE MOVE + ACCESS POLICY — context menu and bulk bar
+   CUT / COPY / PASTE + ACCESS POLICY — context menu and bulk bar
    ══════════════════════════════════════════ */
 
-describe('Cut marks items pending a move; Paste in another folder is what actually moves them', () => {
-  test('contextItems offers Cut and Access policy for both a file and a folder', () => {
+describe('Cut/Copy mark items pending a clipboard op; Paste in another folder is what actually moves/duplicates them', () => {
+  test('contextItems offers Cut, Copy and Access policy for both a file and a folder', () => {
     assert.match(FILES_SRC, /label: 'Cut', icon: 'scissors', shortcut: 'Ctrl\+X', action: \(\) => cutItems\(\[file\]\)/);
+    assert.match(FILES_SRC, /label: 'Copy', icon: 'copy', shortcut: 'Ctrl\+C', action: \(\) => copyItems\(\[file\]\)/);
     assert.match(FILES_SRC, /label: 'Access policy…', icon: 'lock', action: \(\) => setAccessPolicy\(\[file\]\)/);
   });
 
-  test('the bulk bar Cut button and toolbar Paste/Cancel controls exist, bound once, dispatching through handleAction', () => {
+  test('the bulk bar Cut/Copy buttons and toolbar Paste/Cancel controls exist, bound once, dispatching through handleAction', () => {
     assert.match(FILES_HTML, /id="bulkMove" data-tip="Move selected" aria-label="Move selected"/);
+    assert.match(FILES_HTML, /id="bulkCopy" data-tip="Copy selected" aria-label="Copy selected"/);
     assert.match(FILES_HTML, /id="btnPaste" hidden/);
     assert.match(FILES_HTML, /id="btnCancelCut"[^>]*hidden/);
     assert.equal((FILES_SRC.match(/#bulkMove/g) || []).length, 1);
+    assert.equal((FILES_SRC.match(/#bulkCopy/g) || []).length, 1);
     assert.equal((FILES_SRC.match(/#btnPaste/g) || []).length, 2, 'bound once, queried once by updatePasteButton');
     assert.equal((FILES_SRC.match(/#btnCancelCut/g) || []).length, 2);
     assert.match(FILES_SRC, /case 'bulkMove': return cutItems\(selectedFiles\(\)\);/);
+    assert.match(FILES_SRC, /case 'bulkCopy': return copyItems\(selectedFiles\(\)\);/);
     assert.match(FILES_SRC, /case 'paste': return pasteItems\(\);/);
-    assert.ok(FILES_SRC.includes("SCOPED_ACTIONS = new Set(['newFolder', 'renameTree', 'deleteTree', 'bulkDelete', 'bulkStar', 'bulkMove', 'bulkPolicy', 'paste'])"));
+    assert.ok(FILES_SRC.includes("SCOPED_ACTIONS = new Set(['newFolder', 'renameTree', 'deleteTree', 'bulkDelete', 'bulkStar', 'bulkMove', 'bulkCopy', 'bulkPolicy', 'paste'])"));
   });
 
   test('[hidden] actually hides Paste/Cancel - .btn/.btn-icon set their own display, which beats the UA default', () => {
@@ -1589,7 +1593,8 @@ describe('Cut marks items pending a move; Paste in another folder is what actual
     const page = await booted();
     page.c.setSelected('/a.ts', true);
     page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
-    assert.deepEqual([...page.state().cutPaths], ['/a.ts']);
+    assert.equal(page.state().clipboardMode, 'cut');
+    assert.deepEqual([...page.state().clipboardPaths], ['/a.ts']);
     assert.equal(page.state().selected.size, 0, 'selection is cleared on cut, so the two highlight concepts never stack');
     assert.equal(page.els['#btnPaste'].hidden, false);
     assert.equal(page.els['#btnCancelCut'].hidden, false);
@@ -1600,24 +1605,50 @@ describe('Cut marks items pending a move; Paste in another folder is what actual
     assert.match(out, /a\.ts, [^"]*, ready to move/);
   });
 
-  test('a second Cut replaces the first - only one pending move at a time', async () => {
+  test('copyItems marks the pending paths but does NOT gray out the row - the original stays fully usable, like Explorer', async () => {
     const page = await booted();
-    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
-    page.c.cutItems([{ name: 'b.png', path: '/b.png', isFolder: false }]);
-    assert.deepEqual([...page.state().cutPaths], ['/b.png']);
+    page.c.setSelected('/a.ts', true);
+    page.c.copyItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    assert.equal(page.state().clipboardMode, 'copy');
+    assert.deepEqual([...page.state().clipboardPaths], ['/a.ts']);
+    assert.equal(page.state().selected.size, 0);
+    assert.equal(page.els['#btnPaste'].hidden, false);
+    const info = page.toasts.find(t => t.type === 'info' && /ready to copy/.test(t.t));
+    assert.ok(info, 'a toast explains what to do next, worded for copy');
+    const out = page.pure.renderListHtml(page.state());
+    assert.doesNotMatch(out, /data-id="\/a\.ts"[^>]*class="[^"]*is-cut/, 'copy never dims the row');
+    assert.doesNotMatch(out, /a\.ts, [^"]*, ready to move/);
   });
 
-  test('cancelCut clears the pending cut and hides Paste; Escape cancels it when nothing else is open', async () => {
+  test('a second Cut or Copy replaces whatever was pending before, across modes too - only one clipboard op at a time', async () => {
     const page = await booted();
     page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
-    assert.equal(page.c.cancelCut(), true);
-    assert.equal(page.state().cutPaths.size, 0);
+    page.c.copyItems([{ name: 'b.png', path: '/b.png', isFolder: false }]);
+    assert.equal(page.state().clipboardMode, 'copy');
+    assert.deepEqual([...page.state().clipboardPaths], ['/b.png']);
+
+    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    assert.equal(page.state().clipboardMode, 'cut');
+    assert.deepEqual([...page.state().clipboardPaths], ['/a.ts']);
+  });
+
+  test('cancelClipboard clears whatever is pending and hides Paste, with mode-specific wording; Escape cancels it when nothing else is open', async () => {
+    const page = await booted();
+    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    assert.equal(page.c.cancelClipboard(), true);
+    assert.equal(page.state().clipboardPaths.size, 0);
+    assert.equal(page.state().clipboardMode, null);
     assert.equal(page.els['#btnPaste'].hidden, true);
-    assert.equal(page.c.cancelCut(), false, 'nothing pending: a no-op, not a second cancellation toast');
+    assert.ok(page.toasts.some(t => t.t === 'Move cancelled'));
+    assert.equal(page.c.cancelClipboard(), false, 'nothing pending: a no-op, not a second cancellation toast');
+
+    page.c.copyItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    assert.equal(page.c.cancelClipboard(), true);
+    assert.ok(page.toasts.some(t => t.t === 'Copy cancelled'), 'wording matches the mode that was pending');
 
     page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
     page.c.onEscape({ key: 'Escape' });
-    assert.equal(page.state().cutPaths.size, 0, 'Escape cancelled the pending cut');
+    assert.equal(page.state().clipboardPaths.size, 0, 'Escape cancelled the pending cut');
   });
 
   test('paste goes through PUT /fs/move, destination = the currently displayed folder', async () => {
@@ -1630,19 +1661,58 @@ describe('Cut marks items pending a move; Paste in another folder is what actual
     await page.c.pasteItems();
     await settleAll();
     assert.deepEqual(plain(page.calls.put[0]), { url: '/fs/move', body: { paths: ['/a.ts'], destination: '/docs' } });
-    assert.equal(page.state().cutPaths.size, 0, 'moved successfully: nothing stays pending');
+    assert.equal(page.state().clipboardPaths.size, 0, 'moved successfully: nothing stays pending');
+    assert.equal(page.state().clipboardMode, null);
     const ok = page.toasts.find(t => t.type === 'success' && /Moved 1 item/.test(t.t));
     assert.ok(ok);
   });
 
-  test('pasting into the folder an item is already in is a no-op with a message, no request sent', async () => {
+  test('paste in copy mode goes through POST /fs/copy, and the clipboard stays pending - a copy is repeatable, unlike a cut', async () => {
+    const page = await booted({
+      'POST /fs/copy': { success: true, data: { copied: [{ sourcePath: '/a.ts', newPath: '/docs/a.ts' }], failed: [] } },
+    });
+    page.c.navigateTo('/docs');
+    await settleAll();
+    page.c.copyItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    await page.c.pasteItems();
+    await settleAll();
+    assert.deepEqual(plain(page.calls.post.find(p => p.url === '/fs/copy')), { url: '/fs/copy', body: { paths: ['/a.ts'], destination: '/docs' } });
+    assert.equal(page.state().clipboardPaths.size, 1, 'copy never consumes the clipboard on its own');
+    assert.equal(page.state().clipboardMode, 'copy');
+    const ok = page.toasts.find(t => t.type === 'success' && /Copied 1 item/.test(t.t));
+    assert.ok(ok);
+
+    // Paste again into a different folder: the same item duplicates there too.
+    page.c.navigateTo('/media');
+    await settleAll();
+    await page.c.pasteItems();
+    await settleAll();
+    const copyPosts = page.calls.post.filter(p => p.url === '/fs/copy');
+    assert.equal(copyPosts.length, 2, 'pasted twice from the same pending copy');
+    assert.equal(copyPosts[1].body.destination, '/media');
+  });
+
+  test('pasting into the folder an item is already in is a no-op with a message, no request sent (cut only - copy has no such case)', async () => {
     const page = await booted();
     page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]); // currentPath is '/': same parent
     await page.c.pasteItems();
     await settleAll();
     assert.equal(page.calls.put.length, 0, 'no PUT /fs/move fired');
     assert.ok(page.toasts.some(t => t.type === 'info' && /Already there/.test(t.t)));
-    assert.equal(page.state().cutPaths.size, 1, 'still pending - nothing happened to cancel it');
+    assert.equal(page.state().clipboardPaths.size, 1, 'still pending - nothing happened to cancel it');
+  });
+
+  test('copying into the folder an item is already in is NOT short-circuited - the server decides (a real collision)', async () => {
+    const page = await booted({
+      'POST /fs/copy': new Error('An item with this name already exists at the destination.'),
+    });
+    page.c.copyItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]); // currentPath is '/': same parent
+    await page.c.pasteItems();
+    await settleAll();
+    assert.equal(page.calls.post.filter(p => p.url === '/fs/copy').length, 1, 'the request was actually sent, unlike cut');
+    assert.ok(!page.toasts.some(t => /Already there/.test(t.t)));
+    const err = page.toasts.find(t => t.type === 'error');
+    assert.equal(err.t, 'Copy failed');
   });
 
   test('a total paste failure (e.g. a 409 name collision) shows a specific "Move failed" toast, not a generic one', async () => {
@@ -1659,15 +1729,16 @@ describe('Cut marks items pending a move; Paste in another folder is what actual
     assert.equal(err.t, 'Move failed');
     assert.match(err.m, /already exists at the destination/);
     assert.ok(!page.toasts.some((t) => t.t === 'Network Error'), 'not the generic transport-failure title');
-    assert.equal(page.state().cutPaths.size, 1, 'still pending - the operator can retry');
+    assert.equal(page.state().clipboardPaths.size, 1, 'still pending - the operator can retry');
   });
 
-  test('the move request is sent silent, so api.js never also raises its own generic toast for it', () => {
+  test('both the move and the copy request are sent silent, so api.js never also raises its own generic toast for either', () => {
     const fn = FILES_SRC.slice(FILES_SRC.indexOf('async function pasteItems'), FILES_SRC.indexOf('/* ── access policy'));
     assert.match(fn, /window\.API\.put\('\/fs\/move', \{ paths, destination \}, \{ silent: true \}\)/);
+    assert.match(fn, /window\.API\.post\('\/fs\/copy', \{ paths, destination \}, \{ silent: true \}\)/);
   });
 
-  test('a partial paste keeps only the failed item pending, so pasting again retries just that one', async () => {
+  test('a partial move paste keeps only the failed item pending, so pasting again retries just that one', async () => {
     const page = await booted({
       'PUT /fs/move': {
         success: true,
@@ -1685,20 +1756,48 @@ describe('Cut marks items pending a move; Paste in another folder is what actual
     ]);
     await page.c.pasteItems();
     await settleAll();
-    assert.deepEqual([...page.state().cutPaths], ['/b.png']);
+    assert.deepEqual([...page.state().clipboardPaths], ['/b.png']);
     const warn = page.toasts.find(t => t.type === 'warning');
     assert.match(warn.t, /Moved 1 of 2/);
   });
 
-  test('Ctrl+X cuts the focused entry, or the full selection when one is active', async () => {
-    const page = await booted();
-    const entryEl = { getAttribute: (k) => (k === 'data-id' ? '/a.ts' : null), closest(sel) { return sel === '[data-entry]' ? this : null; } };
-    const key = (extra = {}) => Object.assign({ key: 'x', ctrlKey: true, preventDefault() {}, target: entryEl }, extra);
-    page.c.onContainerKeydown(key());
-    assert.deepEqual([...page.state().cutPaths], ['/a.ts']);
+  test('a partial copy paste reports the summary but still leaves everything pending (copy never auto-clears)', async () => {
+    const page = await booted({
+      'POST /fs/copy': {
+        success: true,
+        data: {
+          copied: [{ sourcePath: '/a.ts', newPath: '/docs/a.ts' }],
+          failed: [{ path: '/b.png', error: 'Item not found: /b.png', statusCode: 404 }],
+        },
+      },
+    });
+    page.c.navigateTo('/docs');
+    await settleAll();
+    page.c.copyItems([
+      { name: 'a.ts', path: '/a.ts', isFolder: false },
+      { name: 'b.png', path: '/b.png', isFolder: false },
+    ]);
+    await page.c.pasteItems();
+    await settleAll();
+    assert.deepEqual([...page.state().clipboardPaths].sort(), ['/a.ts', '/b.png'], 'both stay pending - copy does not drop the failed OR the succeeded one');
+    const warn = page.toasts.find(t => t.type === 'warning');
+    assert.match(warn.t, /Copied 1 of 2/);
   });
 
-  test('Ctrl+V pastes when a cut is pending, and is ignored while typing in a field', async () => {
+  test('Ctrl+X cuts and Ctrl+C copies the focused entry, or the full selection when one is active', async () => {
+    const page = await booted();
+    const entryEl = { getAttribute: (k) => (k === 'data-id' ? '/a.ts' : null), closest(sel) { return sel === '[data-entry]' ? this : null; } };
+    const key = (k, extra = {}) => Object.assign({ key: k, ctrlKey: true, preventDefault() {}, target: entryEl }, extra);
+    page.c.onContainerKeydown(key('x'));
+    assert.equal(page.state().clipboardMode, 'cut');
+    assert.deepEqual([...page.state().clipboardPaths], ['/a.ts']);
+
+    page.c.onContainerKeydown(key('c'));
+    assert.equal(page.state().clipboardMode, 'copy');
+    assert.deepEqual([...page.state().clipboardPaths], ['/a.ts']);
+  });
+
+  test('Ctrl+V pastes when a clipboard op is pending, and is ignored while typing in a field', async () => {
     const page = await booted({
       'PUT /fs/move': { success: true, data: { moved: [{ oldPath: '/a.ts', newPath: '/docs/a.ts' }], failed: [] } },
     });
@@ -1717,8 +1816,9 @@ describe('Cut marks items pending a move; Paste in another folder is what actual
     assert.equal(page.calls.put.length, 1);
   });
 
-  test('move goes through PUT /fs/move and policy through PUT /admin/files/policy - no new endpoint invented', () => {
+  test('move goes through PUT /fs/move, copy through POST /fs/copy, and policy through PUT /admin/files/policy - no new endpoint invented beyond those', () => {
     assert.match(FILES_SRC, /window\.API\.put\('\/fs\/move', \{ paths, destination \}, \{ silent: true \}\)/);
+    assert.match(FILES_SRC, /window\.API\.post\('\/fs\/copy', \{ paths, destination \}, \{ silent: true \}\)/);
     assert.match(FILES_SRC, /window\.API\.put\('\/admin\/files\/policy', \{/);
     assert.doesNotMatch(FILES_SRC, /\bfetch\(/);
   });

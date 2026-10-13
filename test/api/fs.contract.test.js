@@ -34,6 +34,12 @@ process.env.PORT = '0';
 // gigabytes. Read once when the upload module loads, so it is set before require.
 const UPLOAD_LIMIT = 64 * 1024;
 process.env.UPLOAD_MAX_BYTES = String(UPLOAD_LIMIT);
+// This suite sends far more mutations per minute than a single real operator
+// ever would; 0 opts this class out entirely (rateLimit.js's own documented
+// escape hatch) rather than picking a number that just moves the ceiling the
+// suite eventually grows into again. Rate-limiting behaviour itself is
+// test/api/rate-limit.test.js's job, not this file's.
+process.env.AFM_RATE_LIMIT_WRITE_PER_MINUTE = '0';
 
 function writeFile(rel, content) {
     const full = path.join(ROOT, rel);
@@ -783,6 +789,108 @@ describe('PUT /api/fs/move - cross-directory, unlike rename', () => {
             destination: '/sub',
         });
         assert.equal(oversized.status, 400);
+    });
+});
+
+describe('POST /api/fs/copy - duplicates, leaving the source in place', () => {
+    test('copies a file into an existing destination folder, source untouched', async () => {
+        writeFile('copyable.txt', 'CONTENT');
+        const res = await sendJson('POST', '/api/fs/copy', { paths: ['/copyable.txt'], destination: '/sub' });
+        assert.equal(res.status, 200);
+        assert.equal(res.json.success, true);
+        assert.deepEqual(res.json.data.copied, [{ sourcePath: '/copyable.txt', newPath: '/sub/copyable.txt' }]);
+        assert.deepEqual(res.json.data.failed, []);
+        assert.equal(fs.readFileSync(path.join(ROOT, 'copyable.txt'), 'utf8'), 'CONTENT', 'the source survives');
+        assert.equal(fs.readFileSync(path.join(ROOT, 'sub', 'copyable.txt'), 'utf8'), 'CONTENT');
+    });
+
+    test('copies a folder and everything inside it, source untouched', async () => {
+        writeFile('tree-to-copy/inner/leaf.txt', 'LEAF');
+        const res = await sendJson('POST', '/api/fs/copy', { paths: ['/tree-to-copy'], destination: '/sub' });
+        assert.equal(res.status, 200);
+        assert.deepEqual(res.json.data.copied, [{ sourcePath: '/tree-to-copy', newPath: '/sub/tree-to-copy' }]);
+        assert.ok(fs.existsSync(path.join(ROOT, 'tree-to-copy', 'inner', 'leaf.txt')), 'the source tree survives');
+        assert.ok(fs.existsSync(path.join(ROOT, 'sub', 'tree-to-copy', 'inner', 'leaf.txt')));
+    });
+
+    test('a mixed batch reports copied and failed separately (partial failure, still 200)', async () => {
+        writeFile('copyable2.txt', 'X');
+        const res = await sendJson('POST', '/api/fs/copy', {
+            paths: ['/copyable2.txt', '/never-existed-copy.txt'],
+            destination: '/sub',
+        });
+        assert.equal(res.status, 200);
+        assert.equal(res.json.success, true);
+        assert.deepEqual(res.json.data.copied, [{ sourcePath: '/copyable2.txt', newPath: '/sub/copyable2.txt' }]);
+        assert.equal(res.json.data.failed.length, 1);
+        assert.equal(res.json.data.failed[0].path, '/never-existed-copy.txt');
+        assert.equal(res.json.data.failed[0].statusCode, 404);
+    });
+
+    test('total failure (nothing copied) is a non-2xx with the first error', async () => {
+        const res = await sendJson('POST', '/api/fs/copy', {
+            paths: ['/never-existed-copy-2.txt'],
+            destination: '/sub',
+        });
+        assert.equal(res.status, 404);
+        assert.equal(res.json.success, false);
+    });
+
+    test('a missing destination is a 404 for every path, and nothing is copied', async () => {
+        writeFile('copy-source.txt', 'X');
+        const res = await sendJson('POST', '/api/fs/copy', { paths: ['/copy-source.txt'], destination: '/no-such-folder' });
+        assert.equal(res.status, 404);
+        assert.ok(!fs.existsSync(path.join(ROOT, 'no-such-folder')));
+    });
+
+    test('a destination that is a file, not a folder, is a 400', async () => {
+        const res = await sendJson('POST', '/api/fs/copy', { paths: ['/notes.txt'], destination: '/existing.txt' });
+        assert.equal(res.status, 400);
+    });
+
+    test('a name collision at the destination is a 409 and neither copy is touched', async () => {
+        writeFile('copy-collide.txt', 'SOURCE');
+        writeFile('sub/copy-collide.txt', 'ALREADY THERE');
+        const res = await sendJson('POST', '/api/fs/copy', { paths: ['/copy-collide.txt'], destination: '/sub' });
+        assert.equal(res.status, 409);
+        assert.equal(fs.readFileSync(path.join(ROOT, 'copy-collide.txt'), 'utf8'), 'SOURCE');
+        assert.equal(fs.readFileSync(path.join(ROOT, 'sub', 'copy-collide.txt'), 'utf8'), 'ALREADY THERE');
+    });
+
+    test('copying into the same folder the item is already in is a 409, not a silent no-op', async () => {
+        writeFile('self-folder.txt', 'X');
+        const res = await sendJson('POST', '/api/fs/copy', { paths: ['/self-folder.txt'], destination: '/' });
+        assert.equal(res.status, 409, 'unlike move, copy has no "already there" no-op');
+    });
+
+    test('a folder cannot be copied into itself or one of its own subfolders', async () => {
+        writeFile('self-copy/child/leaf.txt', 'X');
+        const intoSelf = await sendJson('POST', '/api/fs/copy', { paths: ['/self-copy'], destination: '/self-copy' });
+        assert.equal(intoSelf.status, 400);
+        const intoChild = await sendJson('POST', '/api/fs/copy', { paths: ['/self-copy'], destination: '/self-copy/child' });
+        assert.equal(intoChild.status, 400);
+        const entries = fs.readdirSync(path.join(ROOT, 'self-copy', 'child'));
+        assert.deepEqual(entries, ['leaf.txt'], 'nothing was copied into the tree');
+    });
+
+    test('an empty or oversized batch is a 400', async () => {
+        const empty = await sendJson('POST', '/api/fs/copy', { paths: [], destination: '/sub' });
+        assert.equal(empty.status, 400);
+        const oversized = await sendJson('POST', '/api/fs/copy', {
+            paths: Array.from({ length: 501 }, (_, i) => `/f${i}.txt`),
+            destination: '/sub',
+        });
+        assert.equal(oversized.status, 400);
+    });
+
+    test('no metadata or access policy migrates - a copy is a new item, not the same item relocated', async () => {
+        writeFile('starred-source.txt', 'X');
+        await sendJson('POST', '/api/fs/star', { path: '/starred-source.txt', starred: true });
+        const res = await sendJson('POST', '/api/fs/copy', { paths: ['/starred-source.txt'], destination: '/sub' });
+        assert.equal(res.status, 200);
+        const listing = await getJson('/api/fs/list?path=/sub');
+        const copy = listing.items.find((i) => i.name === 'starred-source.txt');
+        assert.equal(copy.starred, false, 'the new copy starts fresh, not inheriting the source star');
     });
 });
 
