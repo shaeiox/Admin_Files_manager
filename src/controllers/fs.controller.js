@@ -280,6 +280,72 @@ async function renameItem(req, res, next) {
 }
 
 /**
+ * PUT /api/fs/move
+ * Body: { paths: ["/media/a.txt", "/media/folder-b"], destination: "/archive" }
+ * Bulk, same partial-failure contract as DELETE /api/fs/delete: a 200 can
+ * still carry per-item failures in data.failed.
+ */
+async function moveItems(req, res, next) {
+    try {
+        const { paths, destination } = req.body || {};
+
+        if (!Array.isArray(paths) || paths.length === 0) {
+            throw new AppError('At least one path must be provided.', 400);
+        }
+        if (paths.length > 500) {
+            throw new AppError('Too many items in a single request (max 500).', 400);
+        }
+        validateClientPath(destination);
+
+        const results = { moved: [], failed: [] };
+
+        for (const clientPath of paths) {
+            try {
+                validateClientPath(clientPath);
+                const { oldPath: from, newPath: to } = await FileSystemService.move(clientPath, destination);
+
+                if (from !== to) {
+                    try {
+                        await MetadataService.renamePath(from, to);
+                    } catch (metaErr) {
+                        console.error('[Metadata] Failed to migrate on move:', metaErr.message);
+                    }
+                    FileAccessPolicyService.onPathRenamed(from, to);
+
+                    MetadataService.addActivity({
+                        type: 'edit',
+                        user: 'system',
+                        action: 'moved',
+                        target: path.posix.basename(to),
+                        folder: path.posix.dirname(to),
+                    }).catch(() => { });
+                }
+
+                results.moved.push({ oldPath: from, newPath: to });
+            } catch (err) {
+                results.failed.push({
+                    path: clientPath,
+                    error: err.message,
+                    statusCode: err.statusCode || 500,
+                });
+            }
+        }
+
+        if (results.moved.length === 0 && results.failed.length > 0) {
+            const firstErr = results.failed[0];
+            throw new AppError(firstErr.error, firstErr.statusCode);
+        }
+
+        res.json({
+            success: true,
+            data: results,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
  * DELETE /api/fs/delete
  * Body: { paths: ["/media/a.txt", "/media/folder-b"] }
  */
@@ -548,6 +614,7 @@ module.exports = {
     getList,
     createFolder,
     renameItem,
+    moveItems,
     deleteItems,
     downloadFile,
     uploadFile,

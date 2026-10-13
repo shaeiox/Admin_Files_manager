@@ -51,7 +51,7 @@ admin-files-manager/
 │   │   └── filePolicy.controller.js  # admin file-access-policy CRUD + per-user permission grant/revoke
 │   ├── services/                 # 🔒 All filesystem + metadata access (no Express here)
 │   │   ├── PathService.js        # Client path ⇄ secure OS path; traversal guard (THE boundary)
-│   │   ├── FileSystemService.js  # stat/readdir/mkdir/rename/rm/unlink → AppError; tree/volume/health aggregation
+│   │   ├── FileSystemService.js  # stat/readdir/mkdir/rename/move/rm/unlink → AppError; tree/volume/health aggregation
 │   │   ├── MetadataService.js    # JSON-file DB (data/metadata.json), atomic writes, singleton
 │   │   ├── SettingsService.js    # JSON-file store (data/settings.json), atomic writes, defaults on first
 │   │   │                         #   read, whitelist validation at the service boundary; singleton (ADR-006).
@@ -279,7 +279,7 @@ both prefixes at once — never as a separate `app.use` in `server.js`
 │     → controllers/fs.controller.js  [parse, validate, format]  │
 │       → services/  [🔒 ALL disk + metadata access]             │
 │         ├─ PathService  (client path → secure OS path)         │
-│         ├─ FileSystemService (stat/readdir/mkdir/rename/rm)    │
+│         ├─ FileSystemService (stat/readdir/mkdir/rename/move/rm)│
 │         ├─ UploadService (multer staging → final placement)    │
 │         ├─ PreviewService (bounded thumbnails, optional)       │
 │         ├─ MetadataService (data/metadata.json, fire-and-forget)│

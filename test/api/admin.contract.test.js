@@ -224,6 +224,21 @@ describe('file-access-policy management', () => {
         assert.equal(newPolicy.json.access_mode, 'public');
     });
 
+    test('a policy follows a real move through /api/v1/fs/move', async () => {
+        fs.mkdirSync(path.join(ROOT, 'archive'), { recursive: true });
+        fs.writeFileSync(path.join(ROOT, 'before-move.txt'), 'x');
+        await sendJson('PUT', '/api/v1/admin/files/policy', { path: '/before-move.txt', accessMode: 'public' }, adminHeaders);
+        const moveRes = await sendJson('PUT', '/api/v1/fs/move', { paths: ['/before-move.txt'], destination: '/archive' }, adminHeaders);
+        assert.equal(moveRes.status, 200);
+        assert.deepEqual(moveRes.json.data.moved, [{ oldPath: '/before-move.txt', newPath: '/archive/before-move.txt' }]);
+
+        const oldPolicy = await send('GET', '/api/v1/admin/files/policy?path=/before-move.txt', { headers: adminHeaders });
+        assert.equal(oldPolicy.json, null);
+        const newPolicy = await send('GET', '/api/v1/admin/files/policy?path=/archive/before-move.txt', { headers: adminHeaders });
+        assert.ok(newPolicy.json);
+        assert.equal(newPolicy.json.access_mode, 'public');
+    });
+
     test('this change enforces nothing against a real download (design D5)', async () => {
         fs.writeFileSync(path.join(ROOT, 'blocked-in-theory.txt'), 'STILL READABLE');
         await sendJson('PUT', '/api/v1/admin/files/policy', { path: '/blocked-in-theory.txt', accessMode: 'restricted', isLocked: true }, adminHeaders);

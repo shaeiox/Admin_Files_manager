@@ -171,6 +171,78 @@ class FileSystemService {
     }
 
     /**
+     * Move a file or folder into a different, already-existing directory.
+     * The name is kept as-is; only the parent changes. This is the dedicated
+     * move API rename's own doc comment points to - rename stays same-directory
+     * only, and this is deliberately a separate operation rather than an
+     * extension of it (AGENTS.md: "Cross-directory moves need a dedicated,
+     * explicitly-designed API").
+     *
+     * @param {string} oldClientPath - Existing path (e.g., "/media/old.txt")
+     * @param {string} destinationClientPath - Existing destination DIRECTORY (e.g., "/archive")
+     * @returns {Promise<{oldPath: string, newPath: string}>}
+     */
+    static async move(oldClientPath, destinationClientPath) {
+        const path = require('path');
+        const oldSecurePath = PathService.resolveSecurePath(oldClientPath);
+
+        const rootPath = PathService.resolveSecurePath('/');
+        if (oldSecurePath === rootPath) {
+            throw new AppError('Cannot move the storage root.', 403);
+        }
+        if (!(await this.exists(oldSecurePath))) {
+            throw new AppError('Source item not found.', 404);
+        }
+
+        const destSecurePath = PathService.resolveSecurePath(destinationClientPath);
+        let destStat;
+        try {
+            destStat = await fs.stat(destSecurePath);
+        } catch {
+            throw new AppError('Destination folder not found.', 404);
+        }
+        if (!destStat.isDirectory()) {
+            throw new AppError('Destination is not a folder.', 400);
+        }
+
+        // A folder cannot be moved into itself or one of its own descendants -
+        // that would orphan it (and, for the destination-is-a-descendant case,
+        // make fs.rename's own EINVAL the only thing stopping it).
+        if (destSecurePath === oldSecurePath || destSecurePath.startsWith(oldSecurePath + path.sep)) {
+            throw new AppError('Cannot move a folder into itself or one of its own subfolders.', 400);
+        }
+
+        const name = path.basename(oldSecurePath);
+        const newSecurePath = path.join(destSecurePath, name);
+
+        if (newSecurePath === oldSecurePath) {
+            // Already there - a no-op, not an error (mirrors renaming something
+            // to its own current name).
+            return {
+                oldPath: PathService.toClientPath(oldSecurePath),
+                newPath: PathService.toClientPath(newSecurePath),
+            };
+        }
+
+        if (await this.exists(newSecurePath)) {
+            throw new AppError('An item with this name already exists at the destination.', 409);
+        }
+
+        try {
+            await fs.rename(oldSecurePath, newSecurePath);
+            return {
+                oldPath: PathService.toClientPath(oldSecurePath),
+                newPath: PathService.toClientPath(newSecurePath),
+            };
+        } catch (error) {
+            if (error.code === 'EACCES' || error.code === 'EPERM') {
+                throw new AppError('Permission denied to move item.', 403);
+            }
+            throw new AppError('Failed to move item on disk.', 500);
+        }
+    }
+
+    /**
      * Permanently remove a file or folder.
      * Uses recursive + force for folders to remove non-empty trees.
      * 

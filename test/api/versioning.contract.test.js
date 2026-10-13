@@ -265,11 +265,18 @@ describe('the versioned namespace (api-versioning)', () => {
             assert.equal(rename.status, 200, `${prefix} rename -> ${rename.text}`);
             assert.ok(fs.existsSync(path.join(ROOT, `dir-${tag}`, 'moved.txt')));
 
-            const del = await sendJson('DELETE', `${prefix}/fs/delete`, { paths: [`/dir-${tag}`] });
+            const moveDest = await sendJson('POST', `${prefix}/fs/folder`, { path: `/dir-${tag}-dest` });
+            assert.equal(moveDest.status, 201, `${prefix} move-dest folder -> ${moveDest.text}`);
+            const move = await sendJson('PUT', `${prefix}/fs/move`, { paths: [`/dir-${tag}/moved.txt`], destination: `/dir-${tag}-dest` });
+            assert.equal(move.status, 200, `${prefix} move -> ${move.text}`);
+            assert.ok(fs.existsSync(path.join(ROOT, `dir-${tag}-dest`, 'moved.txt')));
+
+            const del = await sendJson('DELETE', `${prefix}/fs/delete`, { paths: [`/dir-${tag}`, `/dir-${tag}-dest`] });
             assert.equal(del.status, 200, `${prefix} delete -> ${del.text}`);
             assert.equal(fs.existsSync(path.join(ROOT, `dir-${tag}`)), false);
+            assert.equal(fs.existsSync(path.join(ROOT, `dir-${tag}-dest`)), false);
 
-            shapes[tag] = [folder, upload, rename, del].map((r) => [r.status, shapeOf(r.json)]);
+            shapes[tag] = [folder, upload, rename, moveDest, move, del].map((r) => [r.status, shapeOf(r.json)]);
         }
         assert.deepEqual(shapes.v1, shapes.legacy, 'every mutation has one status and one shape on both prefixes');
     });
@@ -498,6 +505,7 @@ describe('the two prefixes are one implementation (legacy-api-compatibility)', (
         'POST /fs/folder',
         'POST /fs/star',
         'POST /fs/upload',
+        'PUT /fs/move',
         'PUT /fs/rename',
         'PUT /settings',
     ];

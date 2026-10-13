@@ -534,7 +534,9 @@ describe('surface honesty — source-level guards', () => {
   });
 
   test('the removed fabricated controls are gone from markup and module', () => {
-    for (const id of ['bulkMove', 'bulkShare', 'bulkRename', 'globalSearch']) {
+    // bulkMove is no longer in this list: it is a real, backend-supported
+    // action now (PUT /api/fs/move), not the earlier unbacked stub.
+    for (const id of ['bulkShare', 'bulkRename', 'globalSearch']) {
       assert.ok(!FILES_HTML.includes(`id="${id}"`), `${id} in files.html`);
       assert.ok(!FILES_SRC.includes(`#${id}`), `${id} in files.js`);
     }
@@ -1448,5 +1450,59 @@ describe('list columns are fixed-width and resizable', () => {
   test('widths are applied through a stylesheet, never inline styles', () => {
     assert.match(FILES_SRC, /widthSheet\.textContent = columnWidthsCss\(state\.colWidths\)/);
     assert.doesNotMatch(FILES_SRC, /\.style\./);
+  });
+});
+
+/* ══════════════════════════════════════════
+   MOVE (cross-directory) + ACCESS POLICY — context menu and bulk bar
+   ══════════════════════════════════════════ */
+
+describe('move and access policy are wired on both the row context menu and the bulk bar', () => {
+  test('contextItems offers Move and Access policy for both a file and a folder', () => {
+    assert.match(FILES_SRC, /label: 'Move to…', icon: 'move', action: \(\) => moveItems\(\[file\]\)/);
+    assert.match(FILES_SRC, /label: 'Access policy…', icon: 'lock', action: \(\) => setAccessPolicy\(\[file\]\)/);
+  });
+
+  test('the bulk bar buttons exist, are bound exactly once, and dispatch through handleAction', () => {
+    assert.match(FILES_HTML, /id="bulkMove" data-tip="Move selected" aria-label="Move selected"/);
+    assert.match(FILES_HTML, /id="bulkPolicy" data-tip="Set access policy for selected" aria-label="Set access policy for selected"/);
+    assert.equal((FILES_SRC.match(/#bulkMove/g) || []).length, 1);
+    assert.equal((FILES_SRC.match(/#bulkPolicy/g) || []).length, 1);
+    assert.match(FILES_SRC, /case 'bulkMove': return moveItems\(selectedFiles\(\)\);/);
+    assert.match(FILES_SRC, /case 'bulkPolicy': return setAccessPolicy\(selectedFiles\(\)\);/);
+    assert.ok(FILES_SRC.includes("SCOPED_ACTIONS = new Set(['newFolder', 'renameTree', 'deleteTree', 'bulkDelete', 'bulkStar', 'bulkMove', 'bulkPolicy'])"));
+  });
+
+  test('move goes through PUT /fs/move and policy through PUT /admin/files/policy - no new endpoint invented', () => {
+    assert.match(FILES_SRC, /window\.API\.put\('\/fs\/move', \{ paths, destination \}\)/);
+    assert.match(FILES_SRC, /window\.API\.put\('\/admin\/files\/policy', \{/);
+    assert.doesNotMatch(FILES_SRC, /\bfetch\(/);
+  });
+
+  test('the move and access-policy modals escape the item name before it reaches markup', () => {
+    assert.match(FILES_SRC, /Move .\$\{esc\(items\[0\]\.name\)\}/);
+    assert.match(FILES_SRC, /Access policy — \$\{esc\(items\[0\]\.name\)\}/);
+    assert.doesNotMatch(FILES_SRC, /Move .\$\{items\[0\]\.name\}/);
+    assert.doesNotMatch(FILES_SRC, /Access policy — \$\{items\[0\]\.name\}/);
+  });
+
+  test('the move destination picker escapes every folder path it lists', () => {
+    const fn = FILES_SRC.slice(FILES_SRC.indexOf('function pickMoveDestination'), FILES_SRC.indexOf('function summarizeMove'));
+    assert.doesNotMatch(fn, /\$\{f\.path\}/);
+    assert.doesNotMatch(fn, /\$\{f\.label\}/);
+    assert.match(fn, /esc\(f\.path\)/);
+    assert.match(fn, /esc\(f\.label\)/);
+  });
+
+  test('a bulk policy apply reports its own summary instead of letting each call toast separately', () => {
+    const fn = FILES_SRC.slice(FILES_SRC.indexOf('async function setAccessPolicy'));
+    assert.match(fn, /Promise\.allSettled/);
+    assert.match(fn, /silent: true/);
+  });
+
+  test('access policy is reachable from the row menu and the bulk bar without a client-side role gate', () => {
+    // The Admin nav link itself follows "always show, handle 403 gracefully" -
+    // this page does the same rather than duplicating role logic client-side.
+    assert.doesNotMatch(FILES_SRC, /session\.role|isAdmin/);
   });
 });

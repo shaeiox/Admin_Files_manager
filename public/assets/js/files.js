@@ -29,7 +29,7 @@
 const Files = (() => {
 
   const AFM = window.AFM;
-  const { $, icon, Format, Toast, Modal, ContextMenu, Dropdown, copyToClipboard, Store, FileTypes } = AFM;
+  const { $, el, icon, Format, Toast, Modal, ContextMenu, Dropdown, copyToClipboard, Store, FileTypes } = AFM;
   const esc = AFM.escapeHtml;
 
   /* ══════════════════════════════════════════
@@ -1199,7 +1199,7 @@ const Files = (() => {
      ══════════════════════════════════════════ */
 
   /** Entry-scoped actions need a rendered entry; the rest carry their own scope. */
-  const SCOPED_ACTIONS = new Set(['newFolder', 'renameTree', 'deleteTree', 'bulkDelete', 'bulkStar']);
+  const SCOPED_ACTIONS = new Set(['newFolder', 'renameTree', 'deleteTree', 'bulkDelete', 'bulkStar', 'bulkMove', 'bulkPolicy']);
 
   /**
    * @param {string} act
@@ -1228,6 +1228,8 @@ const Files = (() => {
         const items = selectedFiles();
         return setStars(items, !items.every(f => f.starred));
       }
+      case 'bulkMove': return moveItems(selectedFiles());
+      case 'bulkPolicy': return setAccessPolicy(selectedFiles());
       default: return undefined;
     }
   }
@@ -1290,6 +1292,8 @@ const Files = (() => {
       { label: file.starred ? 'Unstar' : 'Star', icon: 'star', action: () => setStars([file], !file.starred) },
       { divider: true },
       { label: 'Rename', icon: 'edit', shortcut: 'F2', action: () => renameItem(file) },
+      { label: 'Move to…', icon: 'move', action: () => moveItems([file]) },
+      { label: 'Access policy…', icon: 'lock', action: () => setAccessPolicy([file]) },
       { label: 'Delete permanently', icon: 'trash', danger: true, shortcut: 'Del', action: () => deleteItems([file]) },
     );
     return items;
@@ -1408,6 +1412,292 @@ const Files = (() => {
       12000
     );
     announce(`Deleted ${n} of ${summary.sent}. ${summary.failed.length} could not be deleted.`);
+  }
+
+  /* ── move (cross-directory; rename itself stays same-directory only) ── */
+
+  /** Flatten GET /api/fs/tree. That endpoint stops two levels below the root. */
+  function flattenTree(tree) {
+    const out = [];
+    const walk = (nodes, depth) => {
+      if (!Array.isArray(nodes)) return;
+      for (const node of nodes) {
+        if (!node || typeof node.path !== 'string') continue;
+        out.push({ path: node.path, label: node.path === '/' ? '/ (All Files)' : node.path, depth });
+        walk(node.children, depth + 1);
+      }
+    };
+    walk(tree, 0);
+    return out;
+  }
+
+  /**
+   * Modal: pick an existing destination folder. A quick-pick select (folders
+   * up to two levels below the root, same bound GET /fs/tree itself has)
+   * fills a text input that stays the single source of truth, so a deeper
+   * folder can still be typed exactly. Resolves the chosen client path, or
+   * null on cancel - the server is still the authority on whether it exists.
+   */
+  function pickMoveDestination(items) {
+    return new Promise(resolve => {
+      const count = items.length;
+      const title = count === 1 ? `Move “${esc(items[0].name)}”` : `Move ${count} items`;
+      const backdrop = el('div', { class: 'modal-backdrop' }, `
+        <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="moveModalTitle">
+          <div class="modal-header">
+            <div>
+              <div class="modal-title" id="moveModalTitle">${title}</div>
+              <div class="modal-subtitle">Choose an existing destination folder.</div>
+            </div>
+            <button class="btn-icon btn-icon-sm" data-act="cancel" aria-label="Cancel">${icon('x', 15)}</button>
+          </div>
+          <div class="modal-body">
+            <div class="field">
+              <label class="field-label" for="moveDestSelect">Quick pick</label>
+              <select class="input" id="moveDestSelect">
+                <option value="">Loading folders…</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label" for="moveDestInput">Destination folder</label>
+              <input class="input" type="text" id="moveDestInput" placeholder="/folder/path" autocomplete="off">
+            </div>
+            <div class="admin-form-error" id="moveModalError" role="alert" hidden></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" data-act="cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" data-act="ok" disabled>Move</button>
+          </div>
+        </div>
+      `);
+
+      document.body.appendChild(backdrop);
+      requestAnimationFrame(() => Modal.open(backdrop));
+
+      const select = backdrop.querySelector('#moveDestSelect');
+      const input = backdrop.querySelector('#moveDestInput');
+      const okBtn = backdrop.querySelector('[data-act="ok"]');
+      const errBox = backdrop.querySelector('#moveModalError');
+
+      const finish = val => {
+        Modal.close(backdrop);
+        setTimeout(() => backdrop.remove(), 300);
+        resolve(val);
+      };
+
+      const syncOkState = () => { okBtn.disabled = !input.value.trim().startsWith('/'); };
+      input.addEventListener('input', () => { errBox.hidden = true; syncOkState(); });
+      select.addEventListener('change', () => {
+        if (select.value) input.value = select.value;
+        errBox.hidden = true;
+        syncOkState();
+        input.focus();
+      });
+
+      okBtn.onclick = () => {
+        const dest = input.value.trim();
+        if (!dest.startsWith('/')) {
+          errBox.textContent = 'A destination starts at the storage root, “/”.';
+          errBox.hidden = false;
+          return;
+        }
+        finish(dest);
+      };
+      backdrop.querySelectorAll('[data-act="cancel"]').forEach(b => b.onclick = () => finish(null));
+      backdrop.addEventListener('click', e => { if (e.target === backdrop) finish(null); });
+      input.addEventListener('keydown', e => { if (e.key === 'Enter' && !okBtn.disabled) okBtn.click(); });
+
+      window.API.get('/fs/tree', { silent: true }).then(tree => {
+        const folders = flattenTree(tree);
+        select.innerHTML = '<option value="">Choose a folder…</option>' + folders.map(f =>
+          `<option value="${esc(f.path)}">${'— '.repeat(f.depth)}${esc(f.label)}</option>`
+        ).join('');
+      }).catch(() => {
+        select.innerHTML = '<option value="">Folder list unavailable — type a path below</option>';
+      });
+
+      setTimeout(() => input.focus(), 140);
+    });
+  }
+
+  function summarizeMove(sentPaths, data) {
+    const moved = Array.isArray(data && data.moved) ? data.moved : [];
+    const failed = Array.isArray(data && data.failed) ? data.failed : [];
+    return {
+      sent: sentPaths.length,
+      moved,
+      failed,
+      kind: failed.length === 0 ? 'complete' : 'partial',
+    };
+  }
+
+  function reportMove(summary, items, destination) {
+    const nameOf = p => (items.find(i => i.path === p) || { name: baseName(p) }).name;
+    const n = summary.moved.length;
+    if (summary.kind === 'complete') {
+      Toast.success(`Moved ${n} ${n === 1 ? 'item' : 'items'}`, `to ${destination}`);
+      announce(`Moved ${n} ${n === 1 ? 'item' : 'items'} to ${destination}.`);
+      return;
+    }
+    const failures = summary.failed.map(f => `${nameOf(f.path)}: ${f.error || 'not moved'}`).join('; ');
+    Toast.warning(
+      `Moved ${n} of ${summary.sent} — ${summary.failed.length} not moved`,
+      `Not moved: ${failures}`,
+      12000
+    );
+    announce(`Moved ${n} of ${summary.sent}. ${summary.failed.length} could not be moved.`);
+  }
+
+  async function moveItems(items) {
+    if (!items.length) return;
+    const destination = await pickMoveDestination(items);
+    if (!destination) return;
+
+    const paths = items.map(i => i.path);
+    let res;
+    try {
+      res = await window.API.put('/fs/move', { paths, destination });
+    } catch {
+      return; // every path failed: api.js shows the reason and nothing was moved
+    }
+    const summary = summarizeMove(paths, res && res.data);
+    reportMove(summary, items, destination);
+
+    const movedFolders = items.filter(i => i.isFolder && summary.moved.some(m => m.oldPath === i.path));
+    for (const folder of movedFolders) {
+      const entry = summary.moved.find(m => m.oldPath === folder.path);
+      if (entry && syncAfterMutation('rename', entry.oldPath, entry.newPath)) break;
+    }
+    if (movedFolders.length) loadTree();
+    state.selected = new Set();
+    loadFiles({ silent: true });
+  }
+
+  /* ── access policy (admin-only; reuses PUT /admin/files/policy from the Admin page) ── */
+
+  const ACCESS_MODES = [
+    { value: 'restricted', label: 'Restricted' },
+    { value: 'authenticated', label: 'Authenticated' },
+    { value: 'public', label: 'Public' },
+  ];
+
+  /**
+   * Modal: set the file-access policy for one or more paths. No new endpoint -
+   * this goes through window.API to the same PUT /admin/files/policy the
+   * Admin page uses (AGENTS.md rule 8). Admin-only on the server; this page
+   * shows the action to everyone and lets a 403 fail gracefully, the same
+   * "always show, handle 403" pattern the Admin nav link itself already
+   * follows rather than a second, client-side role gate.
+   */
+  function pickAccessPolicy(items) {
+    return new Promise(resolve => {
+      const count = items.length;
+      const title = count === 1 ? `Access policy — ${esc(items[0].name)}` : `Access policy — ${count} items`;
+      const backdrop = el('div', { class: 'modal-backdrop' }, `
+        <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="policyModalTitle">
+          <div class="modal-header">
+            <div>
+              <div class="modal-title" id="policyModalTitle">${title}</div>
+              <div class="modal-subtitle">Administrator only. This manages the data model only —
+                nothing currently checks it before a download.</div>
+            </div>
+            <button class="btn-icon btn-icon-sm" data-act="cancel" aria-label="Cancel">${icon('x', 15)}</button>
+          </div>
+          <div class="modal-body">
+            <div class="field">
+              <label class="field-label" for="policyAccessMode">Access mode</label>
+              <select class="input" id="policyAccessMode">
+                ${ACCESS_MODES.map(m => `<option value="${m.value}">${m.label}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field admin-switch-field">
+              <label class="admin-switch-label">
+                <span class="switch">
+                  <input type="checkbox" id="policyPublished">
+                  <span class="track" aria-hidden="true"></span>
+                </span>
+                <span>Published</span>
+              </label>
+            </div>
+            <div class="field admin-switch-field">
+              <label class="admin-switch-label">
+                <span class="switch">
+                  <input type="checkbox" id="policyLocked">
+                  <span class="track" aria-hidden="true"></span>
+                </span>
+                <span>Locked</span>
+              </label>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" data-act="cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" data-act="ok">Save policy</button>
+          </div>
+        </div>
+      `);
+
+      document.body.appendChild(backdrop);
+      requestAnimationFrame(() => Modal.open(backdrop));
+
+      const modeSelect = backdrop.querySelector('#policyAccessMode');
+      const publishedBox = backdrop.querySelector('#policyPublished');
+      const lockedBox = backdrop.querySelector('#policyLocked');
+
+      const finish = val => {
+        Modal.close(backdrop);
+        setTimeout(() => backdrop.remove(), 300);
+        resolve(val);
+      };
+
+      backdrop.querySelector('[data-act="ok"]').onclick = () => finish({
+        accessMode: modeSelect.value,
+        isPublished: publishedBox.checked,
+        isLocked: lockedBox.checked,
+      });
+      backdrop.querySelectorAll('[data-act="cancel"]').forEach(b => b.onclick = () => finish(null));
+      backdrop.addEventListener('click', e => { if (e.target === backdrop) finish(null); });
+
+      // Prefill from the current policy when editing a single item - a bulk
+      // apply to several items has no single "current" to show, so it starts
+      // from the form's own defaults instead.
+      if (count === 1) {
+        window.API.get(`/admin/files/policy?path=${encodeURIComponent(items[0].path)}`, { silent: true })
+          .then(policy => {
+            if (!policy) return;
+            modeSelect.value = policy.access_mode || 'restricted';
+            publishedBox.checked = policy.is_published === 1;
+            lockedBox.checked = policy.is_locked === 1;
+          })
+          .catch(() => { /* no existing policy, or not an admin - the form's defaults stand */ });
+      }
+    });
+  }
+
+  async function setAccessPolicy(items) {
+    if (!items.length) return;
+    const payload = await pickAccessPolicy(items);
+    if (!payload) return;
+
+    const results = await Promise.allSettled(items.map(f => window.API.put('/admin/files/policy', {
+      path: f.path,
+      isDirectory: !!f.isFolder,
+      ...payload,
+    }, { silent: true })));
+
+    let saved = 0;
+    const failed = [];
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') saved++;
+      else failed.push(`${items[i].name}: ${(r.reason && r.reason.message) || 'not saved'}`);
+    });
+
+    if (failed.length === 0) {
+      Toast.success(`Access policy saved for ${saved} ${saved === 1 ? 'item' : 'items'}`);
+    } else if (saved === 0) {
+      Toast.error('Access policy was not saved', failed[0]);
+    } else {
+      Toast.warning(`Saved ${saved} of ${items.length}`, `Not saved: ${failed.join('; ')}`, 12000);
+    }
   }
 
   /**
@@ -2289,6 +2579,8 @@ const Files = (() => {
 
     bind('#bulkDownload', 'click', e => openBulkDownloadMenu(e.currentTarget));
     bind('#bulkStar', 'click', () => handleAction('bulkStar'));
+    bind('#bulkMove', 'click', () => handleAction('bulkMove'));
+    bind('#bulkPolicy', 'click', () => handleAction('bulkPolicy'));
     bind('#bulkDelete', 'click', () => handleAction('bulkDelete'));
     bind('#bulkClear', 'click', clearSelection);
 

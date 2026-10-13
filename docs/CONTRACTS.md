@@ -23,6 +23,7 @@
   | `POST /api/fs/folder` | write | `{ success, data }` |
   | `POST /api/fs/upload` | write | `{ success, data }` |
   | `PUT /api/fs/rename` | write | `{ success, data }` |
+  | `PUT /api/fs/move` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
   | `DELETE /api/fs/delete` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
   | `POST /api/fs/star` | write | `{ success, data }` |
   | `GET /api/fs/thumbnail/capability` | read | `{ available, formats, maxSize }` — bare object |
@@ -571,6 +572,30 @@ Without `starred` each call toggles once; with it the call is idempotent (sets t
 Errors: `404` source missing · `409` target exists · `400` invalid name. Metadata keys migrate
 best-effort after disk rename.
 
+### PUT /api/fs/move
+
+**Body:** `{ "paths": ["/a.txt", "/b folder"], "destination": "/archive" }` (≤500 paths) → **`200`**
+```json
+{
+  "success": true,
+  "data": {
+    "moved": [ { "oldPath": "/a.txt", "newPath": "/archive/a.txt" } ],
+    "failed": [ { "path": "/b folder", "error": "An item with this name already exists at the destination.", "statusCode": 409 } ]
+  }
+}
+```
+- Cross-directory by design — unlike `PUT /api/fs/rename`, which stays same-directory only (see its own
+  entry above). The name is kept as-is; only the parent changes.
+- The destination must already **exist and be a directory** — there is no implicit creation; create it
+  first with `POST /api/fs/folder`.
+- **A `200` (and `success: true`) does NOT mean every path was moved.** Same partial-failure contract as
+  `DELETE /api/fs/delete`: read `data.moved` / `data.failed`, never assume the full batch landed.
+- Total failure (`moved` empty, `failed` non-empty) is a non-2xx: the first error with its status.
+- Errors per item: `404` source or destination missing · `409` name collision at the destination · `400`
+  destination is not a folder, or the destination is the item itself or one of its own subfolders · `403`
+  moving the storage root itself. Metadata keys and a governed path's access policy migrate best-effort,
+  exactly like a rename (`MetadataService.renamePath` / `FileAccessPolicyService.onPathRenamed`).
+
 ### DELETE /api/fs/delete
 
 **Body:** `{ "paths": ["/a.txt", "/b folder"] }` (≤500) → **`200`**
@@ -759,10 +784,11 @@ of what's set here. This section manages the data model and the admin UI over it
 | `POST /api/admin/files/permissions` → `201` | `{success, permission}` | Body: `{path, userId, permission: "grant"\|"deny"}`. `409` if `path` has no policy yet — grant before policy is a user error, not an implicit policy creation. One row per `(file, user)`; a second grant for the same pair updates the existing row. |
 | `DELETE /api/admin/files/permissions` | `{success: true}` | Body: `{path, userId}`. |
 
-A governed path's `files.client_path` row is kept in step with `PUT /api/fs/rename` and `DELETE
-/api/fs/delete` on a **best-effort** basis (`FileAccessPolicyService.onPathRenamed`/
-`onPathDeleted`, called from `fs.controller.js` alongside the existing `MetadataService`
-fire-and-forget calls) — the filesystem operation's own success never depends on it.
+A governed path's `files.client_path` row is kept in step with `PUT /api/fs/rename`, `PUT
+/api/fs/move` and `DELETE /api/fs/delete` on a **best-effort** basis
+(`FileAccessPolicyService.onPathRenamed`/`onPathDeleted`, called from `fs.controller.js` alongside
+the existing `MetadataService` fire-and-forget calls) — the filesystem operation's own success
+never depends on it.
 
 ## Error Model
 

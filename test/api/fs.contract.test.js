@@ -697,6 +697,95 @@ describe('DELETE /api/fs/delete - partial failure is a 200 that is NOT full succ
     });
 });
 
+describe('PUT /api/fs/move - cross-directory, unlike rename', () => {
+    test('moves a file into an existing destination folder', async () => {
+        writeFile('movable.txt', 'CONTENT');
+        const res = await sendJson('PUT', '/api/fs/move', { paths: ['/movable.txt'], destination: '/sub' });
+        assert.equal(res.status, 200);
+        assert.equal(res.json.success, true);
+        assert.deepEqual(res.json.data.moved, [{ oldPath: '/movable.txt', newPath: '/sub/movable.txt' }]);
+        assert.deepEqual(res.json.data.failed, []);
+        assert.ok(!fs.existsSync(path.join(ROOT, 'movable.txt')));
+        assert.ok(fs.existsSync(path.join(ROOT, 'sub', 'movable.txt')));
+    });
+
+    test('moves a folder and everything inside it', async () => {
+        writeFile('tree-to-move/inner/leaf.txt', 'LEAF');
+        const res = await sendJson('PUT', '/api/fs/move', { paths: ['/tree-to-move'], destination: '/sub' });
+        assert.equal(res.status, 200);
+        assert.deepEqual(res.json.data.moved, [{ oldPath: '/tree-to-move', newPath: '/sub/tree-to-move' }]);
+        assert.ok(fs.existsSync(path.join(ROOT, 'sub', 'tree-to-move', 'inner', 'leaf.txt')));
+    });
+
+    test('a mixed batch reports moved and failed separately (partial failure, still 200)', async () => {
+        writeFile('movable2.txt', 'X');
+        const res = await sendJson('PUT', '/api/fs/move', {
+            paths: ['/movable2.txt', '/never-existed-move.txt'],
+            destination: '/sub',
+        });
+        assert.equal(res.status, 200);
+        assert.equal(res.json.success, true);
+        assert.deepEqual(res.json.data.moved, [{ oldPath: '/movable2.txt', newPath: '/sub/movable2.txt' }]);
+        assert.equal(res.json.data.failed.length, 1);
+        assert.equal(res.json.data.failed[0].path, '/never-existed-move.txt');
+        assert.equal(res.json.data.failed[0].statusCode, 404);
+    });
+
+    test('total failure (nothing moved) is a non-2xx with the first error', async () => {
+        const res = await sendJson('PUT', '/api/fs/move', {
+            paths: ['/never-existed-move-2.txt'],
+            destination: '/sub',
+        });
+        assert.equal(res.status, 404);
+        assert.equal(res.json.success, false);
+    });
+
+    test('a missing destination is a 404 for every path, and nothing is moved', async () => {
+        writeFile('stays-put.txt', 'X');
+        const res = await sendJson('PUT', '/api/fs/move', { paths: ['/stays-put.txt'], destination: '/no-such-folder' });
+        assert.equal(res.status, 404);
+        assert.ok(fs.existsSync(path.join(ROOT, 'stays-put.txt')));
+    });
+
+    test('a destination that is a file, not a folder, is a 400', async () => {
+        const res = await sendJson('PUT', '/api/fs/move', { paths: ['/notes.txt'], destination: '/existing.txt' });
+        assert.equal(res.status, 400);
+    });
+
+    test('a name collision at the destination is a 409 and neither copy is touched', async () => {
+        writeFile('collide.txt', 'SOURCE');
+        writeFile('sub/collide.txt', 'ALREADY THERE');
+        const res = await sendJson('PUT', '/api/fs/move', { paths: ['/collide.txt'], destination: '/sub' });
+        assert.equal(res.status, 409);
+        assert.ok(fs.existsSync(path.join(ROOT, 'collide.txt')));
+        assert.equal(fs.readFileSync(path.join(ROOT, 'sub', 'collide.txt'), 'utf8'), 'ALREADY THERE');
+    });
+
+    test('a folder cannot be moved into itself or one of its own subfolders', async () => {
+        writeFile('self-move/child/leaf.txt', 'X');
+        const intoSelf = await sendJson('PUT', '/api/fs/move', { paths: ['/self-move'], destination: '/self-move' });
+        assert.equal(intoSelf.status, 400);
+        const intoChild = await sendJson('PUT', '/api/fs/move', { paths: ['/self-move'], destination: '/self-move/child' });
+        assert.equal(intoChild.status, 400);
+        assert.ok(fs.existsSync(path.join(ROOT, 'self-move', 'child', 'leaf.txt')), 'the tree was never touched');
+    });
+
+    test('the storage root itself cannot be moved', async () => {
+        const res = await sendJson('PUT', '/api/fs/move', { paths: ['/'], destination: '/sub' });
+        assert.equal(res.status, 403);
+    });
+
+    test('an empty or oversized batch is a 400', async () => {
+        const empty = await sendJson('PUT', '/api/fs/move', { paths: [], destination: '/sub' });
+        assert.equal(empty.status, 400);
+        const oversized = await sendJson('PUT', '/api/fs/move', {
+            paths: Array.from({ length: 501 }, (_, i) => `/f${i}.txt`),
+            destination: '/sub',
+        });
+        assert.equal(oversized.status, 400);
+    });
+});
+
 describe('POST /api/fs/upload - an aborted transfer leaves nothing behind', () => {
     test('destroying the request mid-body removes the staged bytes', async () => {
         const boundary = '----afmabort';

@@ -183,8 +183,9 @@ const API = (() => {
             body: body instanceof FormData ? body : JSON.stringify(body),
         });
 
-    const put = (endpoint, body) =>
+    const put = (endpoint, body, opts = {}) =>
         request(endpoint, {
+            ...opts,
             method: 'PUT',
             body: body instanceof FormData ? body : JSON.stringify(body),
         });
@@ -194,8 +195,9 @@ const API = (() => {
      * @param {string} endpoint
      * @param {object} [body]
      */
-    const del = (endpoint, body) =>
+    const del = (endpoint, body, opts = {}) =>
         request(endpoint, {
+            ...opts,
             method: 'DELETE',
             body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
         });
