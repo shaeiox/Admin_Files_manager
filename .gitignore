@@ -19,6 +19,10 @@ Thumbs.db
 data/*
 !data/.gitkeep
 
+# Local environment variables (Security: Never commit secrets)
+.env
+!.env.example
+
 # Storage / Downloads (If testing locally)
 download/
 
