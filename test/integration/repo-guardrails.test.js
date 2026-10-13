@@ -70,7 +70,7 @@ describe('the frontend API boundary', () => {
     });
 
     test('no page shell hardcodes an API path outside the base-URL meta tag', () => {
-        for (const page of ['index.html', 'files.html', 'uploads.html', 'settings.html']) {
+        for (const page of ['index.html', 'files.html', 'uploads.html', 'settings.html', 'admin.html']) {
             const html = fs.readFileSync(path.join(ROOT, 'public', page), 'utf8')
                 .replace(/<meta name="afm-api-base" content="[^"]*">/, '');
             assert.ok(!/["'`]\/api(\/|["'`])/.test(html), `${page} hardcodes an /api path`);
@@ -105,7 +105,7 @@ describe('the frontend API boundary', () => {
     test('the shipped configuration is same-origin: no absolute API base anywhere', () => {
         const api = code('api.js');
         assert.ok(!/https?:\/\//.test(api), 'api.js names no host');
-        for (const page of ['index.html', 'files.html', 'uploads.html', 'settings.html']) {
+        for (const page of ['index.html', 'files.html', 'uploads.html', 'settings.html', 'admin.html']) {
             const html = fs.readFileSync(path.join(ROOT, 'public', page), 'utf8');
             const meta = html.match(/<meta name="afm-api-base" content="([^"]*)">/);
             assert.ok(meta, `${page} declares the API base`);

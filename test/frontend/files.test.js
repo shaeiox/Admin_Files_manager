@@ -559,6 +559,7 @@ describe('surface honesty — source-level guards', () => {
       /data-dropdown="sortDropdown"/, // app.js Dropdown
       /data-sort-act=/, /data-view=/, // delegated: #sortDropdown, #viewToggle
       /data-upload-dismiss/, // delegated: #uploadTray
+      /data-action="logout"/, // sidebar.js logout control (delegated, ADR-009)
     ];
     const unbound = interactive.filter(tag => {
       if (shared.some(re => re.test(tag))) return false;
@@ -579,8 +580,8 @@ describe('surface honesty — source-level guards', () => {
     assert.doesNotMatch(FILES_SRC, /closest\(['"]\[data-page\]['"]\)/);
   });
 
-  test('the sidebar is byte-identical on all four pages, with no Shared or Trash entry', () => {
-    const slices = ['index.html', 'files.html', 'uploads.html', 'settings.html'].map(p => {
+  test('the sidebar is byte-identical on all five pages, with no Shared or Trash entry', () => {
+    const slices = ['index.html', 'files.html', 'uploads.html', 'settings.html', 'admin.html'].map(p => {
       const src = fs.readFileSync(path.join(ROOT_DIR, 'public', p), 'utf8').replace(/\r\n/g, '\n');
       const start = src.indexOf('<aside class="sidebar"');
       return src.slice(start, src.indexOf('</aside>', start));

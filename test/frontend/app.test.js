@@ -204,54 +204,37 @@ describe('resolveStorageDisplay - unavailable states never render a figure', () 
 });
 
 /* ══════════════════════════════════════════
-   SEAM 2 - sidebar identity: there is no person
+   SEAM 2 - sidebar identity: the live session, never a fabricated one (ADR-009)
    ══════════════════════════════════════════ */
 
-describe('resolveIdentityDisplay - the environment, never a person', () => {
-    test('no health payload renders an environment: the server no longer discloses one', () => {
-        // `env` was removed from GET /api/v1/health (api-security-hardening), so
-        // there is nothing true left to name here. A payload that still carries
-        // the old field must not resurrect it.
-        for (const health of [
-            { success: true, message: 'Dimension API is running', apiVersion: 1 },
-            { success: true, message: 'Dimension API is running', env: 'production' },
-        ]) {
-            const view = resolveIdentityDisplay(health);
-            assert.equal(view.available, false);
+describe('resolveIdentityDisplay - the authenticated session, or an honest absence', () => {
+    test('a real /auth/me payload renders that session\'s username and role', () => {
+        const view = resolveIdentityDisplay({ id: 1, username: 'alice', role: 'user', status: 'active' });
+        assert.equal(view.available, true);
+        assert.equal(view.name, 'alice');
+        assert.equal(view.role, 'User');
+        assert.equal(view.avatar, 'AL');
+    });
+
+    test('an admin role renders as "Administrator"', () => {
+        const view = resolveIdentityDisplay({ id: 2, username: 'root', role: 'admin', status: 'active' });
+        assert.equal(view.role, 'Administrator');
+    });
+
+    test('a failed or missing call (no session) is an honest absence, never a fabricated operator', () => {
+        for (const me of [null, undefined, {}, { success: false }, { username: '' }, { username: '  ' },
+            { username: null }, { username: 0 }, { username: false }, 'ok', 7, []]) {
+            const view = resolveIdentityDisplay(me);
+            assert.equal(view.available, false, JSON.stringify(me));
             assert.equal(view.name, 'Unknown');
-            assert.equal(view.role, 'Environment unavailable');
+            assert.equal(view.role, 'Not signed in');
+            assert.equal(view.avatar, '', JSON.stringify(me));
         }
-    });
-
-    test('no initials are rendered for any input', () => {
-        // An avatar reading "PR" would assert an operator. There is none.
-        for (const health of [{ env: 'production' }, { env: 'development' }, {}, null, undefined,
-            { env: '' }, { env: '   ' }]) {
-            assert.equal(resolveIdentityDisplay(health).avatar, '', JSON.stringify(health));
-        }
-    });
-
-    test('a failed or missing health payload is an honest absence', () => {
-        for (const health of [null, undefined, {}, { success: false }, { env: '' }, { env: '  ' },
-            { env: null }, { env: 0 }, { env: false }, 'ok', 7, []]) {
-            const view = resolveIdentityDisplay(health);
-            assert.equal(view.available, false, JSON.stringify(health));
-            assert.equal(view.name, 'Unknown');
-            assert.equal(view.role, 'Environment unavailable');
-        }
-    });
-
-    test('a user-shaped payload does not conjure a user', () => {
-        // The old signature took a user object. If anything still passes one, the
-        // sidebar must ignore its name rather than render it.
-        const view = resolveIdentityDisplay({ name: 'Sarah Chen', role: 'Administrator', initials: 'SC' });
-        assert.equal(view.name, 'Unknown');
-        assert.equal(view.avatar, '');
     });
 
     test('never throws on partial input', () => {
-        for (const health of [undefined, null, 0, '', [], NaN, {}, { env: {} }, { env: [] }]) {
-            assert.doesNotThrow(() => resolveIdentityDisplay(health), String(health));
+        for (const me of [undefined, null, 0, '', [], NaN, {}, { username: {} }, { username: [] }]) {
+            assert.doesNotThrow(() => resolveIdentityDisplay(me), String(me));
         }
     });
 });
@@ -312,44 +295,40 @@ describe('updateStorageUI - sidebar volume card', () => {
 });
 
 describe('updateUserUI - sidebar identity', () => {
-    test('renders an honest absence: the server no longer discloses the environment', () => {
+    test('renders the real session username and role', () => {
         const nodes = sidebarNodes();
-        // Even a stale payload still carrying the removed `env` field must not be
-        // rendered: the disclosure was closed at the source (api-security-hardening).
-        updateUserUI({ success: true, message: 'Dimension API is running', env: 'development' });
+        updateUserUI({ id: 1, username: 'alice', role: 'admin', status: 'active' });
 
-        assert.equal(nodes['.user-name'].textContent, 'Unknown');
-        assert.equal(nodes['.user-role'].textContent, 'Environment unavailable');
-        assert.equal(nodes['.user-avatar'].textContent, '');
+        assert.equal(nodes['.user-name'].textContent, 'alice');
+        assert.equal(nodes['.user-role'].textContent, 'Administrator');
+        assert.equal(nodes['.user-avatar'].textContent, 'AL');
     });
 
-    test('a failed health call renders unknown, not a fabricated operator', () => {
+    test('a failed /auth/me call renders unknown, not a fabricated operator', () => {
         const nodes = sidebarNodes();
         updateUserUI(null);
 
         assert.equal(nodes['.user-name'].textContent, 'Unknown');
-        assert.equal(nodes['.user-role'].textContent, 'Environment unavailable');
+        assert.equal(nodes['.user-role'].textContent, 'Not signed in');
         assert.equal(nodes['.user-avatar'].textContent, '');
 
         const onScreen = [nodes['.user-name'].textContent, nodes['.user-role'].textContent].join(' | ');
-        for (const invented of ['Linux Admin', 'System Operator', 'Sarah Chen', 'Administrator', 'SC', 'LA']) {
+        for (const invented of ['Linux Admin', 'System Operator', 'Sarah Chen', 'SC', 'LA']) {
             assert.ok(!onScreen.includes(invented), `no "${invented}" in "${onScreen}"`);
         }
     });
 
-    test('a payload without a name no longer throws', () => {
-        // The previous implementation ran user.name.substring(0, 2) unguarded,
-        // which threw for every payload the real /api/health endpoint returns.
+    test('a payload without a username no longer throws', () => {
         const nodes = sidebarNodes();
         assert.doesNotThrow(() => updateUserUI({ success: true }));
-        assert.doesNotThrow(() => updateUserUI({ env: 'test' }));
+        assert.doesNotThrow(() => updateUserUI({ role: 'admin' }));
         assert.doesNotThrow(() => updateUserUI(undefined));
         assert.equal(nodes['.user-name'].textContent, 'Unknown');
     });
 
     test('a page without the identity block does not throw', () => {
         mountSidebar({ '.storage-pct': stubElement() });
-        assert.doesNotThrow(() => updateUserUI({ env: 'development' }));
+        assert.doesNotThrow(() => updateUserUI({ username: 'alice', role: 'user' }));
     });
 });
 
@@ -398,10 +377,10 @@ describe('applyWorkspaceName - a configured name, or the markup default', () => 
         assert.doesNotThrow(() => AFM.applyWorkspaceName(null));
     });
 
-    test('the restored default is the text the four pages actually ship', () => {
+    test('the restored default is the text the five pages actually ship', () => {
         // The fallback is only honest if it is the brand the markup contains -
         // a constant that drifts from the pages is a different invention.
-        for (const page of ['index.html', 'files.html', 'uploads.html', 'settings.html']) {
+        for (const page of ['index.html', 'files.html', 'uploads.html', 'settings.html', 'admin.html']) {
             const src = fs.readFileSync(path.join(__dirname, '..', '..', 'public', page), 'utf8');
             const brand = src.match(/<span class="brand-name">([^<]*)<\/span>/);
             assert.ok(brand, `${page} ships a .brand-name span`);
@@ -424,14 +403,16 @@ describe('seam 3 - the sidebar reads endpoints that exist', () => {
     });
 
     test('no fabricated identity or capacity literals remain', () => {
+        // 'Administrator' is no longer on this list: it is now a real,
+        // server-confirmed role label (ADR-009), not a fabricated name.
         for (const invented of ['Linux Admin', 'System Operator', 'Sarah Chen',
-            '342 * 1024', '500 * 1024', 'Administrator']) {
+            '342 * 1024', '500 * 1024']) {
             assert.ok(!APP_SOURCE.includes(invented), `no "${invented}" in app.js`);
         }
     });
 
-    test('the sidebar reads /health and /dashboard/summary instead', () => {
-        assert.ok(APP_SOURCE.includes("window.API.get('/health')"), 'health drives the identity block');
+    test('the sidebar reads /auth/me and /dashboard/summary instead (ADR-009)', () => {
+        assert.ok(APP_SOURCE.includes("window.API.get('/auth/me'"), 'the live session drives the identity block');
         assert.ok(APP_SOURCE.includes("window.API.get('/dashboard/summary')"), 'summary drives the volume card');
     });
 

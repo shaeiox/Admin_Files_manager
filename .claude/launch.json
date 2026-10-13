@@ -23,6 +23,20 @@
         "UPLOAD_MAX_BYTES": "65536"
       },
       "port": 3918
+    },
+    {
+      "name": "admin-browser-verify",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["D:/Projects/Admin-Files-Manager-fixed/server.js"],
+      "cwd": "temp/admin-verify",
+      "env": {
+        "STORAGE_ROOT": "D:/Projects/Admin-Files-Manager-fixed/temp/admin-verify/root",
+        "AFM_DATA_DIR": "D:/Projects/Admin-Files-Manager-fixed/temp/admin-verify/data",
+        "PORT": "3919",
+        "AFM_BOOTSTRAP_ADMIN_USERNAME": "admin",
+        "AFM_BOOTSTRAP_ADMIN_PASSWORD": "verify-admin-password-1"
+      },
+      "port": 3919
     }
   ]
 }

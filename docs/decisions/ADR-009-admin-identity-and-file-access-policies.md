@@ -117,7 +117,7 @@ in as.
 - `openspec/changes/saas-identity-and-tenancy/` remains an unimplemented, recorded proposal with a
   scope note pointing here; it is not archived (nothing in it has shipped) and not edited to remove
   tenancy (that would misrepresent what was actually decided and when).
-- A new database file (plus its WAL/SHM sidecars) is added under `AFM_DATA_DIR`, alongside
+- A new database file is added under `AFM_DATA_DIR`, alongside
   `metadata.json` and `settings.json`, each independently owned.
 - ADR-003's open Critical (no authentication) is closed by the authentication work this decision's
   sequencing enables, not by this ADR directly — this ADR records the data-model and engine

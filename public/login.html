@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <script src="assets/js/theme.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Sign in to Dimension Files Manager.">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="afm-api-base" content="/api/v1">
+  <title>Sign in · Dimension Files Manager</title>
+
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%236b62f2'/%3E%3Cpath d='M12 6 6 9v6l6 3 6-3V9z' fill='none' stroke='%23fff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/themes.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/login.css">
+</head>
+
+<body data-page="login">
+
+  <main class="login-shell">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 3 4 7v10l8 4 8-4V7l-8-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+            <path d="m4 7 8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Dimension</span>
+          <span class="brand-sub">Files Manager</span>
+        </div>
+      </div>
+
+      <h1 class="login-title">Sign in</h1>
+      <p class="login-subtitle">This workspace requires an administrator or user account.</p>
+
+      <form id="loginForm" class="login-form" novalidate>
+        <div class="field">
+          <label class="field-label" for="loginUsername">Username</label>
+          <input class="input" type="text" id="loginUsername" name="username" autocomplete="username" required
+            autofocus>
+        </div>
+        <div class="field">
+          <label class="field-label" for="loginPassword">Password</label>
+          <input class="input" type="password" id="loginPassword" name="password" autocomplete="current-password"
+            required>
+        </div>
+
+        <div id="loginError" class="login-error" role="alert" hidden></div>
+
+        <button type="submit" class="btn btn-primary login-submit" id="loginSubmit">
+          <span class="login-submit-label">Sign in</span>
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <!-- Scripts -->
+  <script src="assets/js/api.js" defer></script>
+  <script src="assets/js/app.js" defer></script>
+  <script src="assets/js/login.js" defer></script>
+
+</body>
+
+</html>

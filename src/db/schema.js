@@ -4,9 +4,11 @@
 /**
  * Admin database schema (ADR-009, admin-identity-and-access-control design.md).
  *
- * Migration 1 only: users, sessions, audit_logs. Migration 2 (files,
- * file_access_policies, user_file_permissions) is a later, separately-scoped
- * addition - see tasks.md group 4.
+ * Migration 1: users, sessions, audit_logs (phase 1).
+ * Migration 2: files, file_access_policies, user_file_permissions (phase 2,
+ * tasks.md group 4). files is sparse - a row exists only for a path an
+ * administrator has set a policy on, not a mirror of the whole tree
+ * (design D2).
  *
  * Idempotent: migrate() records applied versions in schema_migrations and is
  * a no-op when the stored schema is already current. A stored version newer
@@ -59,6 +61,43 @@ const MIGRATIONS = [
             );
             CREATE INDEX idx_audit_logs_actor_id ON audit_logs(actor_id);
             CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+        `,
+    },
+    {
+        version: 2,
+        sql: `
+            CREATE TABLE files (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_path TEXT NOT NULL UNIQUE,
+                is_directory INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE file_access_policies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_id INTEGER NOT NULL UNIQUE REFERENCES files(id) ON DELETE CASCADE,
+                access_mode TEXT NOT NULL CHECK (access_mode IN ('public','authenticated','restricted')) DEFAULT 'restricted',
+                is_published INTEGER NOT NULL DEFAULT 0,
+                is_locked INTEGER NOT NULL DEFAULT 0,
+                available_from INTEGER,
+                available_until INTEGER,
+                created_by INTEGER REFERENCES users(id),
+                updated_by INTEGER REFERENCES users(id),
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE user_file_permissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                permission TEXT NOT NULL CHECK (permission IN ('grant','deny')),
+                granted_by INTEGER REFERENCES users(id),
+                created_at INTEGER NOT NULL,
+                UNIQUE (file_id, user_id)
+            );
+            CREATE INDEX idx_ufp_user_id ON user_file_permissions(user_id);
         `,
     },
 ];

@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <script src="assets/js/theme.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Manage user accounts and file access policies for Dimension Files Manager.">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="afm-api-base" content="/api/v1">
+  <title>Admin · Dimension Files Manager</title>
+
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%236b62f2'/%3E%3Cpath d='M12 6 6 9v6l6 3 6-3V9z' fill='none' stroke='%23fff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/themes.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/settings.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+</head>
+
+<body data-page="admin">
+
+  <div class="app-shell">
+
+    <!-- ══════════════════════════════════════════
+         SIDEBAR
+         ══════════════════════════════════════════ -->
+    <aside class="sidebar" aria-label="Primary navigation">
+      <!-- Shared sidebar. Duplicated byte-for-byte in index.html, files.html,
+           uploads.html, settings.html and admin.html (no templating, no build
+           step); a test asserts the five copies are identical, so edit all
+           five together. -->
+      <div class="sidebar-header">
+        <a href="index.html" class="brand" aria-label="Dimension home">
+          <div class="brand-mark">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 3 4 7v10l8 4 8-4V7l-8-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+              <path d="m4 7 8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">Dimension</span>
+            <span class="brand-sub">Files Manager</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="sidebar-body">
+
+        <!-- Overview group -->
+        <div class="nav-group">
+          <div class="nav-group-label">Overview</div>
+          <a class="nav-item" href="index.html" data-nav="dashboard">
+            <span class="nav-icon"><i data-icon="dashboard" data-icon-size="18"></i></span>
+            <span class="nav-label">Dashboard</span>
+          </a>
+          <a class="nav-item" href="files.html" data-nav="files">
+            <span class="nav-icon"><i data-icon="folder" data-icon-size="18"></i></span>
+            <span class="nav-label">All Files</span>
+          </a>
+          <a class="nav-item" href="uploads.html" data-nav="uploads">
+            <span class="nav-icon"><i data-icon="uploadCloud" data-icon-size="18"></i></span>
+            <span class="nav-label">Uploads</span>
+          </a>
+        </div>
+
+        <!-- Library group. Each entry is a real listing view of files.html
+             (see files.js LIBRARY_VIEWS); there is no sharing primitive and
+             deletion is permanent, so there is no Shared or Trash entry. -->
+        <div class="nav-group">
+          <div class="nav-group-label">Library</div>
+          <a class="nav-item" href="files.html?view=starred" data-nav-view="starred">
+            <span class="nav-icon"><i data-icon="star" data-icon-size="18"></i></span>
+            <span class="nav-label">Starred</span>
+          </a>
+          <a class="nav-item" href="files.html?view=recent" data-nav-view="recent">
+            <span class="nav-icon"><i data-icon="clock" data-icon-size="18"></i></span>
+            <span class="nav-label">Recent</span>
+          </a>
+          <a class="nav-item" href="files.html?view=downloads" data-nav-view="downloads">
+            <span class="nav-icon"><i data-icon="download" data-icon-size="18"></i></span>
+            <span class="nav-label">Top downloads</span>
+          </a>
+        </div>
+
+        <!-- System group -->
+        <div class="nav-group">
+          <div class="nav-group-label">System</div>
+          <a class="nav-item" href="index.html#serverHealth">
+            <span class="nav-icon"><i data-icon="server" data-icon-size="18"></i></span>
+            <span class="nav-label">Server Health</span>
+          </a>
+          <a class="nav-item" href="settings.html" data-nav="settings">
+            <span class="nav-icon"><i data-icon="settings" data-icon-size="18"></i></span>
+            <span class="nav-label">Settings</span>
+          </a>
+          <a class="nav-item" href="admin.html" data-nav="admin">
+            <span class="nav-icon"><i data-icon="shield" data-icon-size="18"></i></span>
+            <span class="nav-label">Admin</span>
+          </a>
+        </div>
+
+        <!-- Storage card — populated by AFM.updateStorageUI (see p6-contract seam 1).
+             No figure is asserted here: an unmeasured capacity must not render 0%. -->
+        <div class="storage-card" role="group" aria-label="Storage usage">
+          <div class="storage-head">
+            <span class="storage-title">Storage</span>
+            <span class="storage-pct">—</span>
+          </div>
+          <div class="storage-bar">
+            <div class="storage-fill" data-state="unavailable"></div>
+          </div>
+          <div class="storage-meta"></div>
+        </div>
+      </div>
+
+      <!-- Sidebar footer — populated by AFM.updateUserUI from GET /api/auth/me
+           (ADR-009). The session's real username/role render here once the
+           server confirms them; an honest "Unknown / Not signed in" shows
+           only while that call is in flight or has failed. -->
+      <div class="sidebar-footer">
+        <div class="sidebar-user" role="group" aria-label="Account">
+          <div class="user-avatar"></div>
+          <div class="user-info">
+            <div class="user-name"></div>
+            <div class="user-role"></div>
+          </div>
+          <button class="btn-icon btn-icon-sm" data-action="logout" aria-label="Log out" data-tip="Log out">
+            <i data-icon="logout" data-icon-size="16"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ══════════════════════════════════════════
+         MAIN AREA
+         ══════════════════════════════════════════ -->
+    <main class="main-area">
+
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-btn" aria-label="Open menu">
+            <i data-icon="menu" data-icon-size="18"></i>
+          </button>
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <span class="breadcrumb-item">Dimension</span>
+            <span class="breadcrumb-sep"><i data-icon="chevronRight" data-icon-size="14"></i></span>
+            <span class="breadcrumb-item is-current">Admin</span>
+          </nav>
+        </div>
+
+        <div class="topbar-right">
+          <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme" title="Toggle theme">
+            <span class="icon-sun"><i data-icon="sun" data-icon-size="12"></i></span>
+            <span class="icon-moon"><i data-icon="moon" data-icon-size="12"></i></span>
+          </button>
+          <button class="btn-icon" data-tip="Notifications" data-tip-pos="bottom" aria-label="Notifications" aria-expanded="false" aria-controls="notifPanel">
+            <i data-icon="bell" data-icon-size="16"></i>
+          </button>
+        </div>
+      </header>
+
+      <div class="page">
+
+        <div class="page-header">
+          <div class="page-title-group">
+            <span class="page-eyebrow">
+              <span class="dot"></span>
+              Administration
+            </span>
+            <h1 class="page-title">Admin</h1>
+            <p class="page-subtitle">Manage user accounts and file access policies. Only an administrator can
+              reach this page.</p>
+          </div>
+        </div>
+
+        <!-- Shown by admin.js when an admin-only call is refused (403) — e.g. a
+             non-admin account that reached this page via a stale bookmark. -->
+        <div class="admin-notice" id="adminNotice" role="status" hidden>
+          <i data-icon="info" data-icon-size="16"></i>
+          <span id="adminNoticeText"></span>
+        </div>
+
+        <div class="settings-layout">
+          <nav class="settings-nav" aria-label="Admin sections">
+            <div class="settings-nav-label">Administration</div>
+            <button class="settings-nav-item is-active" data-pane="users">
+              <i data-icon="user" data-icon-size="16"></i>
+              Users
+            </button>
+            <button class="settings-nav-item" data-pane="policies">
+              <i data-icon="lock" data-icon-size="16"></i>
+              File access policies
+            </button>
+          </nav>
+
+          <div class="settings-content">
+
+            <!-- ══════════════════════
+               PANE: USERS
+               ══════════════════════ -->
+            <div class="settings-pane is-active" data-pane-content="users">
+
+              <div class="settings-group">
+                <div class="sg-head">
+                  <div class="sg-title">
+                    <i data-icon="userPlus" data-icon-size="18"></i>
+                    Create user
+                  </div>
+                  <div class="sg-desc">A new account starts active, with the "user" role unless you pick "admin".</div>
+                </div>
+                <div class="sg-body">
+                  <form id="createUserForm" class="admin-inline-form">
+                    <div class="field">
+                      <label class="field-label" for="newUsername">Username</label>
+                      <input class="input" type="text" id="newUsername" name="username" required autocomplete="off">
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="newPassword">Password</label>
+                      <input class="input" type="password" id="newPassword" name="password" required
+                        autocomplete="new-password" minlength="8">
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="newRole">Role</label>
+                      <select class="input" id="newRole" name="role">
+                        <option value="user" selected>User</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                      <i data-icon="plus" data-icon-size="14"></i>
+                      Create
+                    </button>
+                  </form>
+                  <div class="admin-form-error" id="createUserError" role="alert" hidden></div>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="sg-head">
+                  <div class="sg-title">
+                    <i data-icon="users" data-icon-size="18"></i>
+                    Accounts
+                  </div>
+                  <div class="sg-desc">Disabling or resetting a password revokes that user's active sessions immediately.</div>
+                </div>
+                <div class="sg-body">
+                  <table class="admin-table" id="usersTable">
+                    <thead>
+                      <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                      <tr class="admin-table-empty"><td colspan="5">Loading…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- ══════════════════════
+               PANE: FILE ACCESS POLICIES
+               ══════════════════════ -->
+            <div class="settings-pane" data-pane-content="policies">
+
+              <div class="admin-notice" role="note">
+                <i data-icon="info" data-icon-size="16"></i>
+                <span>A policy set here does not yet change what this application serves — nothing currently
+                  checks it before a download. This manages the data model only; enforcement is a separate,
+                  not-yet-built change.</span>
+              </div>
+
+              <div class="settings-group">
+                <div class="sg-head">
+                  <div class="sg-title">
+                    <i data-icon="lock" data-icon-size="18"></i>
+                    Set a policy
+                  </div>
+                  <div class="sg-desc">Enter the exact client path (e.g. "/reports/q3.pdf"). Setting a policy again on
+                    the same path updates it in place.</div>
+                </div>
+                <div class="sg-body">
+                  <form id="setPolicyForm" class="admin-inline-form">
+                    <div class="field">
+                      <label class="field-label" for="policyPath">Path</label>
+                      <input class="input" type="text" id="policyPath" name="path" placeholder="/folder/file.txt" required>
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="policyAccessMode">Access mode</label>
+                      <select class="input" id="policyAccessMode" name="accessMode">
+                        <option value="restricted" selected>Restricted</option>
+                        <option value="authenticated">Authenticated</option>
+                        <option value="public">Public</option>
+                      </select>
+                    </div>
+                    <div class="field admin-checkbox-field">
+                      <label><input type="checkbox" id="policyPublished"> Published</label>
+                    </div>
+                    <div class="field admin-checkbox-field">
+                      <label><input type="checkbox" id="policyLocked"> Locked</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                      <i data-icon="save" data-icon-size="14"></i>
+                      Save policy
+                    </button>
+                  </form>
+                  <div class="admin-form-error" id="setPolicyError" role="alert" hidden></div>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="sg-head">
+                  <div class="sg-title">
+                    <i data-icon="fileText" data-icon-size="18"></i>
+                    Governed files
+                  </div>
+                  <div class="sg-desc">Only files with a policy appear here — this is not a listing of everything in storage.</div>
+                </div>
+                <div class="sg-body">
+                  <table class="admin-table" id="policiesTable">
+                    <thead>
+                      <tr>
+                        <th>Path</th>
+                        <th>Access</th>
+                        <th>Published</th>
+                        <th>Locked</th>
+                        <th>Permissions</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="policiesTableBody">
+                      <tr class="admin-table-empty"><td colspan="6">Loading…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="settings-group" id="permissionsGroup" hidden>
+                <div class="sg-head">
+                  <div class="sg-title">
+                    <i data-icon="userCheck" data-icon-size="18"></i>
+                    Per-user permissions — <span id="permissionsPathLabel"></span>
+                  </div>
+                  <div class="sg-desc">Only meaningful for the "Restricted" access mode.</div>
+                </div>
+                <div class="sg-body">
+                  <form id="grantPermissionForm" class="admin-inline-form">
+                    <div class="field">
+                      <label class="field-label" for="grantUserId">User</label>
+                      <select class="input" id="grantUserId" name="userId" required></select>
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="grantPermission">Permission</label>
+                      <select class="input" id="grantPermission" name="permission">
+                        <option value="grant" selected>Grant</option>
+                        <option value="deny">Deny</option>
+                      </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                  </form>
+                  <table class="admin-table" id="permissionsTable">
+                    <thead>
+                      <tr><th>User</th><th>Permission</th><th></th></tr>
+                    </thead>
+                    <tbody id="permissionsTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script src="assets/js/api.js" defer></script>
+  <script src="assets/js/app.js" defer></script>
+  <script src="assets/js/sidebar.js" defer></script>
+  <script src="assets/js/router.js" defer></script>
+  <script src="assets/js/notifications.js" defer></script>
+  <script src="assets/js/admin.js" defer></script>
+
+</body>
+
+</html>

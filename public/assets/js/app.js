@@ -73,6 +73,8 @@ const Icons = {
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
+  userCheck: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
@@ -901,7 +903,7 @@ function initCopyButtons() {
 const UNAVAILABLE_MARK = '—';
 const UNAVAILABLE_VOLUME_META = 'Volume usage unavailable';
 const UNAVAILABLE_IDENTITY_NAME = 'Unknown';
-const UNAVAILABLE_IDENTITY_ROLE = 'Environment unavailable';
+const UNAVAILABLE_IDENTITY_ROLE = 'Not signed in';
 
 function finiteOrNull(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -944,24 +946,30 @@ function resolveStorageDisplay(storage) {
 }
 
 /**
- * Decide what the sidebar identity block shows. This application has no user
- * API and no authentication, so there is no person to name and no operator to
- * greet.
+ * Decide what the sidebar identity block shows, from a `GET /api/auth/me`
+ * response (ADR-009): `{id, username, role, status}`. A missing or
+ * malformed payload (no session, or the call failed) is an honest absence,
+ * never a fabricated operator - the only name/role ever shown is the one
+ * the server just confirmed for the live session.
  *
- * It used to display the runtime environment, read from `env` on the health
- * response. The server no longer discloses that to an anonymous caller
- * (api-security-hardening), so the block reports an honest absence instead of a
- * label the client can no longer obtain. Nothing here may invent an identity.
- *
- * @param {object|null} _health - the `GET /api/health` response, now unused
+ * @param {object|null} me - the `GET /api/auth/me` response, or null on failure
  * @returns {{available: boolean, avatar: string, name: string, role: string}}
  */
-function resolveIdentityDisplay(_health) {
+function resolveIdentityDisplay(me) {
+  const username = me && typeof me === 'object' && typeof me.username === 'string' && me.username.trim();
+  if (!username) {
+    return {
+      available: false,
+      avatar: '',
+      name: UNAVAILABLE_IDENTITY_NAME,
+      role: UNAVAILABLE_IDENTITY_ROLE,
+    };
+  }
   return {
-    available: false,
-    avatar: '',
-    name: UNAVAILABLE_IDENTITY_NAME,
-    role: UNAVAILABLE_IDENTITY_ROLE,
+    available: true,
+    avatar: username.slice(0, 2).toUpperCase(),
+    name: username,
+    role: me.role === 'admin' ? 'Administrator' : 'User',
   };
 }
 
@@ -970,12 +978,18 @@ function resolveIdentityDisplay(_health) {
    ══════════════════════════════════════════ */
 
 async function loadGlobalData() {
-  // Identity: /api/health is the only endpoint that reports the environment.
-  // A failed call must leave the block honestly unknown, never filled in.
+  // Identity (ADR-009): /api/auth/me confirms the live session and carries
+  // the CSRF token every mutating request needs - api.js is the one place
+  // that attaches it, so it is handed there immediately. A failed call
+  // (no session, or expired) already triggers api.js's redirect-to-login;
+  // this catch only keeps the sidebar honestly unknown in the brief window
+  // before that navigation completes.
   try {
-    updateUserUI(await window.API.get('/health'));
+    const me = await window.API.get('/auth/me', { silent: true });
+    window.API.setCsrfToken(me && me.csrfToken);
+    updateUserUI(me);
   } catch (e) {
-    console.warn('[Sidebar] environment unavailable:', e?.message || e);
+    console.warn('[Sidebar] identity unavailable:', e?.message || e);
     updateUserUI(null);
   }
 
@@ -1092,7 +1106,16 @@ function initApp() {
   document.documentElement.classList.add('is-ready');
 }
 
-document.addEventListener('DOMContentLoaded', initApp);
+// The login page has no sidebar/dashboard/settings to hydrate and no session
+// yet to fetch them with - every one of initApp's calls would just 401
+// pointlessly. Skip it there; login.js owns that page's own init. Bind in
+// every other case, including when `document.body`/`.dataset` is missing or
+// unreadable (several frontend test harnesses stub `document` without
+// either) - the safe default is the existing always-bind behavior.
+const isLoginPage = Boolean(document.body && document.body.dataset && document.body.dataset.page === 'login');
+if (!isLoginPage) {
+  document.addEventListener('DOMContentLoaded', initApp);
+}
 
 /* ══════════════════════════════════════════
    EXPORTS (global namespace)

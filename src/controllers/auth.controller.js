@@ -68,11 +68,20 @@ function logout(req, res, next) {
 
 /**
  * GET /api/auth/me
- * Read-only -> bare shape (rule 6).
+ * Read-only -> bare shape (rule 6). Carries the session's csrfToken too, so
+ * a page that reloads (losing api.js's in-memory copy) can recover it
+ * without re-authenticating - the secret never leaves the session that
+ * already holds it, the same session the HttpOnly cookie already proves.
  */
 function me(req, res, next) {
     try {
-        return res.json({ id: req.user.id, username: req.user.username, role: req.user.role, status: req.user.status });
+        return res.json({
+            id: req.user.id,
+            username: req.user.username,
+            role: req.user.role,
+            status: req.user.status,
+            csrfToken: req.session.csrf_secret,
+        });
     } catch (error) {
         return next(error);
     }

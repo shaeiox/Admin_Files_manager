@@ -33,8 +33,9 @@
          ══════════════════════════════════════════ -->
     <aside class="sidebar" aria-label="Primary navigation">
       <!-- Shared sidebar. Duplicated byte-for-byte in index.html, files.html,
-           uploads.html and settings.html (no templating, no build step); a test
-           asserts the four copies are identical, so edit all four together. -->
+           uploads.html, settings.html and admin.html (no templating, no build
+           step); a test asserts the five copies are identical, so edit all
+           five together. -->
       <div class="sidebar-header">
         <a href="index.html" class="brand" aria-label="Dimension home">
           <div class="brand-mark">
@@ -99,6 +100,10 @@
             <span class="nav-icon"><i data-icon="settings" data-icon-size="18"></i></span>
             <span class="nav-label">Settings</span>
           </a>
+          <a class="nav-item" href="admin.html" data-nav="admin">
+            <span class="nav-icon"><i data-icon="shield" data-icon-size="18"></i></span>
+            <span class="nav-label">Admin</span>
+          </a>
         </div>
 
         <!-- Storage card — populated by AFM.updateStorageUI (see p6-contract seam 1).
@@ -115,17 +120,20 @@
         </div>
       </div>
 
-      <!-- Sidebar footer — populated by AFM.updateUserUI (see p6-contract seam 2).
-           This application has no user API and no authentication, so there is no
-           person to name: these elements stay empty until the environment is known.
-           It is a label, not a control, so it carries no button role. -->
+      <!-- Sidebar footer — populated by AFM.updateUserUI from GET /api/auth/me
+           (ADR-009). The session's real username/role render here once the
+           server confirms them; an honest "Unknown / Not signed in" shows
+           only while that call is in flight or has failed. -->
       <div class="sidebar-footer">
-        <div class="sidebar-user" role="group" aria-label="Environment">
+        <div class="sidebar-user" role="group" aria-label="Account">
           <div class="user-avatar"></div>
           <div class="user-info">
             <div class="user-name"></div>
             <div class="user-role"></div>
           </div>
+          <button class="btn-icon btn-icon-sm" data-action="logout" aria-label="Log out" data-tip="Log out">
+            <i data-icon="logout" data-icon-size="16"></i>
+          </button>
         </div>
       </div>
     </aside>

@@ -6,6 +6,7 @@ const fsRoutes = require('./fs.routes');
 const dashboardRoutes = require('./dashboard.routes');
 const settingsRoutes = require('./settings.routes');
 const authRoutes = require('./auth.routes');
+const adminRoutes = require('./admin.routes');
 const { authenticate } = require('../middlewares/authenticate');
 const csrf = require('../middlewares/csrf');
 
@@ -66,5 +67,6 @@ router.use(csrf);
 router.use('/fs', fsRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/settings', settingsRoutes);
+router.use('/admin', adminRoutes);
 
 module.exports = router;

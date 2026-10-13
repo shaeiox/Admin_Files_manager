@@ -30,7 +30,7 @@ const DATA = path.join(TMP, 'data');
 fs.mkdirSync(ROOT, { recursive: true });
 fs.mkdirSync(DATA, { recursive: true });
 
-const PAGES = ['index.html', 'files.html', 'uploads.html', 'settings.html'];
+const PAGES = ['index.html', 'files.html', 'uploads.html', 'settings.html', 'admin.html'];
 const REPO = path.join(__dirname, '..', '..');
 
 const ORIGINAL_ROOT = process.env.STORAGE_ROOT;

@@ -30,17 +30,25 @@ admin-files-manager/
 │   │   ├── env.js                # Env loader + validateStartup() (run by server.js before listen; never exits on require)
 │   │   └── dataDir.js            # Store base directory: AFM_DATA_DIR or <cwd>/data (side-effect free)
 │   ├── routes/
-│   │   ├── api.js                # THE assembly: health + fs + dashboard + settings, mounted by server.js
-│   │   │                         #   at /api/v1 (contract) and /api (alias) — one router, no copies (ADR-007)
+│   │   ├── api.js                # THE assembly: health + auth + fs + dashboard + settings + admin, mounted by
+│   │   │                         #   server.js at /api/v1 (contract) and /api (alias) — one router (ADR-007).
+│   │   │                         #   authenticate+csrf applied once here, after /health and /auth (ADR-009)
 │   │   ├── fs.routes.js          # /api/fs router — wires endpoints to controller fns
 │   │   ├── dashboard.routes.js   # /api/dashboard router — /summary + /health (read-only, no fs remount)
-│   │   └── settings.routes.js    # /api/settings router — GET (bare read) + PUT (full replace) only;
-│   │                             #   no POST /action, no destructive route (ADR-006)
+│   │   ├── settings.routes.js    # /api/settings router — GET (bare read) + PUT (full replace) only;
+│   │   │                         #   no POST /action, no destructive route (ADR-006)
+│   │   ├── auth.routes.js        # /api/auth router (ADR-009) — login (public, throttled), logout, me;
+│   │   │                         #   mounted BEFORE the blanket authenticate so login is reachable
+│   │   └── admin.routes.js       # /api/admin router (ADR-009) — requireAdmin gates the whole router;
+│   │                             #   user management + file-access-policy management
 │   ├── controllers/
 │   │   ├── fs.controller.js      # HTTP handlers: parse/validate → call services → respond (list, upload, star, ZIP…)
 │   │   ├── preview.controller.js # GET /api/fs/thumbnail[/capability] — bounded previews or an explicit "unavailable"
 │   │   ├── dashboard.controller.js  # Composes services into the dashboard DTO; shapes the response
-│   │   └── settings.controller.js   # GET → bare document; PUT → { success, settings }; no hand-rolled checks
+│   │   ├── settings.controller.js   # GET → bare document; PUT → { success, settings }; no hand-rolled checks
+│   │   ├── auth.controller.js    # login/logout/me — sets/clears the session cookie, returns the CSRF token
+│   │   ├── users.controller.js   # admin user CRUD — never returns password_hash (UserService strips it)
+│   │   └── filePolicy.controller.js  # admin file-access-policy CRUD + per-user permission grant/revoke
 │   ├── services/                 # 🔒 All filesystem + metadata access (no Express here)
 │   │   ├── PathService.js        # Client path ⇄ secure OS path; traversal guard (THE boundary)
 │   │   ├── FileSystemService.js  # stat/readdir/mkdir/rename/rm/unlink → AppError; tree/volume/health aggregation
@@ -49,20 +57,42 @@ admin-files-manager/
 │   │   │                         #   read, whitelist validation at the service boundary; singleton (ADR-006).
 │   │   │                         #   Never imports PathService — it validates a client path, never resolves it
 │   │   ├── UploadService.js      # Multer engine + staging: placement decided after the body is parsed; overwrite; size cap
-│   │   └── PreviewService.js     # Thumbnail capability + bounded transform (only if a transformer is installed)
+│   │   ├── PreviewService.js     # Thumbnail capability + bounded transform (only if a transformer is installed)
+│   │   ├── UserService.js        # Admin user management — validates, hashes (node:crypto), strips secrets on the way out
+│   │   ├── SessionService.js     # Login/validateSession/logout/revoke — flat 24h expiry, lockout after 10 failures
+│   │   └── FileAccessPolicyService.js  # Per-file policy CRUD + permission grants; onPathRenamed/onPathDeleted
+│   │                             #   best-effort hooks called from fs.controller.js (enforces nothing, design D5)
+│   ├── db/                       # ADR-009 — a separate node:sqlite database, not a JSON-store replacement
+│   │   ├── connection.js         # Singleton; `dbPath` redirectable by tests like MetadataService.dbPath
+│   │   ├── schema.js             # Migrations array (1: users/sessions/audit_logs; 2: files/policies/permissions)
+│   │   ├── bootstrap.js          # ensureBootstrapAdmin() — creates the first admin from env config, once
+│   │   └── repositories/         # One file per table; no SQL or node:sqlite type crosses this boundary
+│   │       ├── UserRepository.js
+│   │       ├── SessionRepository.js
+│   │       ├── AuditLogRepository.js
+│   │       ├── FileAccessPolicyRepository.js
+│   │       └── UserFilePermissionRepository.js
 │   ├── middlewares/
-│   │   └── errorHandler.js       # Global error serializer ({ success:false, error })
+│   │   ├── errorHandler.js       # Global error serializer ({ success:false, error })
+│   │   ├── authenticate.js       # Session cookie or Authorization: Bearer → req.user/req.session (ADR-009)
+│   │   ├── csrf.js               # Non-GET requires a matching CSRF header (or csrfToken body field for
+│   │   │                         #   the one form-POST transport that can't set headers: downloadZip)
+│   │   └── requireAdmin.js       # req.user.role === 'admin' — gates admin.routes.js only
 │   └── utils/
 │       ├── AppError.js           # Error class carrying HTTP statusCode
 │       ├── validators.js         # validateFileName / validateClientPath / validateSettingsPayload
 │       ├── fileTypes.js          # File-type taxonomy (CATEGORIES/EXTENSION_MAP) — single server-side source, = client FileTypes
-│       └── concurrency.js        # mapWithConcurrency — bounded, order-preserving async map (listing enrichment)
+│       ├── concurrency.js        # mapWithConcurrency — bounded, order-preserving async map (listing enrichment)
+│       └── crypto.js             # hashPassword/verifyPassword (scrypt), randomToken/hashToken — stdlib only
 │
 ├── public/                       # ─── Frontend SPA (served statically, no build) ───
 │   ├── index.html                # Dashboard page        (data-page="dashboard")
 │   ├── files.html                # File browser page     (data-page="files")
 │   ├── uploads.html              # Upload manager page   (data-page="uploads")
 │   ├── settings.html             # Settings page         (data-page="settings")
+│   ├── admin.html                # Admin page            (data-page="admin")  — user + file-policy mgmt (ADR-009)
+│   ├── login.html                # Standalone sign-in page (data-page="login") — NOT in router.js's PAGES;
+│   │                             #   reached by a real navigation/redirect, never an SPA swap. No sidebar.
 │   └── assets/
 │       ├── css/                  # Load order matters: tokens → base → themes → layout
 │       │   ├── tokens.css        # Design tokens (colors/spacing/type)
@@ -70,22 +100,32 @@ admin-files-manager/
 │       │   ├── themes.css        # Dark/light theme overrides via [data-theme]
 │       │   ├── layout.css        # App shell, sidebar, topbar
 │       │   ├── components.css    # Buttons, modals, toasts, tables, dropdowns
-│       │   └── dashboard|files|uploads|settings.css   # Page-specific styles
+│       │   ├── dashboard|files|uploads|settings.css   # Page-specific styles
+│       │   ├── admin.css         # Admin page — reuses settings.css's pane/form shell, adds tables/notices
+│       │   └── login.css         # Standalone sign-in card; not part of the shared app-shell layout
 │       └── js/
-│           ├── app.js            # ⭐ Shared core: Icons, Format, Toast, Modal, Dropdown, $
-│           ├── api.js            # ⭐ API client (window.API): fetch wrapper, XHR upload, iframe downloads
+│           ├── app.js            # ⭐ Shared core: Icons, Format, Toast, Modal, Dropdown, $. Also owns
+│           │                     #   initApp()/loadGlobalData() — skipped on the login page (ADR-009)
+│           ├── api.js            # ⭐ API client (window.API): fetch wrapper, XHR upload, iframe downloads.
+│           │                     #   Also owns the CSRF token (setCsrfToken/clearCsrfToken) and the
+│           │                     #   401 → redirectToLogin flow (ADR-009)
 │           ├── theme.js          # Theme controller (loaded first, pre-CSS)
-│           ├── sidebar.js        # Sidebar collapse + mobile drawer
-│           ├── router.js         # Client-side navigation between the four pages: fetches the target
+│           ├── sidebar.js        # Sidebar collapse + mobile drawer + the logout control (delegated, ADR-009)
+│           ├── router.js         # Client-side navigation between the five shell pages: fetches the target
 │           │                     #   page, swaps <main> + page overlays, calls destroy()/init() (ADR-005)
 │           ├── dashboard.js      # Page module (index.html)
 │           ├── files.js          # Page module (files.html) — see "Files page module" below
 │           ├── uploads.js        # Page module (uploads.html) — queue, progress, presets, destination
 │           │                     #   check/creation, recent uploads from activity; `Uploads.pure` +
 │           │                     #   `Uploads._controller` are test seams
-│           └── settings.js       # Page module (settings.html) — hydrates/extracts exactly the persisted
-│                                 #   keys, gates Save on store reachability, truthful Discard; the theme
-│                                 #   picker belongs to theme.js and is deliberately not intercepted
+│           ├── settings.js       # Page module (settings.html) — hydrates/extracts exactly the persisted
+│           │                     #   keys, gates Save on store reachability, truthful Discard; the theme
+│           │                     #   picker belongs to theme.js and is deliberately not intercepted
+│           ├── admin.js          # Page module (admin.html) — window.Admin; calls window.API.get/post/put/del
+│           │                     #   directly (no named per-endpoint wrappers — see REPO_MAP "Where to Add
+│           │                     #   Things"); every dynamic value is escapeHtml'd before reaching innerHTML
+│           └── login.js          # login.html's own module — not registered in router.js. Owns the
+│                                 #   open-redirect guard on `?redirect=` (root-relative paths only)
 │
 ├── data/                         # ─── Runtime artifacts — NOT checked in ───
 │   └── .gitkeep                  # Tracked placeholder so the dir exists. MetadataService
@@ -93,6 +133,9 @@ admin-files-manager/
 │                                   not exist before the first run and is git-ignored
 │                                   (`data/*.json`, `!data/.gitkeep`). SettingsService does the
 │                                   same for data/settings.json on the first GET /api/settings.
+│                                   AdminDatabase (ADR-009) creates data/admin.sqlite the same
+│                                   way, on first boot — a separate store, not a JSON file, but
+│                                   gitignored by the same `data/*` rule.
 │
 ├── test/                         # ─── Tests (`npm test` → node:test, zero deps) ───
 │   ├── services/
@@ -102,8 +145,18 @@ admin-files-manager/
 │   │   ├── FileSystemService.volume.test.js # statfs → usedBytes/totalBytes, null degradation
 │   │   ├── MetadataService.test.js
 │   │   ├── MetadataService.dashboard.test.js# activities / top-download ranking inputs
-│   │   └── settingsService.test.js          # store: defaults on first read, atomic write, corrupt → 500,
-│   │                                        #   and validateSettingsPayload (whitelist, bounds, client paths)
+│   │   ├── settingsService.test.js          # store: defaults on first read, atomic write, corrupt → 500,
+│   │   │                                    #   and validateSettingsPayload (whitelist, bounds, client paths)
+│   │   ├── UserService.test.js              # create validation, duplicate username, password_hash never returned
+│   │   ├── SessionService.test.js           # login identical-failure shape, lockout, validateSession, revoke
+│   │   └── FileAccessPolicyService.test.js  # upsert-in-place, grant/revoke, onPathRenamed/onPathDeleted hooks
+│   ├── db/
+│   │   └── schema.test.js                   # migrate() idempotency, CHECK/UNIQUE constraints, cascade deletes,
+│   │                                        #   refuses a schema version newer than this code understands
+│   ├── helpers/
+│   │   └── authenticated.js                 # NOT a *.test.js - shared login helper every server-booting
+│   │                                        #   suite imports (ADR-009); see AGENTS.md "Tests never touch
+│   │                                        #   the real stores"
 │   ├── api/
 │   │   ├── versioning.contract.test.js      # /api/v1 vs /api on a live server: same status + shape for every
 │   │   │                                    #   endpoint, /api/v2 + /api/V1 refused, no fs route under either
@@ -115,9 +168,14 @@ admin-files-manager/
 │   │   │                                    #   POST /api/settings/action is a 404, mount order is reachable
 │   │   ├── fs.contract.test.js              # /api/fs/* against a live server: upload placement ON DISK,
 │   │   │                                    #   overwrite/size, listing taxonomy + resilience, star, ZIP, previews
-│   │   └── upload.surface.test.js           # upload error surface: no stack in any configuration (incl. a
-│   │                                        #   child `node server.js` with NODE_ENV unset), authored reasons
-│   │                                        #   forwarded, generic text for the rest, status per failure class
+│   │   ├── upload.surface.test.js           # upload error surface: no stack in any configuration (incl. a
+│   │   │                                    #   child `node server.js` with NODE_ENV unset), authored reasons
+│   │   │                                    #   forwarded, generic text for the rest, status per failure class
+│   │   ├── auth.contract.test.js            # live-server: health/login stay public, every other route 401s
+│   │   │                                    #   with no session, CSRF enforcement, cookie+bearer both work,
+│   │   │                                    #   logout revokes, /api/v1 ↔ /api parity (ADR-009)
+│   │   └── admin.contract.test.js           # live-server: requireAdmin (403 vs 401), full user-management
+│   │                                        #   and file-policy CRUD flows, D5's "enforces nothing yet"
 │   ├── integration/
 │   │   ├── live-server.test.js              # traversal guard wired into the running app
 │   │   ├── error-disclosure.test.js         # no stack / no path in error bodies
@@ -137,8 +195,12 @@ admin-files-manager/
 │       ├── settings.test.js                 # settings.html ⇆ settings.js names cross-asserted in both
 │       │                                    #   directions; save gating, truthful discard, dirty rules, teardown,
 │       │                                    #   non-interference with the delegated theme picker
-│       └── uploads.test.js                  # uploads.js in a vm with stub DOM/API/XHR: queue derivations, failure
-│                                            #   kinds, escaping, destination gate, honesty + a11y source guards
+│       ├── uploads.test.js                  # uploads.js in a vm with stub DOM/API/XHR: queue derivations, failure
+│       │                                    #   kinds, escaping, destination gate, honesty + a11y source guards
+│       ├── admin.test.js                    # admin.html/js source-level: escaping scoped to the HTML-building
+│       │                                    #   functions, API-boundary compliance, D5 disclosure copy pinned
+│       └── login.test.js                    # login.html/js: standalone-page isolation, and a real functional
+│                                            #   test of the open-redirect guard on `?redirect=`
 │
 └── docs/                         # ─── Project brain (reference docs, NOT runtime code) ───
     ├── REPO_MAP.md               # ← you are here (this file is the authoritative map)
@@ -162,9 +224,14 @@ admin-files-manager/
         ├── ADR-007-api-versioning-and-boundary.md # /api/v1 as a mount prefix, one assembly mounted twice,
         │                                        #   alias retained (removal gated on auth), configurable
         │                                        #   API.BASE_URL, kind reserved, taxonomy endpoint deferred
-        └── ADR-008-production-deployment.md     # systemd (no Docker, with the test), AFM_DATA_DIR, startup
-                                                 #   validation, graceful shutdown, host-side suite gate,
-                                                 #   allow-list artifact, post-receive trigger, exposure still gated
+        ├── ADR-008-production-deployment.md     # systemd (no Docker, with the test), AFM_DATA_DIR, startup
+        │                                        #   validation, graceful shutdown, host-side suite gate,
+        │                                        #   allow-list artifact, post-receive trigger, exposure still gated
+        └── ADR-009-admin-identity-and-file-access-policies.md  # node:sqlite (no WAL - single connection,
+                                                 #   single process, see src/db/connection.js), 2-value role
+                                                 #   not a permission catalogue, per-file not per-directory
+                                                 #   policies, no download enforcement yet — closes ADR-003's
+                                                 #   open Critical; see openspec/changes/admin-identity-and-access-control/
 ```
 
 ## Entry Points
@@ -234,12 +301,13 @@ both prefixes at once — never as a separate `app.use` in `server.js`
   except the download stream (`fs.createReadStream(stats.securePath)`), which is mediated by
   `PathService`. Multer's storage engine, staging and placement live in `UploadService`.
 - Frontend page modules depend on `app.js` + `api.js`; they must not duplicate API calls.
-- **Planned (`openspec/changes/admin-identity-and-access-control/`, not yet implemented):** new
-  `src/db/` repositories (`UserRepository`, `SessionRepository`, `FileAccessPolicyRepository`,
-  `UserFilePermissionRepository`, `AuditLogRepository`) will own a `node:sqlite` database the same
-  way `MetadataService`/`SettingsService` each own their JSON file — a new store, not a
-  replacement of either existing one. New `src/middlewares/authenticate.js` and `csrf.js` will sit
-  in front of every router mounted in `src/routes/api.js` except `/health`.
+- **ADR-009 (`openspec/changes/admin-identity-and-access-control/`):** `src/db/` repositories
+  (`UserRepository`, `SessionRepository`, `AuditLogRepository`, `FileAccessPolicyRepository`,
+  `UserFilePermissionRepository`) each own a table in a new `node:sqlite` database, the same way
+  `MetadataService`/`SettingsService` each own their JSON file — a separate store, not a
+  replacement of either existing one. `src/middlewares/authenticate.js` and `csrf.js` sit in front
+  of every router mounted in `src/routes/api.js` except `/health` and `POST /auth/login`;
+  `src/middlewares/requireAdmin.js` additionally gates `src/routes/admin.routes.js` only.
 
 ## Read Path (dashboard aggregation)
 
@@ -384,6 +452,6 @@ Rules worth knowing before you touch this path:
 | Test for an endpoint payload | `test/api/<area>.contract.test.js` |
 | Test for frontend helpers | `test/frontend/<module>.test.js` (no browser; real `app.js` + the module in a `vm` context with stub DOM/API — see `files.test.js`) |
 | Record a decision | `docs/decisions/ADR-NNN-*.md` + a pointer from this map |
-| New admin/identity endpoint *(planned, `openspec/changes/admin-identity-and-access-control/`)* | `src/routes/admin.routes.js` + a controller, mounted inside `src/routes/api.js`; gate with `requireAdmin` if admin-only |
-| New DB-backed table/migration *(planned, same change)* | `src/db/` schema step + a named repository; never raw SQL in a controller/service |
-| New admin page *(planned, same change)* | `public/admin.html` + `public/assets/js/admin.js`, gated on `document.body.dataset.page === 'admin'`, registered in `router.js`'s `PAGES`/`MODULES` |
+| New admin/identity endpoint | `src/routes/admin.routes.js` + a controller (`users.controller.js`/`filePolicy.controller.js`), mounted inside `src/routes/api.js`; every route in that router is admin-gated via `requireAdmin` |
+| New DB-backed table/migration | `src/db/schema.js` (append a new `MIGRATIONS` entry, never edit a shipped one) + a named repository under `src/db/repositories/`; never raw SQL in a controller/service |
+| New admin page | `public/admin.html` + `public/assets/js/admin.js`, gated on `document.body.dataset.page === 'admin'`, registered in `router.js`'s `PAGES`/`MODULES`. Adding a page means updating the byte-identical-sidebar copies in all five shells and the hardcoded shell-count arrays in `test/frontend/app.test.js`, `test/frontend/files.test.js`, `test/integration/csp.test.js`, and `test/integration/repo-guardrails.test.js` (two occurrences) |

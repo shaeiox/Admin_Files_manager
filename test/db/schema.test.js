@@ -58,3 +58,66 @@ describe('schema.migrate', () => {
         assert.throws(() => migrate(db), /newer than this release understands/);
     });
 });
+
+describe('schema.migrate (migration 2: files/file_access_policies/user_file_permissions)', () => {
+    test('creates the three tables', () => {
+        const db = new DatabaseSync(':memory:');
+        migrate(db);
+        const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((r) => r.name);
+        assert.ok(tables.includes('files'));
+        assert.ok(tables.includes('file_access_policies'));
+        assert.ok(tables.includes('user_file_permissions'));
+    });
+
+    test('an access_mode outside public/authenticated/restricted is rejected', () => {
+        const db = new DatabaseSync(':memory:');
+        migrate(db);
+        const now = Date.now();
+        db.prepare('INSERT INTO files (client_path, created_at, updated_at) VALUES (?, ?, ?)').run('/a.txt', now, now);
+        assert.throws(() => {
+            db.prepare(
+                'INSERT INTO file_access_policies (file_id, access_mode, created_at, updated_at) VALUES (1, ?, ?, ?)'
+            ).run('superpublic', now, now);
+        });
+    });
+
+    test('a file can have at most one policy (UNIQUE file_id)', () => {
+        const db = new DatabaseSync(':memory:');
+        migrate(db);
+        const now = Date.now();
+        db.prepare('INSERT INTO files (client_path, created_at, updated_at) VALUES (?, ?, ?)').run('/b.txt', now, now);
+        db.prepare('INSERT INTO file_access_policies (file_id, created_at, updated_at) VALUES (1, ?, ?)').run(now, now);
+        assert.throws(() => {
+            db.prepare('INSERT INTO file_access_policies (file_id, created_at, updated_at) VALUES (1, ?, ?)').run(now, now);
+        });
+    });
+
+    test('a (file, user) pair can have at most one permission row (UNIQUE)', () => {
+        const db = new DatabaseSync(':memory:');
+        migrate(db);
+        const now = Date.now();
+        db.prepare('INSERT INTO users (username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)').run('x', 'h', now, now);
+        db.prepare('INSERT INTO files (client_path, created_at, updated_at) VALUES (?, ?, ?)').run('/c.txt', now, now);
+        db.prepare('INSERT INTO user_file_permissions (file_id, user_id, permission, created_at) VALUES (1, 1, ?, ?)').run('grant', now);
+        assert.throws(() => {
+            db.prepare('INSERT INTO user_file_permissions (file_id, user_id, permission, created_at) VALUES (1, 1, ?, ?)').run('deny', now);
+        });
+    });
+
+    test('deleting a file cascades to its policy and permissions', () => {
+        const db = new DatabaseSync(':memory:');
+        migrate(db);
+        // CASCADE requires this pragma; connection.js sets it for the real
+        // singleton, but migrate() itself only applies schema, so it's set
+        // explicitly here against this bare in-memory connection.
+        db.exec('PRAGMA foreign_keys = ON;');
+        const now = Date.now();
+        db.prepare('INSERT INTO users (username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)').run('y', 'h', now, now);
+        db.prepare('INSERT INTO files (client_path, created_at, updated_at) VALUES (?, ?, ?)').run('/d.txt', now, now);
+        db.prepare('INSERT INTO file_access_policies (file_id, created_at, updated_at) VALUES (1, ?, ?)').run(now, now);
+        db.prepare('INSERT INTO user_file_permissions (file_id, user_id, permission, created_at) VALUES (1, 1, ?, ?)').run('grant', now);
+        db.prepare('DELETE FROM files WHERE id = 1').run();
+        assert.equal(db.prepare('SELECT COUNT(*) AS n FROM file_access_policies').get().n, 0);
+        assert.equal(db.prepare('SELECT COUNT(*) AS n FROM user_file_permissions').get().n, 0);
+    });
+});

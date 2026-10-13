@@ -80,7 +80,7 @@ Identity controls added by ADR-009 / `admin-identity-and-access-control` (phase 
 |---|---|---|---|
 | `AFM_LOGIN_RATE_LIMIT_PER_MINUTE` | no | `10` | Per-IP login attempts per minute, independent of the write/read buckets above. |
 | `AFM_BOOTSTRAP_ADMIN_USERNAME` | **together with the password below, only if no admin account exists yet** | *(unset)* | Creates the first admin account on boot. An unset pair is not an error — the admin panel is simply unreachable until one is set and the service restarted. Setting only one of the pair **refuses startup**. |
-| `AFM_BOOTSTRAP_ADMIN_PASSWORD` | see above | *(unset)* | At least 8 characters, or startup is refused. Never printed to stdout, never logged. The admin database file (plus its `-wal`/`-shm` sidecars) lives in `AFM_DATA_DIR`, alongside `metadata.json`/`settings.json` — back it up the same way. |
+| `AFM_BOOTSTRAP_ADMIN_PASSWORD` | see above | *(unset)* | At least 8 characters, or startup is refused. Never printed to stdout, never logged. The admin database file lives in `AFM_DATA_DIR`, alongside `metadata.json`/`settings.json` — back it up the same way. |
 
 - **Precedence:** a variable already in the process environment always wins. `dotenv` only fills
   unset variables, so a stray `.env` in a working directory can never override the `EnvironmentFile`.

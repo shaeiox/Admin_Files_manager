@@ -44,6 +44,40 @@ const API = (() => {
     })();
 
     /* ══════════════════════════════════════════
+       SESSION STATE (ADR-009)
+       The session itself lives in an HttpOnly cookie the browser already
+       sends automatically on every same-origin request - this module never
+       touches it. The CSRF token is NOT a secret (it is useless without that
+       cookie), but it must be attached to every mutating request by hand, so
+       it is kept here, the one place that builds every request.
+       ══════════════════════════════════════════ */
+
+    let csrfToken = null;
+    const SAFE_METHODS = new Set(['GET', 'HEAD']);
+
+    /** Set after a successful login or an `/auth/me` refresh. Never persisted - a reload re-fetches it. */
+    function setCsrfToken(token) {
+        csrfToken = typeof token === 'string' && token ? token : null;
+    }
+
+    function clearCsrfToken() {
+        csrfToken = null;
+    }
+
+    /**
+     * A 401 means the session is missing or expired - every page but the
+     * login page itself redirects there, preserving the page the caller was
+     * trying to reach. The login form's own request passes
+     * `skipAuthRedirect` so a wrong-password 401 shows an inline error
+     * instead of bouncing the user to the page they are already on.
+     */
+    function redirectToLogin() {
+        if (/\blogin\.html$/.test(window.location.pathname)) return;
+        const dest = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `login.html?redirect=${dest}`;
+    }
+
+    /* ══════════════════════════════════════════
        INTERNAL: JSON REQUEST CORE
        ══════════════════════════════════════════ */
 
@@ -56,19 +90,26 @@ const API = (() => {
      * failure token. Callers branch on those, never on the message text.
      *
      * @param {string} endpoint - Path under BASE_URL (e.g. "/fs/list")
-     * @param {RequestInit & { silent?: boolean }} options - `silent` suppresses the
-     *   generic error toast, for callers that report the failure themselves.
+     * @param {RequestInit & { silent?: boolean, skipAuthRedirect?: boolean }} options -
+     *   `silent` suppresses the generic error toast, for callers that report the
+     *   failure themselves. `skipAuthRedirect` suppresses the 401-redirect-to-login
+     *   behavior, for the login request itself.
      * @returns {Promise<any>}
      */
     async function request(endpoint, options = {}) {
         const url = `${BASE_URL}${endpoint}`;
-        const { silent = false, ...fetchOptions } = options;
+        const { silent = false, skipAuthRedirect = false, ...fetchOptions } = options;
         options = fetchOptions;
         const headers = { ...(options.headers || {}) };
 
         // FormData must set its own multipart boundary — never force JSON Content-Type
         if (!(options.body instanceof FormData) && !headers['Content-Type']) {
             headers['Content-Type'] = 'application/json';
+        }
+
+        const method = (options.method || 'GET').toUpperCase();
+        if (!SAFE_METHODS.has(method) && csrfToken && !headers['X-CSRF-Token']) {
+            headers['X-CSRF-Token'] = csrfToken;
         }
 
         try {
@@ -94,6 +135,10 @@ const API = (() => {
             }
 
             if (!response.ok) {
+                if (response.status === 401 && !skipAuthRedirect) {
+                    clearCsrfToken();
+                    redirectToLogin();
+                }
                 const errorMsg =
                     (data && (data.error || data.message)) ||
                     response.statusText ||
@@ -104,7 +149,7 @@ const API = (() => {
             return data;
         } catch (error) {
             if (typeof error.status !== 'number') error.status = 0;
-            if (!silent && window.AFM && window.AFM.Toast) {
+            if (!silent && error.status !== 401 && window.AFM && window.AFM.Toast) {
                 window.AFM.Toast.error(
                     'Network Error',
                     error.message || 'Failed to communicate with server'
@@ -173,6 +218,7 @@ const API = (() => {
 
         const promise = new Promise((resolve, reject) => {
             xhr.open('POST', url);
+            if (csrfToken) xhr.setRequestHeader('X-CSRF-Token', csrfToken);
 
             if (xhr.upload && typeof onProgress === 'function') {
                 xhr.upload.onprogress = (e) => {
@@ -190,6 +236,11 @@ const API = (() => {
                         resolve(xhr.responseText);
                     }
                     return;
+                }
+
+                if (xhr.status === 401) {
+                    clearCsrfToken();
+                    redirectToLogin();
                 }
 
                 let message = xhr.statusText || 'Upload failed';
@@ -321,8 +372,19 @@ const API = (() => {
         input.name = 'paths';
         // Server accepts JSON string in urlencoded body (see downloadZip controller)
         input.value = JSON.stringify(safePaths);
-
         form.appendChild(input);
+
+        // A <form> POST cannot set a custom header, so the CSRF token rides
+        // as a body field instead (ADR-009; csrf.js accepts either). Only a
+        // same-origin page that already has the token can set this field.
+        if (csrfToken) {
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfToken';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+        }
+
         document.body.appendChild(form);
 
         // Submit while still inside the user-gesture call stack when possible
@@ -367,6 +429,9 @@ const API = (() => {
         downloadMultipleFiles,
         downloadZip,
         thumbnailUrl,
+        setCsrfToken,
+        clearCsrfToken,
+        redirectToLogin,
     });
 })();
 

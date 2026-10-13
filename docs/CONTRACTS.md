@@ -722,6 +722,48 @@ two-argument middleware which never calls `next()`, so a mount placed after it i
 unreachable and `GET /api/settings` would answer `404` even though the router exists. Pinned by
 `test/api/settings.contract.test.js`.
 
+## Admin endpoints (ADR-009 phase 2)
+
+Mounted at `/api/admin` (and `/api/v1/admin`), served by `src/routes/admin.routes.js`. Every route
+here requires a session (like everything except `/health` and `/auth/login`) **and** `req.user.role
+=== 'admin'` — a non-admin session gets `403`, not `401`; no session at all still gets `401` first
+(the blanket `authenticate` in `src/routes/api.js` runs before this router's `requireAdmin`). There
+is no per-route permission catalogue — one role check gates the whole router (identity/rbac-lite
+spec).
+
+**What this track does not do:** nothing here enforces a file-access policy against a real
+download. `GET /api/fs/list`, `GET /api/fs/download`, etc. are unmodified by this change and
+answer exactly as they did before — any authenticated session can still read any file regardless
+of what's set here. This section manages the data model and the admin UI over it only (design D5).
+
+### User management
+
+| Endpoint | Envelope | Notes |
+|---|---|---|
+| `GET /api/admin/users` | bare array | Each row excludes `password_hash`/`failed_login_count`/`locked_until` — stripped at the service boundary, never the controller. |
+| `POST /api/admin/users` → `201` | `{success, user}` | Body: `{username, password, role?}`. `role` defaults to `"user"`; `409` on a duplicate username (case-insensitive); `400` on a password under 8 characters. |
+| `POST /api/admin/users/:id/status` | `{success, user}` | Body: `{status: "active"\|"disabled"}`. Disabling revokes every active session for that user immediately (`SessionService.revokeAllForUser`). |
+| `POST /api/admin/users/:id/reset-password` | `{success, user}` | Body: `{password}`. Also revokes every active session for that user — a reset password must not leave an old session usable. |
+| `POST /api/admin/users/:id/revoke-sessions` | `{success: true}` | Ends every active session for that user without touching `status`. |
+| `DELETE /api/admin/users/:id` | `{success: true}` | Also revokes sessions (belt-and-suspenders; the user row and its sessions are gone either way via `ON DELETE CASCADE`). |
+
+### File access policies
+
+| Endpoint | Envelope | Notes |
+|---|---|---|
+| `GET /api/admin/files/policies` | bare array | Only paths with a policy — sparse, not a mirror of `STORAGE_ROOT` (design D2). |
+| `GET /api/admin/files/policy?path=...` | bare object or `null` | `null` means no policy exists for that path. |
+| `PUT /api/admin/files/policy` | `{success, policy}` | Body: `{path, isDirectory?, accessMode?, isPublished?, isLocked?, availableFrom?, availableUntil?}`. Creates the `files`+`file_access_policies` rows on first call, **updates in place** on a later call for the same path — never a duplicate row. Omitted fields keep their current value (or the documented default on first creation: `access_mode="restricted"`, both flags `false`). |
+| `DELETE /api/admin/files/policy?path=...` | `{success: true}` | Removes the policy and (via `ON DELETE CASCADE`) every per-user permission on that file. |
+| `GET /api/admin/files/permissions?path=...` | bare array | `[]` if the path has a policy but no per-user rows. |
+| `POST /api/admin/files/permissions` → `201` | `{success, permission}` | Body: `{path, userId, permission: "grant"\|"deny"}`. `409` if `path` has no policy yet — grant before policy is a user error, not an implicit policy creation. One row per `(file, user)`; a second grant for the same pair updates the existing row. |
+| `DELETE /api/admin/files/permissions` | `{success: true}` | Body: `{path, userId}`. |
+
+A governed path's `files.client_path` row is kept in step with `PUT /api/fs/rename` and `DELETE
+/api/fs/delete` on a **best-effort** basis (`FileAccessPolicyService.onPathRenamed`/
+`onPathDeleted`, called from `fs.controller.js` alongside the existing `MetadataService`
+fire-and-forget calls) — the filesystem operation's own success never depends on it.
+
 ## Error Model
 
 | Status | Meaning | Typical triggers |

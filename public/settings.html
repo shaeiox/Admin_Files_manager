@@ -34,8 +34,9 @@
          ══════════════════════════════════════════ -->
     <aside class="sidebar" aria-label="Primary navigation">
       <!-- Shared sidebar. Duplicated byte-for-byte in index.html, files.html,
-           uploads.html and settings.html (no templating, no build step); a test
-           asserts the four copies are identical, so edit all four together. -->
+           uploads.html, settings.html and admin.html (no templating, no build
+           step); a test asserts the five copies are identical, so edit all
+           five together. -->
       <div class="sidebar-header">
         <a href="index.html" class="brand" aria-label="Dimension home">
           <div class="brand-mark">
@@ -100,6 +101,10 @@
             <span class="nav-icon"><i data-icon="settings" data-icon-size="18"></i></span>
             <span class="nav-label">Settings</span>
           </a>
+          <a class="nav-item" href="admin.html" data-nav="admin">
+            <span class="nav-icon"><i data-icon="shield" data-icon-size="18"></i></span>
+            <span class="nav-label">Admin</span>
+          </a>
         </div>
 
         <!-- Storage card — populated by AFM.updateStorageUI (see p6-contract seam 1).
@@ -116,17 +121,20 @@
         </div>
       </div>
 
-      <!-- Sidebar footer — populated by AFM.updateUserUI (see p6-contract seam 2).
-           This application has no user API and no authentication, so there is no
-           person to name: these elements stay empty until the environment is known.
-           It is a label, not a control, so it carries no button role. -->
+      <!-- Sidebar footer — populated by AFM.updateUserUI from GET /api/auth/me
+           (ADR-009). The session's real username/role render here once the
+           server confirms them; an honest "Unknown / Not signed in" shows
+           only while that call is in flight or has failed. -->
       <div class="sidebar-footer">
-        <div class="sidebar-user" role="group" aria-label="Environment">
+        <div class="sidebar-user" role="group" aria-label="Account">
           <div class="user-avatar"></div>
           <div class="user-info">
             <div class="user-name"></div>
             <div class="user-role"></div>
           </div>
+          <button class="btn-icon btn-icon-sm" data-action="logout" aria-label="Log out" data-tip="Log out">
+            <i data-icon="logout" data-icon-size="16"></i>
+          </button>
         </div>
       </div>
     </aside>
@@ -459,22 +467,23 @@
               <div class="settings-pane" data-pane-content="security">
 
                 <!--
-                  Security.
+                  Security (ADR-009, phase 1).
 
                   This pane previously listed a "Two-factor authentication —
                   Enabled" badge with a Manage button, a single-sign-on Configure
                   button, a session-timeout select, a checked-and-disabled
                   "Encryption at rest — AES-256" switch, a checked "Virus scanning
                   — ClamAV" switch, a password-protected-links switch and a
-                  watermarking switch.
+                  watermarking switch. None of those existed then and none exist
+                  now, so they stay removed.
 
-                  There is no authentication anywhere in this application (the API is
-                  unauthenticated by a recorded decision, ADR-003), no encryption at
-                  rest, no antivirus, no sessions and no share links. Every one of
-                  those controls read as real state and none of it existed, so the
-                  whole pane is replaced by the statement below — the same pattern as
-                  the quota panel and the API keys note. The controls return only
-                  alongside an authentication subsystem.
+                  What changed: real session authentication now exists (sessions,
+                  CSRF, login throttle). User management (create/disable/reset
+                  password/revoke sessions) lives on the Admin page, not here —
+                  this pane states what protects the session itself, not account
+                  administration. There is still no 2FA, no SSO, no encryption at
+                  rest, and no antivirus; those stay named as absent rather than
+                  implied.
                 -->
                 <div class="settings-group">
                   <div class="sg-head">
@@ -486,17 +495,21 @@
                   </div>
                   <div class="sg-body">
                     <div class="setting-hint">
-                      No authentication or security subsystem exists in this build. There
-                      are no accounts, passwords, sessions, single sign-on, two-factor
-                      steps, encryption at rest, virus scanning or password-protected
-                      links, so there is nothing here to configure — and no status here
-                      to report. Anyone who can reach this server has full access to
-                      every file in it.
+                      Every page requires a signed-in session (an <code>HttpOnly</code>
+                      cookie, or a bearer token for scripts), and every change you make
+                      is checked against that session's own CSRF token before it is
+                      applied. Repeated failed logins are throttled and lock the account
+                      for a short period. Any signed-in account currently has the same
+                      capabilities as any other — there is no per-account permission
+                      catalogue yet beyond the administrator/user distinction managed on
+                      the Admin page. There is no two-factor authentication, no
+                      single sign-on, no encryption at rest, and no antivirus scanning —
+                      none of that exists in this build.
                     </div>
                   </div>
 
                   <div class="sg-footer">
-                    <div class="sg-footer-note">Security controls are unavailable in this build.</div>
+                    <div class="sg-footer-note">Manage accounts on the <a href="admin.html">Admin page</a>.</div>
                   </div>
                 </div>
               </div>

@@ -671,6 +671,7 @@ describe('every rendered control is bound, and no dead UI ships', () => {
       /class="mobile-menu-btn"/,                 // sidebar.js
       /data-theme-toggle/,                       // theme.js topbar toggle
       /data-tip="Notifications"/,                // AFM.Notifications bell (delegated)
+      /data-action="logout"/,                    // sidebar.js logout control (delegated, ADR-009)
       /class="theme-option"/,                    // theme.js picker cards (delegated)
       /class="settings-nav-item/,                // the pane switcher
       /class="segmented"/,                       // container, not a control
@@ -707,9 +708,16 @@ describe('every rendered control is bound, and no dead UI ships', () => {
     assert.deepEqual(present, [], 'a removed capability is still rendered');
   });
 
-  test('the security area states plainly that no such subsystem exists here', () => {
-    assert.match(RENDERED_HTML, /no authentication or security subsystem exists in this build/i);
-    // The honest residue must not smuggle in a status of its own.
+  test('the security area describes the real session system (ADR-009), not a fabricated one', () => {
+    // Real authentication exists now: session cookie/bearer, CSRF, login
+    // throttle. The pane must say so, not the old "nothing exists here" line.
+    assert.doesNotMatch(RENDERED_HTML, /no authentication or security subsystem exists in this build/i);
+    assert.match(RENDERED_HTML, /signed-in session/i);
+    assert.match(RENDERED_HTML, /CSRF/i);
+    // Still-absent capabilities stay named as absent, not fabricated as present.
+    for (const absent of ['two-factor authentication', 'single sign-on', 'encryption at rest', 'antivirus']) {
+      assert.match(RENDERED_HTML.toLowerCase(), new RegExp(absent.toLowerCase()));
+    }
     assert.doesNotMatch(RENDERED_HTML, /badge-success[^>]*>\s*Enabled/i);
   });
 

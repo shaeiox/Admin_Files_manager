@@ -28,8 +28,9 @@ const Router = (() => {
     'files.html': 'files',
     'uploads.html': 'uploads',
     'settings.html': 'settings',
+    'admin.html': 'admin',
   };
-  const MODULES = { dashboard: 'Dashboard', files: 'Files', uploads: 'Uploads', settings: 'Settings' };
+  const MODULES = { dashboard: 'Dashboard', files: 'Files', uploads: 'Uploads', settings: 'Settings', admin: 'Admin' };
 
   const htmlCache = new Map();
   let pageExtras = [];      // page-owned <body> children outside .app-shell

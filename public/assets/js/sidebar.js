@@ -126,6 +126,15 @@ const Sidebar = (() => {
     return overlay;
   }
 
+  /** Revoke the session (best-effort) and return to the login page (ADR-009). */
+  async function handleLogout() {
+    try {
+      await window.API.post('/auth/logout', undefined, { skipAuthRedirect: true, silent: true });
+    } catch { /* best-effort: leave regardless of whether the server call succeeded */ }
+    window.API.clearCsrfToken();
+    window.location.href = 'login.html';
+  }
+
   /* ── Keyboard navigation inside sidebar ── */
   function handleSidebarKeydown(e) {
     if (!sidebarEl) return;
@@ -231,6 +240,16 @@ const Sidebar = (() => {
         // Small delay for visual feedback
         setTimeout(closeMobile, 150);
       }
+    });
+
+    // Log out (ADR-009). Revoke is best-effort — the user leaves either way,
+    // since the point is to stop being logged in, not to prove the server
+    // acknowledged it.
+    sidebarEl.addEventListener('click', e => {
+      const logoutBtn = e.target.closest('[data-action="logout"]');
+      if (!logoutBtn) return;
+      e.preventDefault();
+      handleLogout();
     });
 
     // Keyboard nav

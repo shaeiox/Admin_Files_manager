@@ -194,9 +194,11 @@ describe('every API URL is built inside the boundary', () => {
 
     test('there is no general-purpose URL escape hatch', () => {
         const { API } = loadApi();
+        // setCsrfToken/clearCsrfToken/redirectToLogin added by ADR-009: session
+        // state, not a URL builder - they don't widen this boundary.
         assert.deepEqual(Object.keys(API).sort(), [
-            'BASE_URL', 'del', 'downloadFile', 'downloadMultipleFiles', 'downloadZip',
-            'get', 'post', 'put', 'thumbnailUrl', 'upload',
+            'BASE_URL', 'clearCsrfToken', 'del', 'downloadFile', 'downloadMultipleFiles', 'downloadZip',
+            'get', 'post', 'put', 'redirectToLogin', 'setCsrfToken', 'thumbnailUrl', 'upload',
         ]);
     });
 });

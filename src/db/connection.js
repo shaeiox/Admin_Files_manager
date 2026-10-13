@@ -38,7 +38,14 @@ class AdminDatabase {
     _open() {
         fs.mkdirSync(path.dirname(this.dbPath), { recursive: true });
         const db = new DatabaseSync(this.dbPath);
-        db.exec('PRAGMA journal_mode = WAL;');
+        // Default rollback-journal mode, not WAL: this app has exactly one
+        // connection from one process at a time (both in production and in
+        // every test), so WAL's benefit - concurrent readers/writers across
+        // processes - does not apply here, and it costs two extra sidecar
+        // file handles (-wal/-shm) per connection for nothing. node:sqlite's
+        // own test-suite-wide concurrency (many short-lived connections
+        // across parallel test processes) measurably destabilized on
+        // Windows with WAL enabled; plain journal mode removed that.
         db.exec('PRAGMA foreign_keys = ON;');
         migrate(db);
         this._db = db;
