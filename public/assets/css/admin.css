@@ -39,12 +39,17 @@
   color: var(--accent-primary);
 }
 
+/* sg-body ships unpadded by design (settings.css) - every content type that
+   lives inside one supplies its own gutter, matching the 20/24px rhythm
+   .theme-picker/.quota-panel/.integration-grid already use. These three were
+   the one set of sg-body children that never did, so their fields and table
+   sat flush against the card border instead of inset from it. */
 .admin-inline-form {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--spacing-16);
-  margin-bottom: var(--spacing-12);
+  padding: var(--spacing-20) var(--spacing-24);
 }
 
 .admin-inline-form .field {
@@ -82,7 +87,10 @@
   border: 1px solid var(--color-error-border);
   border-radius: var(--radius-lg);
   padding: 10px 14px;
-  margin-top: var(--spacing-8);
+  /* Pull up out of the form's own bottom padding (above) rather than
+     stacking a second 20px gap under it, while keeping the same horizontal
+     gutter and a full 20px of breathing room below before the card border. */
+  margin: calc(-1 * var(--spacing-12)) var(--spacing-24) var(--spacing-20);
 }
 
 .admin-form-error[hidden] { display: none; }
@@ -90,14 +98,15 @@
 /* ── Tables ── */
 
 .admin-table {
-  width: 100%;
+  width: calc(100% - (var(--spacing-24) * 2));
+  margin: var(--spacing-12) var(--spacing-24) var(--spacing-20);
   border-collapse: collapse;
   font-size: var(--text-body-sm);
 }
 
 .admin-table th {
   text-align: left;
-  padding: 10px 12px;
+  padding: var(--spacing-12) var(--spacing-16);
   color: var(--text-secondary);
   font-weight: var(--font-weight-medium);
   font-size: var(--text-caption);
@@ -107,7 +116,7 @@
 }
 
 .admin-table td {
-  padding: 12px;
+  padding: var(--spacing-12) var(--spacing-16);
   border-bottom: 1px solid var(--border-secondary);
   vertical-align: middle;
   color: var(--text-primary);
@@ -194,15 +203,23 @@
   .admin-inline-form {
     flex-direction: column;
     align-items: stretch;
+    padding: var(--spacing-16);
   }
 
   .admin-inline-form .field {
     min-width: 0;
   }
 
+  .admin-form-error {
+    margin-left: var(--spacing-16);
+    margin-right: var(--spacing-16);
+  }
+
   .admin-table {
     display: block;
     overflow-x: auto;
+    width: calc(100% - (var(--spacing-16) * 2));
+    margin: var(--spacing-12) var(--spacing-16) var(--spacing-16);
   }
 }
 
