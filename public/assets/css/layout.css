@@ -623,7 +623,10 @@
   display: grid;
   place-items: center;
   color: var(--text-secondary);
-  z-index: 2;
+  /* Above .sidebar-resizer (z-index: 2): the resizer's hit area spans the full
+     height at this same edge and would otherwise swallow clicks/hover meant
+     for this button where the two overlap. */
+  z-index: 3;
   transition: all var(--transition-fast);
   box-shadow: var(--shadow-card);
 }
@@ -644,6 +647,43 @@
 .sidebar.is-collapsed .sidebar-collapse-btn svg {
   transform: rotate(180deg);
 }
+
+/* ── Drag-to-resize handle (right edge) ── */
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 2;
+}
+
+.sidebar-resizer::after {
+  content: '';
+  position: absolute;
+  top: 10%;
+  bottom: 10%;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--border-hover);
+  opacity: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+}
+
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after,
+.sidebar-resizer.is-dragging::after {
+  opacity: 1;
+  background: var(--accent-primary);
+}
+
+.sidebar-resizer:focus-visible { outline: none; }
+
+.sidebar.is-collapsed .sidebar-resizer { display: none; }
 
 /* ══════════════════════════════════════════
    MAIN AREA
@@ -1017,7 +1057,8 @@
     display: flex;
   }
 
-  .sidebar-collapse-btn {
+  .sidebar-collapse-btn,
+  .sidebar-resizer {
     display: none;
   }
 

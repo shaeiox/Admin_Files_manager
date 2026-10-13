@@ -1056,10 +1056,41 @@ tr:focus-within .row-actions { opacity: 1; }
 
 .files-layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: var(--spacing-20);
+  grid-template-columns: 240px var(--spacing-20) minmax(0, 1fr);
   align-items: start;
 }
+
+/* ── Drag handle between the tree panel and the files container ── */
+.layout-resizer {
+  grid-column: 2;
+  align-self: stretch;
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.layout-resizer::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--border-hover);
+  opacity: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+}
+
+.layout-resizer:hover::after,
+.layout-resizer:focus-visible::after,
+.layout-resizer.is-dragging::after {
+  opacity: 1;
+  background: var(--accent-primary);
+}
+
+.layout-resizer:focus-visible { outline: none; }
 
 /* The bulk bar floats over the page; reserve room so it never hides the last rows. */
 body.has-bulk-bar .page { padding-bottom: calc(var(--spacing-24) * 4); }
@@ -1220,6 +1251,7 @@ button.breadcrumb-item {
 @media (max-width: 860px) {
   .files-toolbar { position: static; }
   .files-layout { grid-template-columns: minmax(0, 1fr); }
+  .layout-resizer { display: none; }
   .tree-panel { position: static; max-height: 40vh; }
   .files-table-wrap { max-height: none; }
   .col-modified { display: none; }

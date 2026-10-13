@@ -86,6 +86,13 @@ const Files = (() => {
     { max: 560, hide: ['type', 'downloads', 'modified', 'size'] },
   ];
 
+  /** Drag-resize range for the folder tree panel (arrow keys use the same step/shift as columns). */
+  const TREE_WIDTH_MIN = 180;
+  const TREE_WIDTH_MAX = 480;
+  const TREE_WIDTH_DEFAULT = 240;
+  const TREE_WIDTH_STEP = 16;
+  const TREE_WIDTH_STORE_KEY = 'tree-panel-width';
+
   /** Filter chips, in display order. `other` is shown only when it has members. */
   const TYPE_CHIPS = [
     { key: 'all', label: 'All', icon: 'layers' },
@@ -2355,6 +2362,83 @@ const Files = (() => {
     }
   }
 
+  /* ── tree panel resizing (drag the divider between the folder tree and the files container) ──
+     Same approach as column widths: one <style> element, never an inline style. */
+
+  let treeResizeDrag = null;
+  let treeWidthSheet = null;
+
+  function clampTreeWidth(width) {
+    const n = Math.round(Number(width));
+    return Number.isFinite(n) ? Math.min(TREE_WIDTH_MAX, Math.max(TREE_WIDTH_MIN, n)) : TREE_WIDTH_DEFAULT;
+  }
+
+  function setTreePanelWidth(width, { persist = true } = {}) {
+    const w = clampTreeWidth(width);
+    if (document.createElement && document.head) {
+      if (!treeWidthSheet) {
+        treeWidthSheet = document.createElement('style');
+        treeWidthSheet.id = 'filesTreeWidth';
+        document.head.appendChild(treeWidthSheet);
+      }
+      // Scoped to the breakpoint where the tree sits beside the files container;
+      // below it .files-layout collapses to one column and this must not fight that.
+      treeWidthSheet.textContent =
+        `@media (min-width: 861px) { .files-layout { grid-template-columns: ${w}px var(--spacing-20) minmax(0, 1fr); } }`;
+    }
+    const handle = $('#treePanelResizer');
+    if (handle) handle.setAttribute('aria-valuenow', String(w));
+    if (persist) Store.set(TREE_WIDTH_STORE_KEY, w);
+    return w;
+  }
+
+  /** The rendered width, read back from the panel itself (no inline style to read). */
+  function currentTreeWidth() {
+    const panel = $('.tree-panel');
+    const rect = panel && panel.getBoundingClientRect ? panel.getBoundingClientRect() : null;
+    return rect && rect.width ? rect.width : TREE_WIDTH_DEFAULT;
+  }
+
+  function onTreeResizePointerDown(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    const panel = $('.tree-panel');
+    const handle = e.currentTarget;
+    treeResizeDrag = {
+      handle,
+      startX: e.clientX,
+      start: panel ? panel.getBoundingClientRect().width : TREE_WIDTH_DEFAULT,
+    };
+    if (handle.setPointerCapture && e.pointerId !== undefined) handle.setPointerCapture(e.pointerId);
+    handle.classList.add('is-dragging');
+    handle.addEventListener('pointermove', onTreeResizePointerMove);
+    handle.addEventListener('pointerup', onTreeResizePointerEnd);
+    handle.addEventListener('pointercancel', onTreeResizePointerEnd);
+  }
+
+  function onTreeResizePointerMove(e) {
+    if (!treeResizeDrag) return;
+    setTreePanelWidth(treeResizeDrag.start + (e.clientX - treeResizeDrag.startX), { persist: false });
+  }
+
+  function onTreeResizePointerEnd() {
+    if (!treeResizeDrag) return;
+    const { handle } = treeResizeDrag;
+    handle.classList.remove('is-dragging');
+    handle.removeEventListener('pointermove', onTreeResizePointerMove);
+    handle.removeEventListener('pointerup', onTreeResizePointerEnd);
+    handle.removeEventListener('pointercancel', onTreeResizePointerEnd);
+    treeResizeDrag = null;
+    Store.set(TREE_WIDTH_STORE_KEY, clampTreeWidth(currentTreeWidth()));
+  }
+
+  function onTreeResizeKeydown(e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const step = (e.shiftKey ? TREE_WIDTH_STEP * 4 : TREE_WIDTH_STEP) * (e.key === 'ArrowRight' ? 1 : -1);
+    setTreePanelWidth(currentTreeWidth() + step);
+  }
+
   function onContainerDblClick(e) {
     const handle = e.target && e.target.closest ? e.target.closest('[data-resize]') : null;
     if (!handle) return;
@@ -2647,6 +2731,10 @@ const Files = (() => {
     bind('#folderTree', 'click', onTreeClick);
     bind('#folderTree', 'keydown', onTreeKeydown);
     bind('#folderTree', 'contextmenu', onTreeContextMenu);
+
+    bind('#treePanelResizer', 'pointerdown', onTreeResizePointerDown);
+    bind('#treePanelResizer', 'keydown', onTreeResizeKeydown);
+    bind('#treePanelResizer', 'dblclick', () => setTreePanelWidth(TREE_WIDTH_DEFAULT));
     bind('#breadcrumb', 'click', onBreadcrumbClick);
     bind('#filterChips', 'click', onChipClick);
     bind('#filesSearch', 'input', onSearchInput);
@@ -2716,6 +2804,7 @@ const Files = (() => {
       colWidths: sanitizeColumnWidths(Store.get(COLUMN_STORE_KEY, {})),
     });
     applyColumnWidths();
+    setTreePanelWidth(Store.get(TREE_WIDTH_STORE_KEY, TREE_WIDTH_DEFAULT), { persist: false });
     initExpansion(state);
     applyLibraryView(resolveLibraryView(window.location && window.location.search));
 
@@ -2741,8 +2830,11 @@ const Files = (() => {
     globalListeners = [];
     cancelPendingSearch();
     onResizePointerEnd();
+    onTreeResizePointerEnd();
     if (widthSheet && widthSheet.remove) widthSheet.remove();
     widthSheet = null;
+    if (treeWidthSheet && treeWidthSheet.remove) treeWidthSheet.remove();
+    treeWidthSheet = null;
     if (document.body && document.body.classList) document.body.classList.remove('has-bulk-bar');
   }
 

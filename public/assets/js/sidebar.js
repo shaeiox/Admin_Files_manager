@@ -10,15 +10,22 @@ const Sidebar = (() => {
   /* ── Constants ── */
   const STORE_KEY = 'sidebar-collapsed';
   const MOBILE_BREAKPOINT = 860;
+  const WIDTH_STORE_KEY = 'sidebarWidth';
+  const WIDTH_MIN = 200;
+  const WIDTH_MAX = 420;
+  const WIDTH_DEFAULT = 260;
+  const WIDTH_STEP = 12;
 
   /* ── State ── */
   let sidebarEl = null;
   let overlayEl = null;
   let collapseBtn = null;
+  let resizerEl = null;
   let mobileMenuBtn = null;
   let mainArea = null;
   let isCollapsed = false;
   let isMobileOpen = false;
+  let resizeDrag = null;
   let listeners = [];
 
   /* ── Private ── */
@@ -126,6 +133,75 @@ const Sidebar = (() => {
     return overlay;
   }
 
+  function buildResizer() {
+    const handle = document.createElement('div');
+    handle.className = 'sidebar-resizer';
+    handle.setAttribute('role', 'separator');
+    handle.setAttribute('aria-orientation', 'vertical');
+    handle.setAttribute('aria-label', 'Resize sidebar');
+    handle.setAttribute('aria-valuemin', String(WIDTH_MIN));
+    handle.setAttribute('aria-valuemax', String(WIDTH_MAX));
+    handle.setAttribute('tabindex', '0');
+    return handle;
+  }
+
+  /* ── Sidebar width (drag-to-resize) ── */
+
+  function clampWidth(width) {
+    const n = Math.round(Number(width));
+    return Number.isFinite(n) ? Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, n)) : WIDTH_DEFAULT;
+  }
+
+  function setWidth(width, persist = true) {
+    const w = clampWidth(width);
+    document.documentElement.style.setProperty('--sidebar-width', `${w}px`);
+    if (resizerEl) resizerEl.setAttribute('aria-valuenow', String(w));
+    if (persist) AFM?.Store?.set(WIDTH_STORE_KEY, w);
+    return w;
+  }
+
+  function currentWidth() {
+    const raw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width'));
+    return Number.isFinite(raw) ? raw : WIDTH_DEFAULT;
+  }
+
+  function onResizerPointerDown(e) {
+    if (isCollapsed || isMobile() || (e.button !== undefined && e.button !== 0)) return;
+    e.preventDefault();
+    resizeDrag = { startX: e.clientX, start: sidebarEl.getBoundingClientRect().width };
+    if (resizerEl.setPointerCapture && e.pointerId !== undefined) resizerEl.setPointerCapture(e.pointerId);
+    resizerEl.classList.add('is-dragging');
+    sidebarEl.style.transition = 'none';
+    if (mainArea) mainArea.style.transition = 'none';
+    resizerEl.addEventListener('pointermove', onResizerPointerMove);
+    resizerEl.addEventListener('pointerup', onResizerPointerEnd);
+    resizerEl.addEventListener('pointercancel', onResizerPointerEnd);
+  }
+
+  function onResizerPointerMove(e) {
+    if (!resizeDrag) return;
+    setWidth(resizeDrag.start + (e.clientX - resizeDrag.startX), false);
+  }
+
+  function onResizerPointerEnd() {
+    if (!resizeDrag) return;
+    resizerEl.classList.remove('is-dragging');
+    resizerEl.removeEventListener('pointermove', onResizerPointerMove);
+    resizerEl.removeEventListener('pointerup', onResizerPointerEnd);
+    resizerEl.removeEventListener('pointercancel', onResizerPointerEnd);
+    sidebarEl.style.transition = '';
+    if (mainArea) mainArea.style.transition = '';
+    resizeDrag = null;
+    AFM?.Store?.set(WIDTH_STORE_KEY, clampWidth(currentWidth()));
+  }
+
+  function onResizerKeydown(e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const step = (e.shiftKey ? WIDTH_STEP * 4 : WIDTH_STEP) * (e.key === 'ArrowRight' ? 1 : -1);
+    setWidth(currentWidth() + step);
+  }
+
   /** Revoke the session (best-effort) and return to the login page (ADR-009). */
   async function handleLogout() {
     try {
@@ -200,10 +276,18 @@ const Sidebar = (() => {
       sidebarEl.parentElement.insertBefore(overlayEl, sidebarEl.nextSibling);
     }
 
+    // Create resize handle if not present
+    resizerEl = sidebarEl.querySelector('.sidebar-resizer');
+    if (!resizerEl) {
+      resizerEl = buildResizer();
+      sidebarEl.appendChild(resizerEl);
+    }
+
     // Restore state on desktop
     if (!isMobile()) {
       const stored = AFM?.Store?.get(STORE_KEY, false);
       applyState(stored, false);
+      setWidth(AFM?.Store?.get(WIDTH_STORE_KEY, WIDTH_DEFAULT), false);
     }
 
     // ─── Event Bindings ───
@@ -229,6 +313,11 @@ const Sidebar = (() => {
       if (isMobileOpen) closeMobile();
       else openMobile();
     });
+
+    // Drag-resize
+    resizerEl.addEventListener('pointerdown', onResizerPointerDown);
+    resizerEl.addEventListener('keydown', onResizerKeydown);
+    resizerEl.addEventListener('dblclick', () => setWidth(WIDTH_DEFAULT));
 
     // Overlay click → close mobile sidebar
     overlayEl.addEventListener('click', closeMobile);
