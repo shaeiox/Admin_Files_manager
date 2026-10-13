@@ -1645,6 +1645,28 @@ describe('Cut marks items pending a move; Paste in another folder is what actual
     assert.equal(page.state().cutPaths.size, 1, 'still pending - nothing happened to cancel it');
   });
 
+  test('a total paste failure (e.g. a 409 name collision) shows a specific "Move failed" toast, not a generic one', async () => {
+    const page = await booted({
+      'PUT /fs/move': new Error('An item with this name already exists at the destination.'),
+    });
+    page.c.navigateTo('/docs');
+    await settleAll();
+    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    await page.c.pasteItems();
+    await settleAll();
+    const err = page.toasts.find((t) => t.type === 'error');
+    assert.ok(err, 'an error toast appears');
+    assert.equal(err.t, 'Move failed');
+    assert.match(err.m, /already exists at the destination/);
+    assert.ok(!page.toasts.some((t) => t.t === 'Network Error'), 'not the generic transport-failure title');
+    assert.equal(page.state().cutPaths.size, 1, 'still pending - the operator can retry');
+  });
+
+  test('the move request is sent silent, so api.js never also raises its own generic toast for it', () => {
+    const fn = FILES_SRC.slice(FILES_SRC.indexOf('async function pasteItems'), FILES_SRC.indexOf('/* ── access policy'));
+    assert.match(fn, /window\.API\.put\('\/fs\/move', \{ paths, destination \}, \{ silent: true \}\)/);
+  });
+
   test('a partial paste keeps only the failed item pending, so pasting again retries just that one', async () => {
     const page = await booted({
       'PUT /fs/move': {
@@ -1696,7 +1718,7 @@ describe('Cut marks items pending a move; Paste in another folder is what actual
   });
 
   test('move goes through PUT /fs/move and policy through PUT /admin/files/policy - no new endpoint invented', () => {
-    assert.match(FILES_SRC, /window\.API\.put\('\/fs\/move', \{ paths, destination \}\)/);
+    assert.match(FILES_SRC, /window\.API\.put\('\/fs\/move', \{ paths, destination \}, \{ silent: true \}\)/);
     assert.match(FILES_SRC, /window\.API\.put\('\/admin\/files\/policy', \{/);
     assert.doesNotMatch(FILES_SRC, /\bfetch\(/);
   });

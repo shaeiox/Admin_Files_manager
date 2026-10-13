@@ -1521,9 +1521,14 @@ const Files = (() => {
     const paths = items.map(i => i.path);
     let res;
     try {
-      res = await window.API.put('/fs/move', { paths, destination });
-    } catch {
-      return; // every path failed: api.js shows the reason; the cut stays pending so the operator can retry
+      res = await window.API.put('/fs/move', { paths, destination }, { silent: true });
+    } catch (error) {
+      // Silent: api.js's generic "Network Error" toast is wrong here - this is
+      // the server's own refusal (e.g. a 409 name collision), not a transport
+      // failure. The cut stays pending so the operator can retry after
+      // resolving it (rename the item here, or pick a different folder).
+      Toast.error('Move failed', (error && error.message) || 'The item could not be moved.');
+      return;
     }
     const summary = summarizeMove(paths, res && res.data);
     reportMove(summary, items, destination);
