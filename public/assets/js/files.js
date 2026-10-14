@@ -1626,7 +1626,7 @@ const Files = (() => {
 
   const ACCESS_MODES = [
     { value: 'restricted', label: 'Restricted' },
-    { value: 'authenticated', label: 'Authenticated' },
+    { value: 'authenticated', label: 'Signed-in users' },
     { value: 'public', label: 'Public' },
   ];
 
@@ -1647,8 +1647,8 @@ const Files = (() => {
           <div class="modal-header">
             <div>
               <div class="modal-title" id="policyModalTitle">${title}</div>
-              <div class="modal-subtitle">Administrator only. Enforced for every non-administrator
-                account; a folder's policy covers everything inside it.</div>
+              <div class="modal-subtitle">Administrator only. Applies to the file portal, never to this
+                app; a folder's policy covers everything inside it.</div>
             </div>
             <button class="btn-icon btn-icon-sm" data-act="cancel" aria-label="Cancel">${icon('x', 15)}</button>
           </div>
@@ -1674,7 +1674,7 @@ const Files = (() => {
                   <input type="checkbox" id="policyLocked">
                   <span class="track" aria-hidden="true"></span>
                 </span>
-                <span>Locked</span>
+                <span>Show locked to visitors</span>
               </label>
             </div>
           </div>

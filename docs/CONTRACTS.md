@@ -63,8 +63,8 @@
   requires a session (`afm_session` cookie or `Authorization: Bearer`). This closes ADR-003 §9's
   Critical, scoped to single-tenant authentication — see "Auth endpoints (ADR-009)" below.
 - **CSRF defence is in place.** Every non-GET request requires a session-bound `X-CSRF-Token`
-  header, checked before any mutation. **Per-file access policies are enforced** for non-admin
-  sessions (see "What a policy enforces" under the admin endpoints). **Still open:** a full
+  header, checked before any mutation. **File-access policies do not restrict this app**: they
+  govern the File Portal only (see "What a policy does" under the admin endpoints). **Still open:** a full
   permission catalogue and the Files-portal integration decision are explicit follow-ups — see
   `openspec/changes/admin-identity-and-access-control/` and ADR-009.
 
@@ -182,11 +182,18 @@ guard → `GET /health` → `/auth` router (self-gated) → `authenticate` → `
 | DELETE | `/api/admin/users/:id` | admin | ✅ live | Delete an account |
 | GET | `/api/admin/files/policies` | admin | ✅ live | Every path with a policy |
 | GET | `/api/admin/files/policy` | admin | ✅ live | One path's policy, or `null` |
-| PUT | `/api/admin/files/policy` | admin | ✅ live | Create or update a policy (stored, **not enforced**) |
+| PUT | `/api/admin/files/policy` | admin | ✅ live | Create or update a File Portal policy (see "What a policy does") |
 | DELETE | `/api/admin/files/policy` | admin | ✅ live | Remove a policy and its permissions |
 | GET | `/api/admin/files/permissions` | admin | ✅ live | Per-user grants/denies on one path |
-| POST | `/api/admin/files/permissions` | admin | ✅ live | Grant or deny one user (`201`) |
-| DELETE | `/api/admin/files/permissions` | admin | ✅ live | Remove one user's grant/deny |
+| POST | `/api/admin/files/permissions` | admin | ✅ live | Grant or deny one user or group, at a level (`201`) |
+| DELETE | `/api/admin/files/permissions` | admin | ✅ live | Remove one user's or group's grant/deny |
+| GET | `/api/admin/files/group-permissions` | admin | ✅ live | Group grants/denies on one path |
+| GET | `/api/admin/files/effective` | admin | ✅ live | What the File Portal decides for a user or a visitor at a path, and why |
+| GET | `/api/admin/groups` | admin | ✅ live | Groups with their members |
+| POST | `/api/admin/groups` | admin | ✅ live | Create a group (`201`) |
+| PUT | `/api/admin/groups/:id` | admin | ✅ live | Rename / re-describe a group |
+| DELETE | `/api/admin/groups/:id` | admin | ✅ live | Delete a group and its grants |
+| PUT | `/api/admin/groups/:id/members` | admin | ✅ live | Replace a group's members |
 | GET | `/api/admin/portal/config` | admin | ✅ live | File portal `.env` keys, or `available:false` |
 | PUT | `/api/admin/portal/config` | admin | ✅ live | Replace the six portal `.env` keys (applies on portal restart) |
 | GET | `/api/admin/logs/portal` | admin | ✅ live | File portal trace, newest first |
@@ -885,30 +892,29 @@ here requires a session (like everything except `/health` and `/auth/login`) **a
 is no per-route permission catalogue — one role check gates the whole router (identity/rbac-lite
 spec).
 
-**What a policy enforces.** `FileAccessPolicyService.checkerFor(req.user)` is the single decision,
-consulted by every `/fs` endpoint, the thumbnail, and the dashboard summary:
+**What a policy does.** Policies govern the **File Portal** (files-server-web) only. This app never
+consults them: every `/fs` endpoint, the thumbnail and the dashboard serve every signed-in account the
+whole storage root, whatever policies exist. The portal reads `admin.sqlite` read-only and decides
+per path and per caller (a visitor who is not signed in, or a signed-in portal user):
 
-- **Administrators are never restricted.** A path with **no policy** on itself or any ancestor is
-  open to every signed-in user (the behaviour before policies existed).
-- Otherwise **every** policy on the path — each ancestor folder's and the item's own — must allow, so
-  a folder's policy covers everything inside it and cannot be loosened by a child. A policy allows
-  when it is not locked, is published, `available_from <= now < available_until` (either bound may be
-  null), and, for `restricted`, the user holds a `grant` on that policy's path (a `deny` or no row
-  refuses). `public` and `authenticated` behave identically: every route already needs a session.
-- Paths are compared after canonicalisation (`//`, `.`, `..`, trailing `/`; `\` and letter case on
-  Windows/macOS), so a different spelling of a hidden path is not a way around it.
+- **Levels:** `view` (listed in browse, search, categories, releases and the navbar, marked
+  `viewOnly`) < `download` (also downloaded, hashed, zipped, served as `/release{8,9}/latest`).
+- **Per policy:** unpublished, before `available_from` or after `available_until` (both inclusive),
+  or a deny for the user or any of their groups → **hidden**. A visitor: `is_locked` → **locked** (the
+  name is shown with a lock and a sign-in prompt), `public` → the `default_level`, otherwise hidden. A
+  signed-in user: `restricted` → the highest level granted to them or one of their groups (none →
+  hidden); `authenticated`/`public` → the `default_level`, raised by a grant. `is_locked` does not
+  affect signed-in users.
+- **Over the path** (the item and every ancestor folder): hidden beats locked beats the **lowest**
+  level, so a folder caps everything inside it. No policy → download. **Administrators get no bypass
+  on the portal.**
+- Rows written before levels existed (migration 4) default to `download`, which is what they meant.
 
-| Endpoint | When the path is not allowed |
-|---|---|
-| `GET /fs/download`, `GET /fs/thumbnail`, `POST /fs/star`, `PUT /fs/rename`, `POST /fs/folder`, `POST /fs/upload` (target file) | `404`, same body as a missing path — a hidden item's existence is not disclosed |
-| `GET /fs/list`, `GET /fs/tree` | the requested folder itself → `404`; hidden children are omitted, and `total`/`counts` exclude them |
-| `POST /fs/download-zip` | a hidden requested path → `404`; hidden descendants of a requested folder are left out of the archive |
-| `DELETE /fs/delete`, `PUT /fs/move`, `POST /fs/copy`, `PUT /fs/rename` | per item: hidden → `404`; a folder **containing** something hidden → `403 "This folder contains items you do not have access to."` (deleting it would destroy what the user cannot see; copying it would publish an unprotected duplicate). A hidden `destination` → `404` for the whole request |
-| `GET /dashboard/summary` | hidden files are dropped from `activities` and `topFiles`. Aggregate totals (`stats`, `storage`, `storageBreakdown`) still count them |
-
-Known limits: a folder entry's recursive `size` in `/fs/list` still includes hidden descendants;
-an in-root symlink to a governed file is not mapped back to that file's policy. Renaming, moving or
-deleting a folder carries the policies **below** it too (they are re-keyed or removed with it).
+The portal endpoints and their responses are documented in files-server-web
+`docs/integration-admin-files-manager.md`. `GET /api/admin/files/effective` runs the same rules here
+(`FileAccessPolicyService.portalAccess`) for the admin's "Check access" tool. Renaming, moving or
+deleting a file or folder in this app carries its policies, and those **below** it, along
+(best-effort, `onPathRenamed`/`onPathDeleted`), so a portal policy never strands on a dead path.
 
 Data model, constraints and lifecycle: `docs/DATABASE.md`. Every mutating admin call — success
 **and** failure — writes one `audit_logs` row (action names in `docs/DATABASE.md` → *Action
@@ -955,11 +961,16 @@ token, `429` from the general limiter.
   "created_by": 1, "updated_by": 1, "created_at": 1760400000000, "updated_at": 1760400000000 }
 ```
 
-**Permission object:** `{ "id", "file_id", "user_id", "permission": "grant"|"deny", "granted_by", "created_at" }`.
+Policy objects also carry `"default_level"` (`view`|`download`, default `download`).
+
+**Permission object:** `{ "id", "file_id", "user_id", "permission": "grant"|"deny", "level", "granted_by", "created_at" }`.
+**Group permission object:** the same with `group_id` and `group_name` in place of `user_id`.
+`level` is ignored for a deny.
 
 Validation (`FileAccessPolicyService`): `path` must pass `validateClientPath` (`400`);
 `accessMode` ∈ `public`/`authenticated`/`restricted`; `availableFrom`/`availableUntil` are
-safe-integer epoch ms or `null`, and `from ≤ until`; `permission` ∈ `grant`/`deny` — all `400`
+safe-integer epoch ms or `null`, and `from ≤ until`; `permission` ∈ `grant`/`deny`; `defaultLevel`
+and `level` ∈ `view`/`download` — all `400`
 otherwise. The path is **not** checked against the disk: a policy can be set on a path that does
 not exist. Request field names are camelCase; response fields are the snake_case column names.
 
@@ -967,11 +978,29 @@ not exist. Request field names are camelCase; response fields are the snake_case
 |---|---|---|
 | `GET /api/admin/files/policies` | bare array | Only paths with a policy — sparse, not a mirror of `STORAGE_ROOT` (design D2). |
 | `GET /api/admin/files/policy?path=...` | bare object or `null` | `null` means no policy exists for that path. |
-| `PUT /api/admin/files/policy` | `{success, policy}` | Body: `{path, isDirectory?, accessMode?, isPublished?, isLocked?, availableFrom?, availableUntil?}`. Creates the `files`+`file_access_policies` rows on first call, **updates in place** on a later call for the same path — never a duplicate row. Omitted fields keep their current value (or the documented default on first creation: `access_mode="restricted"`, both flags `false`). |
+| `PUT /api/admin/files/policy` | `{success, policy}` | Body: `{path, isDirectory?, accessMode?, isPublished?, isLocked?, availableFrom?, availableUntil?, defaultLevel?}`. Creates the `files`+`file_access_policies` rows on first call, **updates in place** on a later call for the same path — never a duplicate row. Omitted fields keep their current value (or the documented default on first creation: `access_mode="restricted"`, both flags `false`). |
 | `DELETE /api/admin/files/policy?path=...` | `{success: true}` | Removes the policy and (via `ON DELETE CASCADE`) every per-user permission on that file. |
 | `GET /api/admin/files/permissions?path=...` | bare array | `[]` if the path has a policy but no per-user rows. |
-| `POST /api/admin/files/permissions` → `201` | `{success, permission}` | Body: `{path, userId, permission: "grant"\|"deny"}`. `409` if `path` has no policy yet — grant before policy is a user error, not an implicit policy creation. One row per `(file, user)`; a second grant for the same pair updates the existing row. |
-| `DELETE /api/admin/files/permissions` | `{success: true}` | Body: `{path, userId}`. |
+| `POST /api/admin/files/permissions` → `201` | `{success, permission}` | Body: `{path, userId \| groupId, permission: "grant"\|"deny", level?}` — `level` defaults to `download` (what a grant meant before levels). `409` if `path` has no policy yet — grant before policy is a user error, not an implicit policy creation. One row per `(file, user)` / `(file, group)`; a second grant for the same pair updates the existing row. `404` for an unknown user or group. |
+| `DELETE /api/admin/files/permissions` | `{success: true}` | Body: `{path, userId \| groupId}`. |
+| `GET /api/admin/files/group-permissions?path=...` | bare array | Group permission objects, by group name. |
+| `GET /api/admin/files/effective?path=...&userId=...` | bare object | `{outcome: "download"\|"view"\|"locked"\|"hidden"\|"disabled", policies: [{path, outcome}]}` — the File Portal's decision and what each governing policy gave. Omit `userId` for a visitor who is not signed in. |
+
+### Groups
+
+A group is a named set of users that one file grant can cover; it carries no capability of its own
+and never changes a role. **Group object:** `{ "id", "name", "description", "created_at",
+"updated_at", "members": [{ "id", "username" }] }`. Names are 1-64 characters, unique
+case-insensitively (`409`); descriptions at most 200 (`400`). Audited as `group.create`,
+`group.update`, `group.delete`, `group.members` (`target_type = 'group'`).
+
+| Endpoint | Envelope | Notes |
+|---|---|---|
+| `GET /api/admin/groups` | bare array | Ordered by name; members inline. |
+| `POST /api/admin/groups` → `201` | `{success, group}` | Body: `{name, description?}`. |
+| `PUT /api/admin/groups/:id` | `{success, group}` | Body: `{name?, description?}`; `404` unknown id. |
+| `DELETE /api/admin/groups/:id` | `{success: true}` | Memberships and every group grant go with it (cascade). |
+| `PUT /api/admin/groups/:id/members` | `{success, group}` | Body: `{userIds: number[]}` — **full replace**; `404` if any id is not a user. |
 
 A governed path's `files.client_path` row is kept in step with `PUT /api/fs/rename`, `PUT
 /api/fs/move` and `DELETE /api/fs/delete` on a **best-effort** basis

@@ -157,72 +157,89 @@ describe('FileAccessPolicyService.onPathRenamed / onPathDeleted carry descendant
     });
 });
 
-describe('FileAccessPolicyService.checkerFor (the access decision)', () => {
+describe('FileAccessPolicyService.portalAccess (mirror of the portal decision)', () => {
+    const GroupService = require('../../src/services/GroupService');
     const NOW = 1_000_000;
-    let user;
-    let other;
+    let alice; // member of "team"
+    let bob; // member of "team", individually denied on /pa/team/notes
+    let carol; // no group
+    let off; // disabled
+    let team;
 
     before(() => {
-        user = UserRepository.create({ username: 'checker-user', passwordHash: hashPassword('x-password-1') });
-        other = UserRepository.create({ username: 'checker-other', passwordHash: hashPassword('x-password-1') });
-        const open = { accessMode: 'authenticated', isPublished: true, actorId };
-        FileAccessPolicyService.setPolicy('/k/open.txt', open);
-        FileAccessPolicyService.setPolicy('/k/public.txt', { ...open, accessMode: 'public' });
-        FileAccessPolicyService.setPolicy('/k/locked.txt', { ...open, isLocked: true });
-        FileAccessPolicyService.setPolicy('/k/unpublished.txt', { ...open, isPublished: false });
-        FileAccessPolicyService.setPolicy('/k/starts.txt', { ...open, availableFrom: NOW + 1 });
-        FileAccessPolicyService.setPolicy('/k/ends.txt', { ...open, availableUntil: NOW });
-        FileAccessPolicyService.setPolicy('/k/window.txt', { ...open, availableFrom: NOW, availableUntil: NOW + 1 });
-        FileAccessPolicyService.setPolicy('/k/restricted.txt', { ...open, accessMode: 'restricted' });
-        FileAccessPolicyService.grantPermission('/k/restricted.txt', user.id, 'grant', actorId);
-        FileAccessPolicyService.setPolicy('/k/denied.txt', { ...open, accessMode: 'restricted' });
-        FileAccessPolicyService.grantPermission('/k/denied.txt', user.id, 'deny', actorId);
-        FileAccessPolicyService.setPolicy('/k/sealed', { ...open, isDirectory: true, isLocked: true });
-        FileAccessPolicyService.setPolicy('/k/sealed/opened.txt', open);
+        const mk = (username, extra = {}) => UserRepository.create({ username, passwordHash: hashPassword('x-password-1'), ...extra });
+        alice = mk('pa-alice');
+        bob = mk('pa-bob');
+        carol = mk('pa-carol');
+        off = mk('pa-off');
+        UserRepository.setStatus(off.id, 'disabled');
+        team = GroupService.create({ name: 'PA team' });
+        GroupService.setMembers(team.id, [alice.id, bob.id]);
+
+        const pub = { isPublished: true, isDirectory: true, actorId };
+        FileAccessPolicyService.setPolicy('/pa/team', { ...pub, accessMode: 'restricted', isLocked: true });
+        FileAccessPolicyService.grantGroupPermission('/pa/team', team.id, 'grant', actorId, 'view');
+        FileAccessPolicyService.grantPermission('/pa/team', alice.id, 'grant', actorId, 'download');
+        FileAccessPolicyService.setPolicy('/pa/team/notes', { ...pub, accessMode: 'authenticated' });
+        FileAccessPolicyService.grantPermission('/pa/team/notes', bob.id, 'deny', actorId);
+        FileAccessPolicyService.setPolicy('/pa/show', { ...pub, accessMode: 'public', defaultLevel: 'view' });
+        FileAccessPolicyService.setPolicy('/pa/members', { ...pub, accessMode: 'authenticated' });
+        FileAccessPolicyService.setPolicy('/pa/draft', { ...pub, accessMode: 'public', isPublished: false });
+        FileAccessPolicyService.setPolicy('/pa/window', { ...pub, accessMode: 'public', availableFrom: NOW, availableUntil: NOW + 10 });
     });
 
-    test('each rule decides as documented', () => {
-        const access = FileAccessPolicyService.checkerFor({ id: user.id, role: 'user' }, NOW);
-        const expected = {
-            '/k/no-policy.txt': true,
-            '/k/open.txt': true,
-            '/k/public.txt': true,
-            '/k/locked.txt': false,
-            '/k/unpublished.txt': false,
-            '/k/starts.txt': false,
-            '/k/ends.txt': false, // available_until is exclusive
-            '/k/window.txt': true, // available_from is inclusive
-            '/k/restricted.txt': true,
-            '/k/denied.txt': false,
-            '/k/sealed': false,
-            '/k/sealed/opened.txt': false, // a locked ancestor wins over a permissive child
-        };
-        for (const [p, allowed] of Object.entries(expected)) assert.equal(access.canAccess(p), allowed, p);
+    const at = (p, user) => FileAccessPolicyService.portalAccess(p, user ? user.id : null, NOW).outcome;
+
+    test('a restricted folder: grantees at their highest level, others hidden, visitors see the lock', () => {
+        assert.equal(at('/pa/team/a.iso', alice), 'download', 'user grant beats the lower group grant');
+        assert.equal(at('/pa/team/a.iso', bob), 'view', 'through the group');
+        assert.equal(at('/pa/team/a.iso', carol), 'hidden');
+        assert.equal(at('/pa/team/a.iso', null), 'locked');
     });
 
-    test('a grant belongs to one user', () => {
-        const access = FileAccessPolicyService.checkerFor({ id: other.id, role: 'user' }, NOW);
-        assert.equal(access.canAccess('/k/restricted.txt'), false);
+    test('a deny hides it from that member even inside a granted folder', () => {
+        assert.equal(at('/pa/team/notes/x', bob), 'hidden');
+        assert.equal(at('/pa/team/notes/x', alice), 'download');
     });
 
-    test('an administrator is never restricted', () => {
-        const access = FileAccessPolicyService.checkerFor({ id: actorId, role: 'admin' }, NOW);
-        assert.equal(access.canAccess('/k/locked.txt'), true);
-        assert.equal(access.hidesAnythingBelow('/k'), false);
+    test('public and signed-in modes, default level, unpublished and the window', () => {
+        assert.equal(at('/pa/show/demo.iso', null), 'view');
+        assert.equal(at('/pa/show/demo.iso', carol), 'view');
+        assert.equal(at('/pa/members/x', null), 'hidden', 'not locked: visitors see nothing');
+        assert.equal(at('/pa/members/x', carol), 'download', 'the default level');
+        assert.equal(at('/pa/draft/x', carol), 'hidden');
+        assert.equal(FileAccessPolicyService.portalAccess('/pa/window/x', null, NOW + 10).outcome, 'download', 'bounds inclusive');
+        assert.equal(FileAccessPolicyService.portalAccess('/pa/window/x', null, NOW + 11).outcome, 'hidden');
+        assert.equal(at('/pa/no-policy/x', null), 'download');
     });
 
-    test('non-canonical spellings resolve to the governed path', () => {
-        const access = FileAccessPolicyService.checkerFor({ id: user.id, role: 'user' }, NOW);
-        for (const p of ['/k//locked.txt', '/k/./locked.txt', '/k/x/../locked.txt', '/k/locked.txt/']) {
-            assert.equal(access.canAccess(p), false, p);
-        }
+    test('administrators get no bypass on the portal; disabled accounts cannot sign in', () => {
+        assert.equal(at('/pa/team/a.iso', { id: actorId }), 'hidden');
+        assert.equal(at('/pa/team/a.iso', off), 'disabled');
     });
 
-    test('a subtree operation is refused when the folder hides something, with 404 for the hidden item itself', () => {
-        const access = FileAccessPolicyService.checkerFor({ id: user.id, role: 'user' }, NOW);
-        assert.equal(access.hidesAnythingBelow('/k'), true);
-        assert.throws(() => access.assertCanAccessTree('/k'), (err) => err.statusCode === 403);
-        assert.throws(() => access.assertCanAccess('/k/locked.txt'), (err) => err.statusCode === 404);
-        assert.doesNotThrow(() => access.assertCanAccessTree('/k/open.txt'));
+    test('it explains which policy gave what', () => {
+        const { policies } = FileAccessPolicyService.portalAccess('/pa/team/notes/x', bob.id, NOW);
+        assert.deepEqual(policies, [{ path: '/pa/team', outcome: 'view' }, { path: '/pa/team/notes', outcome: 'hidden' }]);
+    });
+
+    test('levels and group names are validated', () => {
+        const bad = (fn) => assert.throws(fn, (err) => err instanceof AppError && err.statusCode === 400);
+        bad(() => FileAccessPolicyService.setPolicy('/pa/show', { defaultLevel: 'manage', actorId }));
+        bad(() => FileAccessPolicyService.grantPermission('/pa/team', carol.id, 'grant', actorId, 'upload'));
+        bad(() => GroupService.create({ name: '  ' }));
+        assert.throws(() => GroupService.create({ name: 'pa TEAM' }), (err) => err.statusCode === 409, 'names are case-insensitive');
+        assert.throws(() => GroupService.setMembers(team.id, [999999]), (err) => err.statusCode === 404);
+    });
+
+    test('removing a member or deleting a group removes the access it gave', () => {
+        GroupService.setMembers(team.id, [alice.id]);
+        assert.equal(at('/pa/team/a.iso', bob), 'hidden');
+        const temp = GroupService.create({ name: 'PA temp' });
+        GroupService.setMembers(temp.id, [carol.id]);
+        FileAccessPolicyService.grantGroupPermission('/pa/team', temp.id, 'grant', actorId, 'view');
+        assert.equal(at('/pa/team/a.iso', carol), 'view');
+        GroupService.remove(temp.id);
+        assert.equal(at('/pa/team/a.iso', carol), 'hidden');
     });
 });

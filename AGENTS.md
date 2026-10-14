@@ -147,10 +147,12 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 10
   `POST /auth/login` requires a session (`afm_session` cookie or `Authorization: Bearer`), checked
   by `authenticate` in `src/routes/api.js`, plus a CSRF header on every non-GET request. This is a
   **single-tenant, flat-authorization** slice — any active session has today's full capability set;
-  there is no tenancy and no permission catalogue yet. Per-file access policies **are** enforced for
-  non-admin sessions through `FileAccessPolicyService.checkerFor` — every new path-consuming endpoint
-  must consult it (rules in `docs/CONTRACTS.md` → "What a policy enforces"; the remaining work is
-  tracked in `openspec/changes/admin-identity-and-access-control/`). CORS stays same-origin by
+  there is no tenancy and no permission catalogue yet. **File-access policies govern the File Portal
+  only** (files-server-web reads them from `admin.sqlite`); this app never consults them — no `/fs`,
+  dashboard or preview endpoint may filter or refuse by policy. The admin page and the Files page's
+  "Access policy…" dialog only manage them; `FileAccessPolicyService.portalAccess` mirrors the
+  portal's decision for "Check access" and must stay in step with the portal's
+  `lib/access-policy.js` (rules in `docs/CONTRACTS.md` → "What a policy does"). CORS stays same-origin by
   default (`cors()` is only registered when `AFM_CORS_ENABLED=true`, from a validated allowlist) —
   this was closed earlier by `api-security-hardening` and is unrelated to the auth work.
 - **Filename rules are cross-platform strict:** reject `[<>:"|?*\x00-\x1F]`, reserved Windows names

@@ -195,6 +195,10 @@
               <i data-icon="user" data-icon-size="16"></i>
               Users
             </button>
+            <button class="settings-nav-item" data-pane="groups">
+              <i data-icon="users" data-icon-size="16"></i>
+              Groups
+            </button>
             <button class="settings-nav-item" data-pane="policies">
               <i data-icon="lock" data-icon-size="16"></i>
               File access policies
@@ -280,69 +284,186 @@
             </div>
 
             <!-- ══════════════════════
-               PANE: FILE ACCESS POLICIES
+               PANE: GROUPS
                ══════════════════════ -->
-            <div class="settings-pane" data-pane-content="policies">
+            <div class="settings-pane" data-pane-content="groups">
 
-              <div class="admin-notice" role="note">
-                <i data-icon="info" data-icon-size="16"></i>
-                <span>Policies are enforced for every non-administrator account: a file is listed, previewed,
-                  downloaded or changed only when every policy on its path allows it — not locked, published,
-                  inside its availability window, and, if restricted, granted to that user. A policy on a folder
-                  covers everything inside it. Paths with no policy stay open to all signed-in users, and
-                  administrators are never restricted. "Public" currently behaves like "Authenticated": every
-                  request needs a sign-in.</span>
+              <div class="settings-group">
+                <div class="sg-head">
+                  <div class="sg-title">
+                    <i data-icon="users" data-icon-size="18"></i>
+                    Create group
+                  </div>
+                  <div class="sg-desc">A group is a named set of users. Grant it a level on a portal policy and every
+                    member gets that level on the portal; add or remove a member here and their access follows.</div>
+                </div>
+                <div class="sg-body">
+                  <form id="createGroupForm" class="admin-inline-form">
+                    <div class="field">
+                      <label class="field-label" for="newGroupName">Name</label>
+                      <input class="input" type="text" id="newGroupName" name="name" required maxlength="64" autocomplete="off">
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="newGroupDescription">Description</label>
+                      <input class="input" type="text" id="newGroupDescription" name="description" maxlength="200" autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                      <i data-icon="plus" data-icon-size="14"></i>
+                      Create
+                    </button>
+                  </form>
+                  <div class="admin-form-error" id="createGroupError" role="alert" hidden></div>
+                </div>
               </div>
 
               <div class="settings-group">
                 <div class="sg-head">
                   <div class="sg-title">
-                    <i data-icon="lock" data-icon-size="18"></i>
-                    Set a policy
+                    <i data-icon="users" data-icon-size="18"></i>
+                    Groups
                   </div>
-                  <div class="sg-desc">Enter the exact client path (e.g. "/reports/q3.pdf"). Setting a policy again on
-                    the same path updates it in place.</div>
+                  <div class="sg-desc">Deleting a group removes its file grants; its members keep their accounts.</div>
                 </div>
                 <div class="sg-body">
-                  <form id="setPolicyForm" class="admin-inline-form">
-                    <div class="field">
-                      <label class="field-label" for="policyPath">Path</label>
-                      <input class="input" type="text" id="policyPath" name="path" placeholder="/folder/file.txt" required>
-                    </div>
-                    <div class="field">
-                      <label class="field-label" for="policyAccessMode">Access mode</label>
-                      <select class="input" id="policyAccessMode" name="accessMode">
-                        <option value="restricted" selected>Restricted</option>
-                        <option value="authenticated">Authenticated</option>
-                        <option value="public">Public</option>
-                      </select>
-                    </div>
-                    <div class="field admin-switch-field">
-                      <label class="admin-switch-label">
-                        <span class="switch">
-                          <input type="checkbox" id="policyPublished">
-                          <span class="track" aria-hidden="true"></span>
-                        </span>
-                        <span>Published</span>
-                      </label>
-                    </div>
-                    <div class="field admin-switch-field">
-                      <label class="admin-switch-label">
-                        <span class="switch">
-                          <input type="checkbox" id="policyLocked">
-                          <span class="track" aria-hidden="true"></span>
-                        </span>
-                        <span>Locked</span>
-                      </label>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-sm">
-                      <i data-icon="save" data-icon-size="14"></i>
-                      Save policy
-                    </button>
-                  </form>
-                  <div class="admin-form-error" id="setPolicyError" role="alert" hidden></div>
+                  <table class="admin-table" id="groupsTable">
+                    <thead>
+                      <tr><th>Name</th><th>Members</th><th>Description</th><th></th></tr>
+                    </thead>
+                    <tbody id="groupsTableBody">
+                      <tr class="admin-table-empty"><td colspan="4">Loading…</td></tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
+
+              <form class="settings-group" id="groupMembersForm" hidden>
+                <div class="sg-head">
+                  <div class="sg-title">
+                    <i data-icon="userCheck" data-icon-size="18"></i>
+                    Members: <span id="groupMembersLabel"></span>
+                  </div>
+                  <div class="sg-desc">Tick the users who belong to this group, then save. Membership only changes
+                    what they can reach on the file portal.</div>
+                </div>
+                <div class="sg-body">
+                  <div class="admin-member-list" id="groupMembersList"></div>
+                  <div class="admin-inline-form">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                      <i data-icon="save" data-icon-size="14"></i>
+                      Save members
+                    </button>
+                    <button type="button" class="btn btn-sm" id="groupMembersCancel">Cancel</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <!-- ══════════════════════
+               PANE: FILE ACCESS POLICIES
+               ══════════════════════ -->
+            <div class="settings-pane" data-pane-content="policies">
+
+              <section class="policy-rules" aria-labelledby="policyRulesTitle">
+                <h2 class="policy-rules-title" id="policyRulesTitle">How the file portal decides access</h2>
+                <p class="policy-rules-lead">Policies apply to the file portal only. This app is never restricted by
+                  them: every account that signs in here manages the whole storage. On the portal, each policy gives a
+                  visitor or signed-in user one of two levels.</p>
+                <ol class="policy-ladder">
+                  <li><strong>View</strong><span>Listed in browse, search, categories, releases and the navbar,
+                      marked "View only"</span></li>
+                  <li><strong>Download</strong><span>Also downloaded, checksummed, zipped and served as the latest
+                      release</span></li>
+                </ol>
+                <ul class="policy-rules-list">
+                  <li>A policy on a folder caps everything inside it; the lowest level on the path wins.</li>
+                  <li>A deny, for the user or one of their groups, beats every grant.</li>
+                  <li>Unpublished, or outside its availability dates, hides it from everyone.</li>
+                  <li>Paths with no policy stay open to every portal visitor. Administrators get no bypass on the
+                    portal: they follow the same policies as everyone else.</li>
+                </ul>
+              </section>
+
+              <form class="settings-group policy-editor" id="setPolicyForm" novalidate>
+                <div class="sg-head">
+                  <div class="sg-title">
+                    <i data-icon="lock" data-icon-size="18"></i>
+                    <span id="policyFormTitle">Set a policy</span>
+                  </div>
+                  <div class="sg-desc" id="policyFormDesc">Pick a file or folder and decide who can reach it on the file
+                    portal. Saving a path that already has a policy updates it in place.</div>
+                </div>
+                <div class="sg-body policy-editor-body">
+
+                  <div class="field policy-field-path">
+                    <label class="field-label" for="policyPath">Path</label>
+                    <input class="input" type="text" id="policyPath" name="path" placeholder="/releases/el9"
+                      required autocomplete="off" spellcheck="false" aria-describedby="policyPathHint">
+                    <span class="field-hint" id="policyPathHint">The client path as shown on the Files page, starting
+                      with "/". A folder covers everything inside it.</span>
+                  </div>
+
+                  <fieldset class="policy-fieldset">
+                    <legend class="field-label">Who can reach it</legend>
+                    <div class="policy-modes" role="radiogroup">
+                      <label class="policy-mode">
+                        <input type="radio" name="accessMode" value="restricted" checked>
+                        <span class="policy-mode-name">Restricted</span>
+                        <span class="policy-mode-desc">Only the users and groups you grant</span>
+                      </label>
+                      <label class="policy-mode">
+                        <input type="radio" name="accessMode" value="authenticated">
+                        <span class="policy-mode-name">Signed-in users</span>
+                        <span class="policy-mode-desc">Anyone who signs in to the portal</span>
+                      </label>
+                      <label class="policy-mode">
+                        <input type="radio" name="accessMode" value="public">
+                        <span class="policy-mode-name">Public</span>
+                        <span class="policy-mode-desc">Everyone, including visitors who are not signed in</span>
+                      </label>
+                    </div>
+                  </fieldset>
+
+                  <div class="field policy-field-level" id="policyDefaultLevelField" hidden>
+                    <label class="field-label" for="policyDefaultLevel">Default level</label>
+                    <select class="input" id="policyDefaultLevel" name="defaultLevel" aria-describedby="policyDefaultLevelHint">
+                      <option value="view">View</option>
+                      <option value="download" selected>Download</option>
+                    </select>
+                    <span class="field-hint" id="policyDefaultLevelHint">What this audience gets. A grant can raise View
+                      to Download for one user or group.</span>
+                  </div>
+
+                  <div class="policy-switches">
+                    <label class="admin-switch-label policy-switch">
+                      <span class="switch">
+                        <input type="checkbox" id="policyPublished">
+                        <span class="track" aria-hidden="true"></span>
+                      </span>
+                      <span><strong>Published</strong><span class="field-hint">Off hides it on the portal for everyone,
+                          administrators included.</span></span>
+                    </label>
+                    <label class="admin-switch-label policy-switch">
+                      <span class="switch">
+                        <input type="checkbox" id="policyLocked">
+                        <span class="track" aria-hidden="true"></span>
+                      </span>
+                      <span><strong>Show locked to visitors</strong><span class="field-hint">Visitors who cannot open it
+                          see its name with a lock and a sign-in prompt, instead of nothing. Signed-in users are
+                          unaffected.</span></span>
+                    </label>
+                  </div>
+
+                  <div class="admin-form-error" id="setPolicyError" role="alert" hidden></div>
+
+                  <div class="policy-actions">
+                    <button type="submit" class="btn btn-primary" id="policySubmit">
+                      <i data-icon="save" data-icon-size="14"></i>
+                      <span id="policySubmitLabel">Save policy</span>
+                    </button>
+                    <button type="button" class="btn" id="policyCancel" hidden>Cancel editing</button>
+                  </div>
+                </div>
+              </form>
 
               <div class="settings-group">
                 <div class="sg-head">
@@ -350,56 +471,97 @@
                     <i data-icon="fileText" data-icon-size="18"></i>
                     Governed files
                   </div>
-                  <div class="sg-desc">Only files with a policy appear here — this is not a listing of everything in storage.</div>
+                  <div class="sg-desc">Only files and folders with a policy appear here, not everything in storage.
+                    Select a path to see who can reach it.</div>
                 </div>
                 <div class="sg-body">
-                  <table class="admin-table" id="policiesTable">
+                  <div class="policy-list-bar">
+                    <label class="sr-only" for="policyFilter">Filter policies by path</label>
+                    <input class="input policy-filter" type="search" id="policyFilter" placeholder="Filter by path"
+                      autocomplete="off" spellcheck="false">
+                    <span class="policy-count" id="policyCount" aria-live="polite"></span>
+                  </div>
+                  <table class="admin-table policy-table" id="policiesTable">
                     <thead>
                       <tr>
                         <th>Path</th>
-                        <th>Access</th>
-                        <th>Published</th>
-                        <th>Locked</th>
-                        <th>Permissions</th>
-                        <th></th>
+                        <th>Who can reach it</th>
+                        <th>Default level</th>
+                        <th>State</th>
+                        <th><span class="sr-only">Actions</span></th>
                       </tr>
                     </thead>
                     <tbody id="policiesTableBody">
-                      <tr class="admin-table-empty"><td colspan="6">Loading…</td></tr>
+                      <tr class="admin-table-empty"><td colspan="5">Loading…</td></tr>
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              <div class="settings-group" id="permissionsGroup" hidden>
-                <div class="sg-head">
-                  <div class="sg-title">
-                    <i data-icon="userCheck" data-icon-size="18"></i>
-                    Per-user permissions — <span id="permissionsPathLabel"></span>
+              <div class="settings-group permissions-panel" id="permissionsGroup" hidden>
+                <div class="sg-head permissions-head">
+                  <div>
+                    <div class="sg-title">
+                      <i data-icon="userCheck" data-icon-size="18"></i>
+                      <span>Who can reach <span class="permissions-path" id="permissionsPathLabel"></span></span>
+                    </div>
+                    <div class="sg-desc" id="permissionsSummary"></div>
                   </div>
-                  <div class="sg-desc">Only meaningful for the "Restricted" access mode.</div>
+                  <button type="button" class="btn-icon btn-icon-sm" id="permissionsClose" data-tip="Close"
+                    data-tip-pos="bottom" aria-label="Close permissions">
+                    <i data-icon="x" data-icon-size="15"></i>
+                  </button>
                 </div>
                 <div class="sg-body">
-                  <form id="grantPermissionForm" class="admin-inline-form">
+                  <form id="grantPermissionForm" class="permissions-add">
                     <div class="field">
-                      <label class="field-label" for="grantUserId">User</label>
-                      <select class="input" id="grantUserId" name="userId" required></select>
+                      <label class="field-label" for="grantUserId">User or group</label>
+                      <select class="input" id="grantUserId" name="subject" required></select>
                     </div>
                     <div class="field">
-                      <label class="field-label" for="grantPermission">Permission</label>
-                      <select class="input" id="grantPermission" name="permission">
-                        <option value="grant" selected>Grant</option>
-                        <option value="deny">Deny</option>
+                      <label class="field-label" for="grantLevel">Access</label>
+                      <select class="input" id="grantLevel" name="level">
+                        <option value="view">View: listed, not downloadable</option>
+                        <option value="download" selected>Download: listed and downloadable</option>
+                        <option value="deny">Deny: hidden, even through a group</option>
                       </select>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                    <button type="submit" class="btn btn-primary">
+                      <i data-icon="plus" data-icon-size="14"></i>
+                      Add access
+                    </button>
                   </form>
-                  <table class="admin-table" id="permissionsTable">
+                  <table class="admin-table permissions-table" id="permissionsTable">
                     <thead>
-                      <tr><th>User</th><th>Permission</th><th></th></tr>
+                      <tr><th>User or group</th><th>Access</th><th><span class="sr-only">Actions</span></th></tr>
                     </thead>
                     <tbody id="permissionsTableBody"></tbody>
                   </table>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="sg-head">
+                  <div class="sg-title">
+                    <i data-icon="search" data-icon-size="18"></i>
+                    Check access
+                  </div>
+                  <div class="sg-desc">What the file portal shows a user, or a visitor who is not signed in, at a path,
+                    and which policy decided it.</div>
+                </div>
+                <div class="sg-body">
+                  <form id="effectiveForm" class="admin-inline-form">
+                    <div class="field">
+                      <label class="field-label" for="effectiveUserId">Who</label>
+                      <select class="input" id="effectiveUserId" name="userId"></select>
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="effectivePath">Path</label>
+                      <input class="input" type="text" id="effectivePath" name="path" placeholder="/folder/file.txt" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Check</button>
+                  </form>
+                  <div class="admin-effective" id="effectiveResult" role="status" hidden></div>
                 </div>
               </div>
             </div>

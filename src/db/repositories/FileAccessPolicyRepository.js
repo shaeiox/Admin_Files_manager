@@ -19,7 +19,7 @@ class FileAccessPolicyRepository {
         return AdminDatabase.get().prepare(
             `SELECT f.id AS file_id, f.client_path, f.is_directory,
                     p.id AS policy_id, p.access_mode, p.is_published, p.is_locked,
-                    p.available_from, p.available_until, p.created_by, p.updated_by,
+                    p.available_from, p.available_until, p.default_level, p.created_by, p.updated_by,
                     p.created_at, p.updated_at
              FROM files f
              JOIN file_access_policies p ON p.file_id = f.id
@@ -31,7 +31,7 @@ class FileAccessPolicyRepository {
         return AdminDatabase.get().prepare(
             `SELECT f.id AS file_id, f.client_path, f.is_directory,
                     p.id AS policy_id, p.access_mode, p.is_published, p.is_locked,
-                    p.available_from, p.available_until, p.created_by, p.updated_by,
+                    p.available_from, p.available_until, p.default_level, p.created_by, p.updated_by,
                     p.created_at, p.updated_at
              FROM files f
              JOIN file_access_policies p ON p.file_id = f.id
@@ -44,7 +44,7 @@ class FileAccessPolicyRepository {
      * updates the existing policy in place - never a second row for the
      * same path (design D2).
      */
-    upsertPolicy(clientPath, { isDirectory = false, accessMode = 'restricted', isPublished = false, isLocked = false, availableFrom = null, availableUntil = null, actorId = null }) {
+    upsertPolicy(clientPath, { isDirectory = false, accessMode = 'restricted', isPublished = false, isLocked = false, availableFrom = null, availableUntil = null, defaultLevel = 'download', actorId = null }) {
         const db = AdminDatabase.get();
         const now = Date.now();
 
@@ -63,15 +63,15 @@ class FileAccessPolicyRepository {
                 db.prepare(
                     `UPDATE file_access_policies
                      SET access_mode = ?, is_published = ?, is_locked = ?, available_from = ?, available_until = ?,
-                         updated_by = ?, updated_at = ?
+                         default_level = ?, updated_by = ?, updated_at = ?
                      WHERE file_id = ?`
-                ).run(accessMode, isPublished ? 1 : 0, isLocked ? 1 : 0, availableFrom, availableUntil, actorId, now, file.id);
+                ).run(accessMode, isPublished ? 1 : 0, isLocked ? 1 : 0, availableFrom, availableUntil, defaultLevel, actorId, now, file.id);
             } else {
                 db.prepare(
                     `INSERT INTO file_access_policies
-                        (file_id, access_mode, is_published, is_locked, available_from, available_until, created_by, updated_by, created_at, updated_at)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-                ).run(file.id, accessMode, isPublished ? 1 : 0, isLocked ? 1 : 0, availableFrom, availableUntil, actorId, actorId, now, now);
+                        (file_id, access_mode, is_published, is_locked, available_from, available_until, default_level, created_by, updated_by, created_at, updated_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                ).run(file.id, accessMode, isPublished ? 1 : 0, isLocked ? 1 : 0, availableFrom, availableUntil, defaultLevel, actorId, actorId, now, now);
             }
             db.exec('COMMIT');
         } catch (error) {

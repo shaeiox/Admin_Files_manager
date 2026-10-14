@@ -11,6 +11,12 @@
  * (design D2).
  * Migration 3: portal_nav_folders - folders the File Portal links in its
  * navbar. Access is still decided by file_access_policies on the portal side.
+ * Migration 4: File Portal access levels and groups. A grant carries a
+ * `level` (view < download), a policy carries the `default_level` its
+ * audience gets on a non-restricted path, and user_groups /
+ * user_group_members / group_file_permissions let one grant cover a team.
+ * Existing rows default to 'download' - exactly what a grant meant before.
+ * Policies govern the portal only; this application never enforces them.
  *
  * Idempotent: migrate() records applied versions in schema_migrations and is
  * a no-op when the stored schema is already current. A stored version newer
@@ -114,6 +120,43 @@ const MIGRATIONS = [
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             );
+        `,
+    },
+    {
+        version: 4,
+        sql: `
+            ALTER TABLE file_access_policies ADD COLUMN default_level TEXT NOT NULL DEFAULT 'download'
+                CHECK (default_level IN ('view','download'));
+            ALTER TABLE user_file_permissions ADD COLUMN level TEXT NOT NULL DEFAULT 'download'
+                CHECK (level IN ('view','download'));
+
+            CREATE TABLE user_groups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                description TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE user_group_members (
+                group_id INTEGER NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at INTEGER NOT NULL,
+                PRIMARY KEY (group_id, user_id)
+            );
+            CREATE INDEX idx_ugm_user_id ON user_group_members(user_id);
+
+            CREATE TABLE group_file_permissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+                group_id INTEGER NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+                permission TEXT NOT NULL CHECK (permission IN ('grant','deny')),
+                level TEXT NOT NULL DEFAULT 'download' CHECK (level IN ('view','download')),
+                granted_by INTEGER REFERENCES users(id),
+                created_at INTEGER NOT NULL,
+                UNIQUE (file_id, group_id)
+            );
+            CREATE INDEX idx_gfp_group_id ON group_file_permissions(group_id);
         `,
     },
 ];

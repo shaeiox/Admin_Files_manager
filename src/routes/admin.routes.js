@@ -6,6 +6,7 @@ const requireAdmin = require('../middlewares/requireAdmin');
 const usersController = require('../controllers/users.controller');
 const filePolicyController = require('../controllers/filePolicy.controller');
 const systemController = require('../controllers/system.controller');
+const groupsController = require('../controllers/groups.controller');
 
 /**
  * Admin-only endpoints (ADR-009 phase 2): user management and
@@ -25,6 +26,12 @@ router.post('/users/:id/reset-password', usersController.resetPassword);
 router.post('/users/:id/revoke-sessions', usersController.revokeSessions);
 router.delete('/users/:id', usersController.remove);
 
+router.get('/groups', groupsController.list);
+router.post('/groups', groupsController.create);
+router.put('/groups/:id', groupsController.update);
+router.delete('/groups/:id', groupsController.remove);
+router.put('/groups/:id/members', groupsController.setMembers);
+
 router.get('/files/policies', filePolicyController.list);
 router.get('/files/policy', filePolicyController.getPolicy);
 router.put('/files/policy', filePolicyController.setPolicy);
@@ -32,6 +39,8 @@ router.delete('/files/policy', filePolicyController.deletePolicy);
 router.get('/files/permissions', filePolicyController.listPermissions);
 router.post('/files/permissions', filePolicyController.grantPermission);
 router.delete('/files/permissions', filePolicyController.revokePermission);
+router.get('/files/group-permissions', filePolicyController.listGroupPermissions);
+router.get('/files/effective', filePolicyController.effectiveAccess);
 
 router.get('/portal/config', systemController.getPortalConfig);
 router.put('/portal/config', systemController.setPortalConfig);

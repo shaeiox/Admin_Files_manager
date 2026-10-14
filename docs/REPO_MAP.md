@@ -51,7 +51,8 @@ admin-files-manager/
 │   │   ├── settings.controller.js   # GET → bare document; PUT → { success, settings }; no hand-rolled checks
 │   │   ├── auth.controller.js    # login/logout/me — sets/clears the session cookie, returns the CSRF token
 │   │   ├── users.controller.js   # admin user CRUD — never returns password_hash (UserService strips it)
-│   │   ├── filePolicy.controller.js  # admin file-access-policy CRUD + per-user permission grant/revoke
+│   │   ├── filePolicy.controller.js  # admin file-access-policy CRUD + user/group grants at a level; effective access
+│   │   ├── groups.controller.js  # admin user-group CRUD + full-replace membership
 │   │   └── system.controller.js  # admin: file-portal .env keys (PORTAL_ROOT), portal trace log, audit log
 │   ├── services/                 # 🔒 All filesystem + metadata access (no Express here)
 │   │   ├── PathService.js        # Client path ⇄ secure OS path; traversal guard (THE boundary)
@@ -65,18 +66,22 @@ admin-files-manager/
 │   │   ├── UserService.js        # Admin user management — validates, hashes (node:crypto), strips secrets on the way out
 │   │   ├── PortalService.js      # File portal link (PORTAL_ROOT): whitelisted .env read/rewrite + portal.log tail
 │   │   ├── SessionService.js     # Login/validateSession/logout/revoke — flat 24h expiry, lockout after 10 failures
-│   │   └── FileAccessPolicyService.js  # Per-file policy CRUD + permission grants; onPathRenamed/onPathDeleted
-│   │                             #   best-effort hooks called from fs.controller.js; checkerFor() = the access decision
+│   │   ├── GroupService.js       # User groups: validation + membership (a group grants nothing by itself)
+│   │   └── FileAccessPolicyService.js  # Per-file policy CRUD + user/group grants; onPathRenamed/onPathDeleted
+│   │                             #   best-effort hooks called from fs.controller.js. Policies govern the File Portal
+│   │                             #   ONLY (never enforced here); portalAccess() mirrors the portal's decision
 │   ├── db/                       # ADR-009 — a separate node:sqlite database, not a JSON-store replacement
 │   │   ├── connection.js         # Singleton; `dbPath` redirectable by tests like MetadataService.dbPath
-│   │   ├── schema.js             # Migrations array (1: users/sessions/audit_logs; 2: files/policies/permissions)
+│   │   ├── schema.js             # Migrations array (1: users/sessions/audit_logs; 2: files/policies/permissions;
+│   │   │                         #   3: portal_nav_folders; 4: access levels + user groups)
 │   │   ├── bootstrap.js          # ensureBootstrapAdmin() — creates the first admin from env config, once
 │   │   └── repositories/         # One file per table; no SQL or node:sqlite type crosses this boundary
 │   │       ├── UserRepository.js
 │   │       ├── SessionRepository.js
 │   │       ├── AuditLogRepository.js
 │   │       ├── FileAccessPolicyRepository.js
-│   │       └── UserFilePermissionRepository.js
+│   │       ├── UserFilePermissionRepository.js
+│   │       └── GroupRepository.js        # user_groups, members, group_file_permissions
 │   ├── middlewares/
 │   │   ├── errorHandler.js       # Global error serializer ({ success:false, error })
 │   │   ├── authenticate.js       # Session cookie or Authorization: Bearer → req.user/req.session (ADR-009)

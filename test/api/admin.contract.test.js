@@ -23,6 +23,7 @@ process.env.DOTENV_CONFIG_QUIET = 'true';
 process.env.STORAGE_ROOT = ROOT;
 process.env.PORT = '0';
 process.env.AFM_LOGIN_RATE_LIMIT_PER_MINUTE = '1000';
+process.env.AFM_RATE_LIMIT_WRITE_PER_MINUTE = '1000';
 
 const MetadataService = require('../../src/services/MetadataService');
 MetadataService.dbPath = path.join(TMP, 'metadata.json');
@@ -252,139 +253,122 @@ describe('file-access-policy management', () => {
     });
 });
 
-describe('policy enforcement for a non-admin session', () => {
+describe('policies never restrict this application (they govern the File Portal only)', () => {
     const q = (p) => encodeURIComponent(p);
-    let user;
     let userHeaders;
 
-    async function policy(p, fields) {
-        const res = await sendJson('PUT', '/api/v1/admin/files/policy', { path: p, ...fields }, adminHeaders);
-        assert.equal(res.status, 200, JSON.stringify(res.json));
-    }
-    const download = (p, headers = userHeaders) => send('GET', `/api/v1/fs/download?path=${q(p)}`, { headers });
-    async function listNames(dir) {
-        const res = await send('GET', `/api/v1/fs/list?path=${q(dir)}&limit=200`, { headers: userHeaders });
-        assert.equal(res.status, 200, JSON.stringify(res.json));
-        return { names: res.json.items.map((i) => i.name).sort(), total: res.json.total };
-    }
-
     before(async () => {
-        const dir = path.join(ROOT, 'enforce');
-        fs.mkdirSync(path.join(dir, 'vault', 'deep'), { recursive: true });
-        for (const name of ['open.txt', 'locked.txt', 'draft.txt', 'shared.txt', 'granted.txt', 'denied.txt', 'future.txt', 'expired.txt']) {
+        const dir = path.join(ROOT, 'portal-only');
+        fs.mkdirSync(path.join(dir, 'vault'), { recursive: true });
+        for (const name of ['restricted.txt', 'locked.txt', 'draft.txt', 'denied.txt', 'expired.txt']) {
             fs.writeFileSync(path.join(dir, name), name);
         }
-        fs.writeFileSync(path.join(dir, 'vault', 'deep', 'secret.txt'), 'secret');
+        fs.writeFileSync(path.join(dir, 'vault', 'secret.txt'), 'secret');
 
-        user = await createUser('enforce-user');
-        userHeaders = await loginAs('enforce-user');
+        const user = await createUser('portal-only-user');
+        userHeaders = await loginAs('portal-only-user');
 
-        const hour = 3600 * 1000;
-        await policy('/enforce/locked.txt', { accessMode: 'authenticated', isPublished: true, isLocked: true });
-        await policy('/enforce/draft.txt', { accessMode: 'authenticated', isPublished: false });
-        await policy('/enforce/shared.txt', { accessMode: 'authenticated', isPublished: true });
-        await policy('/enforce/granted.txt', { accessMode: 'restricted', isPublished: true });
-        await policy('/enforce/denied.txt', { accessMode: 'restricted', isPublished: true });
-        await policy('/enforce/future.txt', { accessMode: 'authenticated', isPublished: true, availableFrom: Date.now() + hour });
-        await policy('/enforce/expired.txt', { accessMode: 'authenticated', isPublished: true, availableUntil: Date.now() - hour });
-        await policy('/enforce/vault', { isDirectory: true, accessMode: 'authenticated', isPublished: true, isLocked: true });
-
-        await sendJson('POST', '/api/v1/admin/files/permissions', { path: '/enforce/granted.txt', userId: user.id, permission: 'grant' }, adminHeaders);
-        await sendJson('POST', '/api/v1/admin/files/permissions', { path: '/enforce/denied.txt', userId: user.id, permission: 'deny' }, adminHeaders);
+        const set = (p, fields) => sendJson('PUT', '/api/v1/admin/files/policy', { path: p, ...fields }, adminHeaders);
+        await set('/portal-only/restricted.txt', { accessMode: 'restricted', isPublished: true });
+        await set('/portal-only/locked.txt', { accessMode: 'authenticated', isPublished: true, isLocked: true });
+        await set('/portal-only/draft.txt', { accessMode: 'public', isPublished: false });
+        await set('/portal-only/denied.txt', { accessMode: 'public', isPublished: true });
+        await set('/portal-only/expired.txt', { accessMode: 'public', isPublished: true, availableUntil: Date.now() - 1000 });
+        await set('/portal-only/vault', { isDirectory: true, accessMode: 'restricted', isPublished: true });
+        await sendJson('POST', '/api/v1/admin/files/permissions',
+            { path: '/portal-only/denied.txt', userId: user.id, permission: 'deny' }, adminHeaders);
     });
 
-    test('download: allowed exactly where every policy on the path allows', async () => {
-        const expected = {
-            '/enforce/open.txt': 200, // no policy: open to every signed-in user
-            '/enforce/shared.txt': 200,
-            '/enforce/granted.txt': 200,
-            '/enforce/locked.txt': 404,
-            '/enforce/draft.txt': 404,
-            '/enforce/denied.txt': 404,
-            '/enforce/future.txt': 404,
-            '/enforce/expired.txt': 404,
-            '/enforce/vault/deep/secret.txt': 404, // locked ancestor folder
-        };
-        for (const [p, status] of Object.entries(expected)) {
-            assert.equal((await download(p)).status, status, p);
+    test('a non-admin account lists, downloads and zips every governed path', async () => {
+        const list = await send('GET', `/api/v1/fs/list?path=${q('/portal-only')}&limit=200`, { headers: userHeaders });
+        assert.equal(list.status, 200);
+        assert.deepEqual(list.json.items.map((i) => i.name).sort(),
+            ['denied.txt', 'draft.txt', 'expired.txt', 'locked.txt', 'restricted.txt', 'vault']);
+
+        for (const p of ['restricted.txt', 'locked.txt', 'draft.txt', 'denied.txt', 'expired.txt', 'vault/secret.txt']) {
+            const res = await send('GET', `/api/v1/fs/download?path=${q('/portal-only/' + p)}`, { headers: userHeaders });
+            assert.equal(res.status, 200, p);
         }
-    });
-
-    test('a hidden file answers exactly like a missing one', async () => {
-        const hidden = await download('/enforce/locked.txt');
-        const missing = await download('/enforce/no-such-file.txt');
-        assert.equal(hidden.status, missing.status);
-        assert.equal(hidden.json.error.replace('locked', 'X'), missing.json.error.replace('no-such-file', 'X'));
-    });
-
-    test('non-canonical spellings of a hidden path are not a way around it', async () => {
-        for (const p of ['/enforce//locked.txt', '/enforce/./locked.txt', '/enforce/vault/../locked.txt', '/enforce/locked.txt/', '/enforce/vault//deep/secret.txt']) {
-            assert.notEqual((await download(p)).status, 200, p);
-        }
-    });
-
-    test('list and tree omit hidden entries, and total/counts do not reveal them', async () => {
-        const { names, total } = await listNames('/enforce');
-        assert.deepEqual(names, ['granted.txt', 'open.txt', 'shared.txt']);
-        assert.equal(total, 3);
-
-        const tree = await send('GET', `/api/v1/fs/tree?path=${q('/enforce')}`, { headers: userHeaders });
+        const tree = await send('GET', `/api/v1/fs/tree?path=${q('/portal-only')}`, { headers: userHeaders });
         assert.equal(tree.status, 200);
-        assert.deepEqual(tree.json[0].children.map((c) => c.name), [], 'the locked vault folder is not in the tree');
-
-        assert.equal((await send('GET', `/api/v1/fs/list?path=${q('/enforce/vault')}`, { headers: userHeaders })).status, 404);
+        assert.deepEqual(tree.json[0].children.map((c) => c.name), ['vault']);
     });
 
-    test('ZIP refuses a hidden path and leaves hidden descendants out of a folder', async () => {
-        const zipHidden = await sendJson('POST', '/api/v1/fs/download-zip', { paths: ['/enforce/locked.txt'] }, userHeaders);
-        assert.equal(zipHidden.status, 404);
+    test('a non-admin account can rename and delete governed items, and the policy follows', async () => {
+        const renamed = await sendJson('PUT', '/api/v1/fs/rename', { oldPath: '/portal-only/vault', newName: 'vault2' }, userHeaders);
+        assert.equal(renamed.status, 200, JSON.stringify(renamed.json));
+        const moved = await send('GET', `/api/v1/admin/files/policy?path=${q('/portal-only/vault2')}`, { headers: adminHeaders });
+        assert.equal(moved.json.access_mode, 'restricted');
 
-        const raw = await new Promise((resolve, reject) => {
-            const body = JSON.stringify({ paths: ['/enforce'] });
-            const req = http.request({ host: '127.0.0.1', port, path: '/api/v1/fs/download-zip', method: 'POST', agent: false,
-                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), ...userHeaders } }, (res) => {
-                const chunks = [];
-                res.on('data', (c) => chunks.push(c));
-                res.on('end', () => resolve({ status: res.statusCode, buffer: Buffer.concat(chunks) }));
-            });
-            req.on('error', reject);
-            req.end(body);
-        });
-        assert.equal(raw.status, 200);
-        const listing = raw.buffer.toString('latin1'); // ZIP stores entry names uncompressed
-        assert.ok(listing.includes('enforce/open.txt'));
-        for (const hidden of ['locked.txt', 'draft.txt', 'denied.txt', 'secret.txt']) {
-            assert.ok(!listing.includes(hidden), `${hidden} must not be in the archive`);
-        }
+        const del = await sendJson('DELETE', '/api/v1/fs/delete', { paths: ['/portal-only/locked.txt'] }, userHeaders);
+        assert.equal(del.status, 200, JSON.stringify(del.json));
+        assert.deepEqual(del.json.data.deleted, ['/portal-only/locked.txt']);
+    });
+});
+
+describe('groups and portal access levels', () => {
+    const q = (p) => encodeURIComponent(p);
+    let viewer;
+    let viewerHeaders;
+    let group;
+    const effective = async (p, userId) => (await send('GET',
+        `/api/v1/admin/files/effective?path=${q(p)}${userId ? `&userId=${userId}` : ''}`, { headers: adminHeaders })).json;
+
+    before(async () => {
+        fs.mkdirSync(path.join(ROOT, 'levels'), { recursive: true });
+        fs.writeFileSync(path.join(ROOT, 'levels', 'build.iso'), 'ISO');
+        viewer = await createUser('level-viewer');
+        viewerHeaders = await loginAs('level-viewer');
     });
 
-    test('mutations refuse hidden items and folders hiding something', async () => {
-        const del = await sendJson('DELETE', '/api/v1/fs/delete', { paths: ['/enforce/locked.txt'] }, userHeaders);
-        assert.equal(del.status, 404);
-        const delFolder = await sendJson('DELETE', '/api/v1/fs/delete', { paths: ['/enforce'] }, userHeaders);
-        assert.equal(delFolder.status, 403, 'deleting a folder would destroy what the user cannot see');
-        const copy = await sendJson('POST', '/api/v1/fs/copy', { paths: ['/enforce'], destination: '/' }, userHeaders);
-        assert.equal(copy.status, 403, 'copying would publish an unprotected duplicate');
-        const rename = await sendJson('PUT', '/api/v1/fs/rename', { oldPath: '/enforce/draft.txt', newName: 'x.txt' }, userHeaders);
-        assert.equal(rename.status, 404);
-        const move = await sendJson('PUT', '/api/v1/fs/move', { paths: ['/enforce/open.txt'], destination: '/enforce/vault' }, userHeaders);
-        assert.equal(move.status, 404, 'cannot move into a hidden folder');
-        const star = await sendJson('POST', '/api/v1/fs/star', { path: '/enforce/locked.txt' }, userHeaders);
-        assert.equal(star.status, 404);
-        const folder = await sendJson('POST', '/api/v1/fs/folder', { path: '/enforce/vault/new' }, userHeaders);
-        assert.equal(folder.status, 404);
-        assert.ok(fs.existsSync(path.join(ROOT, 'enforce', 'locked.txt')));
+    test('group CRUD: create -> members -> list -> duplicate -> admin only', async () => {
+        const created = await sendJson('POST', '/api/v1/admin/groups', { name: 'Viewers' }, adminHeaders);
+        assert.equal(created.status, 201, JSON.stringify(created.json));
+        group = created.json.group;
+
+        const members = await sendJson('PUT', `/api/v1/admin/groups/${group.id}/members`, { userIds: [viewer.id] }, adminHeaders);
+        assert.equal(members.status, 200);
+        assert.deepEqual(members.json.group.members.map((m) => m.username), ['level-viewer']);
+
+        const listed = await send('GET', '/api/v1/admin/groups', { headers: adminHeaders });
+        assert.ok(Array.isArray(listed.json), 'bare array');
+        assert.ok(listed.json.some((g) => g.id === group.id));
+
+        const dup = await sendJson('POST', '/api/v1/admin/groups', { name: 'viewers' }, adminHeaders);
+        assert.equal(dup.status, 409);
+        const forbidden = await send('GET', '/api/v1/admin/groups', { headers: viewerHeaders });
+        assert.equal(forbidden.status, 403);
     });
 
-    test('an administrator is never restricted by a policy', async () => {
-        assert.equal((await download('/enforce/locked.txt', adminHeaders)).status, 200);
-        assert.equal((await download('/enforce/vault/deep/secret.txt', adminHeaders)).status, 200);
+    test('Check access answers with the portal decision, for members, others and visitors', async () => {
+        await sendJson('PUT', '/api/v1/admin/files/policy',
+            { path: '/levels', isDirectory: true, accessMode: 'restricted', isPublished: true, isLocked: true }, adminHeaders);
+        const grant = await sendJson('POST', '/api/v1/admin/files/permissions',
+            { path: '/levels', groupId: group.id, permission: 'grant', level: 'view' }, adminHeaders);
+        assert.equal(grant.status, 201, JSON.stringify(grant.json));
+
+        assert.equal((await effective('/levels/build.iso', viewer.id)).outcome, 'view');
+        assert.equal((await effective('/levels/build.iso')).outcome, 'locked', 'a visitor sees the lock');
+        assert.deepEqual((await effective('/levels/build.iso', viewer.id)).policies, [{ path: '/levels', outcome: 'view' }]);
+
+        const perms = await send('GET', `/api/v1/admin/files/group-permissions?path=${q('/levels')}`, { headers: adminHeaders });
+        assert.deepEqual(perms.json.map((p) => [p.group_name, p.level]), [['Viewers', 'view']]);
     });
 
-    test('changing the policy takes effect on the next request', async () => {
-        await policy('/enforce/draft.txt', { isPublished: true });
-        assert.equal((await download('/enforce/draft.txt')).status, 200);
-        await sendJson('DELETE', '/api/v1/admin/files/permissions', { path: '/enforce/granted.txt', userId: user.id }, adminHeaders);
-        assert.equal((await download('/enforce/granted.txt')).status, 404, 'a revoked grant closes a restricted file');
+    test('the same member is not restricted in this app', async () => {
+        const dl = await send('GET', `/api/v1/fs/download?path=${q('/levels/build.iso')}`, { headers: viewerHeaders });
+        assert.equal(dl.status, 200);
+    });
+
+    test('only portal levels are accepted', async () => {
+        const bad = await sendJson('POST', '/api/v1/admin/files/permissions',
+            { path: '/levels', groupId: group.id, permission: 'grant', level: 'manage' }, adminHeaders);
+        assert.equal(bad.status, 400);
+    });
+
+    test('revoking the group grant hides the folder from the member on the portal', async () => {
+        const res = await sendJson('DELETE', '/api/v1/admin/files/permissions', { path: '/levels', groupId: group.id }, adminHeaders);
+        assert.equal(res.status, 200);
+        assert.equal((await effective('/levels/build.iso', viewer.id)).outcome, 'hidden');
     });
 });

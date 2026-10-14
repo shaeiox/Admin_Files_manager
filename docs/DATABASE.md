@@ -153,14 +153,14 @@ on a best-effort basis (see *Lifecycle*).
 | `is_published` | INTEGER | NOT NULL, default 0 | |
 | `is_locked` | INTEGER | NOT NULL, default 0 | |
 | `available_from`, `available_until` | INTEGER | nullable | Epoch ms; `from ≤ until` is checked by the service, not the schema. |
+| `default_level` | TEXT | NOT NULL, CHECK `view`\|`download`, default `download` (migration 4) | Level the policy's portal audience gets on a non-restricted policy. |
 | `created_by`, `updated_by` | INTEGER | FK → `users.id`, no ON DELETE action | |
 | `created_at`, `updated_at` | INTEGER | NOT NULL | |
 
 > [!IMPORTANT]
-> **Policies are enforced for non-admin sessions** by `FileAccessPolicyService.checkerFor`, which
-> reads every policy row (and the caller's `user_file_permissions`) once per request. A policy on a
-> directory path covers everything below it: every policy on a path, ancestors included, must allow.
-> The full rules and per-endpoint behaviour are in `docs/CONTRACTS.md` → "What a policy enforces".
+> **Policies govern the File Portal only.** The portal reads these tables read-only and enforces
+> them; this app never consults them. A policy on a directory path covers everything below it; the
+> lowest level on a path wins. The full rules are in `docs/CONTRACTS.md` → "What a policy does".
 > `renamePath`/`deletePath` act on the path **and every row below it**, so a folder rename never
 > strands a descendant's policy on a path that no longer exists.
 
@@ -172,6 +172,7 @@ on a best-effort basis (see *Lifecycle*).
 | `file_id` | INTEGER | NOT NULL, FK → `files.id` ON DELETE CASCADE | |
 | `user_id` | INTEGER | NOT NULL, FK → `users.id` ON DELETE CASCADE | |
 | `permission` | TEXT | NOT NULL, CHECK `grant`\|`deny` | |
+| `level` | TEXT | NOT NULL, CHECK `view`\|`download`, default `download` (migration 4) | Ignored for a deny. |
 | `granted_by` | INTEGER | FK → `users.id`, no ON DELETE action | |
 | `created_at` | INTEGER | NOT NULL | Not updated when an existing grant is changed. |
 | | | **UNIQUE (`file_id`, `user_id`)** | One row per pair; a second grant updates it. |
@@ -179,6 +180,21 @@ on a best-effort basis (see *Lifecycle*).
 Index: `idx_ufp_user_id (user_id)` (the unique constraint already covers `file_id`-first lookups).
 
 A permission requires a `files` row, so it requires a policy first (`409` otherwise).
+
+#### `user_groups`, `user_group_members`, `group_file_permissions` (migration 4)
+
+- `user_groups`: `id` PK, `name` TEXT NOT NULL **UNIQUE COLLATE NOCASE**, `description` TEXT,
+  `created_at`, `updated_at`.
+- `user_group_members`: `group_id` FK → `user_groups.id` ON DELETE CASCADE, `user_id` FK →
+  `users.id` ON DELETE CASCADE, `created_at`; **PRIMARY KEY (`group_id`, `user_id`)**; index
+  `idx_ugm_user_id (user_id)`.
+- `group_file_permissions`: same shape as `user_file_permissions` with `group_id` (FK →
+  `user_groups.id` ON DELETE CASCADE) in place of `user_id`; **UNIQUE (`file_id`, `group_id`)**;
+  index `idx_gfp_group_id (group_id)`.
+
+A user's grant on a file is folded with every grant reaching them through a group: any deny wins,
+otherwise the highest level. The file portal reads these tables read-only in its snapshot (it
+understands schema ≤ 4 — upgrade the portal before this admin release).
 
 #### `schema_migrations`
 
@@ -200,6 +216,8 @@ A permission requires a `files` row, so it requires a policy first (`409` otherw
 |---|---|
 | 1 | `users`, `sessions`, `audit_logs` + indexes (ADR-009 phase 1) |
 | 2 | `files`, `file_access_policies`, `user_file_permissions` + index (ADR-009 phase 2) |
+| 3 | `portal_nav_folders` (File portal navbar links) |
+| 4 | `file_access_policies.default_level`, `user_file_permissions.level`, `user_groups`, `user_group_members`, `group_file_permissions` + indexes (access levels and groups) |
 
 **Adding a migration:** append `{ version: N+1, sql }` — never edit an applied one; a deployed
 database will not re-run it. Prefer additive DDL (`CREATE TABLE`, `ALTER TABLE … ADD COLUMN`).
@@ -218,7 +236,8 @@ and no `node:sqlite` type crosses into services or controllers. Every statement 
 | `SessionRepository` | `create`, `findById`, `findActiveByTokenHash`, `touch`, `revoke`, `revokeAllForUser` | `SessionService` |
 | `AuditLogRepository` | `record`, `list({limit})`, `prune(olderThanMs)` | admin controllers (`record` only) |
 | `FileAccessPolicyRepository` | `findFileByPath`, `findPolicyByPath`, `listPolicies` (by path), `upsertPolicy` (transactional), `renamePath`, `deletePath`, `deletePolicy` | `FileAccessPolicyService` |
-| `UserFilePermissionRepository` | `upsert`, `revoke`, `listForFile` | `FileAccessPolicyService` |
+| `UserFilePermissionRepository` | `upsert`, `revoke`, `listForFile`, `listForUser` | `FileAccessPolicyService` |
+| `GroupRepository` | `list` (members inline), `findById`, `findByName`, `create`, `update`, `remove`, `setMembers` (transactional), `upsertPermission`, `revokePermission`, `listPermissionsForFile`, `listPermissionsForUser` | `GroupService`, `FileAccessPolicyService` |
 
 `upsertPolicy` is the only multi-statement write; it creates the `files` row if absent and inserts
 or updates the policy inside one `BEGIN … COMMIT`. `UserFilePermissionRepository.upsert` is a

@@ -36,13 +36,13 @@ function getPolicy(req, res, next) {
 
 /**
  * PUT /api/admin/files/policy -> envelope. Body:
- * { path, isDirectory?, accessMode?, isPublished?, isLocked?, availableFrom?, availableUntil? }
+ * { path, isDirectory?, accessMode?, isPublished?, isLocked?, availableFrom?, availableUntil?, defaultLevel? }
  */
 function setPolicy(req, res, next) {
-    const { path: clientPath, isDirectory, accessMode, isPublished, isLocked, availableFrom, availableUntil } = req.body || {};
+    const { path: clientPath, isDirectory, accessMode, isPublished, isLocked, availableFrom, availableUntil, defaultLevel } = req.body || {};
     try {
         const policy = FileAccessPolicyService.setPolicy(clientPath, {
-            isDirectory, accessMode, isPublished, isLocked, availableFrom, availableUntil,
+            isDirectory, accessMode, isPublished, isLocked, availableFrom, availableUntil, defaultLevel,
             actorId: req.user.id,
         });
         audit(req, 'file.policy.update', 'success', clientPath);
@@ -75,12 +75,20 @@ function listPermissions(req, res, next) {
     }
 }
 
-/** POST /api/admin/files/permissions -> envelope. Body: { path, userId, permission }. */
+/**
+ * POST /api/admin/files/permissions -> envelope.
+ * Body: { path, userId | groupId, permission, level? } - level defaults to "download".
+ */
 function grantPermission(req, res, next) {
-    const { path: clientPath, userId, permission } = req.body || {};
+    const { path: clientPath, userId, groupId, permission, level } = req.body || {};
     try {
-        const grant = FileAccessPolicyService.grantPermission(clientPath, Number(userId), permission, req.user.id);
-        audit(req, 'file.permission.grant', 'success', clientPath);
+        if (groupId !== undefined) {
+            const grant = FileAccessPolicyService.grantGroupPermission(clientPath, Number(groupId), permission, req.user.id, level);
+            audit(req, 'file.permission.grant', 'success', `${clientPath} group:${groupId} ${permission}:${level || 'download'}`);
+            return res.status(201).json({ success: true, permission: grant });
+        }
+        const grant = FileAccessPolicyService.grantPermission(clientPath, Number(userId), permission, req.user.id, level);
+        audit(req, 'file.permission.grant', 'success', `${clientPath} user:${userId} ${permission}:${level || 'download'}`);
         return res.status(201).json({ success: true, permission: grant });
     } catch (error) {
         audit(req, 'file.permission.grant', 'failure', clientPath);
@@ -88,11 +96,12 @@ function grantPermission(req, res, next) {
     }
 }
 
-/** DELETE /api/admin/files/permissions -> envelope. Body: { path, userId }. */
+/** DELETE /api/admin/files/permissions -> envelope. Body: { path, userId | groupId }. */
 function revokePermission(req, res, next) {
-    const { path: clientPath, userId } = req.body || {};
+    const { path: clientPath, userId, groupId } = req.body || {};
     try {
-        FileAccessPolicyService.revokePermission(clientPath, Number(userId));
+        if (groupId !== undefined) FileAccessPolicyService.revokeGroupPermission(clientPath, Number(groupId));
+        else FileAccessPolicyService.revokePermission(clientPath, Number(userId));
         audit(req, 'file.permission.revoke', 'success', clientPath);
         return res.json({ success: true });
     } catch (error) {
@@ -101,4 +110,29 @@ function revokePermission(req, res, next) {
     }
 }
 
-module.exports = { list, getPolicy, setPolicy, deletePolicy, listPermissions, grantPermission, revokePermission };
+/** GET /api/admin/files/group-permissions?path=... -> bare array. */
+function listGroupPermissions(req, res, next) {
+    try {
+        return res.json(FileAccessPolicyService.listGroupPermissions(req.query.path));
+    } catch (error) {
+        return next(error);
+    }
+}
+
+/**
+ * GET /api/admin/files/effective?path=...&userId=... -> bare { outcome, policies[] }:
+ * what the File Portal decides. Omit userId for a visitor who is not signed in.
+ */
+function effectiveAccess(req, res, next) {
+    try {
+        const { userId } = req.query;
+        return res.json(FileAccessPolicyService.portalAccess(req.query.path, userId ? Number(userId) : null));
+    } catch (error) {
+        return next(error);
+    }
+}
+
+module.exports = {
+    list, getPolicy, setPolicy, deletePolicy,
+    listPermissions, grantPermission, revokePermission, listGroupPermissions, effectiveAccess,
+};

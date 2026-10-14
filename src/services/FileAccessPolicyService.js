@@ -2,132 +2,134 @@
 'use strict';
 
 const AppError = require('../utils/AppError');
-const PathService = require('./PathService');
 const { validateClientPath } = require('../utils/validators');
 const FileAccessPolicyRepository = require('../db/repositories/FileAccessPolicyRepository');
 const UserFilePermissionRepository = require('../db/repositories/UserFilePermissionRepository');
 const UserRepository = require('../db/repositories/UserRepository');
+const GroupRepository = require('../db/repositories/GroupRepository');
 
 const ACCESS_MODES = new Set(['public', 'authenticated', 'restricted']);
 const PERMISSIONS = new Set(['grant', 'deny']);
 
-/** Windows and macOS volumes are case-insensitive: `/Secret.txt` opens `/secret.txt`. */
-const CASE_INSENSITIVE = process.platform === 'win32' || process.platform === 'darwin';
-
 /**
- * The form a path is compared in. `validateClientPath` does not normalise, and
- * `/a//x`, `/x/../a`, `/a/` (and `\` on Windows) all reach the same file, so a
- * raw string lookup would be bypassable. Both sides go through this.
- * ponytail: lexical only - an in-root symlink to a governed file, or a Windows
- * trailing-dot alias, is not mapped back; canonicalise via realpath if those matter.
+ * Portal access levels, ordered: download includes view.
+ * view     - listed in browse, search, categories, releases and the navbar
+ * download - also downloaded, hashed, zipped, served as "latest"
  */
-function canonical(clientPath) {
-    const key = PathService.toClientPath(PathService.resolveSecurePath(clientPath));
-    return CASE_INSENSITIVE ? key.toLowerCase() : key;
+const LEVELS = ['view', 'download'];
+/** 'view' -> 1, 'download' -> 2; anything else 0. */
+const rank = (level) => LEVELS.indexOf(level) + 1;
+const DENY = -1;
+
+function assertLevel(level, field) {
+    if (!LEVELS.includes(level)) throw new AppError(`${field} must be one of: ${LEVELS.join(', ')}.`, 400);
 }
 
-/** `/a/b` -> ['/', '/a', '/a/b']: every path whose policy governs `/a/b`. */
-function selfAndAncestors(key) {
+/**
+ * The portal's comparison form (files-server-web lib/admin-db.js
+ * normalizeClientPath): slashes collapsed, no trailing slash, case-folded on
+ * Windows. Kept identical so "Check access" answers what the portal decides.
+ */
+function portalKey(clientPath) {
+    let p = String(clientPath || '').replace(/\\/g, '/').replace(/\/+/g, '/');
+    if (p.length > 1) p = p.replace(/\/+$/, '');
+    return process.platform === 'win32' ? p.toLowerCase() : p;
+}
+
+/** `/a/b` -> ['/', '/a', '/a/b'] (portal access-policy governingPaths). */
+function governingPaths(clientPath) {
+    const parts = String(clientPath).replace(/\\/g, '/').split('/').filter(Boolean);
     const out = ['/'];
-    let at = 0;
-    while ((at = key.indexOf('/', at + 1)) !== -1) out.push(key.slice(0, at));
-    if (key !== '/') out.push(key);
+    for (let i = 1; i <= parts.length; i++) out.push('/' + parts.slice(0, i).join('/'));
     return out;
 }
 
-const ALLOW_ALL = Object.freeze({
-    canAccess: () => true,
-    assertCanAccess: () => {},
-    assertCanAccessTree: () => {},
-    hidesAnythingBelow: () => false,
-});
-
-/** Same answer as a path that does not exist, so a hidden file's existence is not disclosed. */
-function notFound(clientPath) {
-    return new AppError(`Item not found: ${clientPath}`, 404);
+/** Folds grant rows into fileId -> DENY or the highest granted rank. */
+function foldGrants(rows) {
+    const out = new Map();
+    for (const row of rows) {
+        const prev = out.get(row.file_id);
+        if (prev === DENY) continue;
+        out.set(row.file_id, row.permission === 'deny' ? DENY : Math.max(prev || 0, rank(row.level)));
+    }
+    return out;
 }
 
 /**
- * File-access policies (ADR-009, authorization/file-access-policy spec):
- * administrator management of the data model, and `checkerFor`, the one
- * decision every fs/dashboard endpoint consults before serving or mutating
- * a path.
+ * File-access policies. They govern the File Portal (files-server-web) ONLY:
+ * the portal reads them from admin.sqlite and enforces them on every endpoint.
+ * This application never consults them - every signed-in account here sees
+ * and manages the whole storage root. This service is their administration:
+ * CRUD, grants, the best-effort rename/delete hooks that keep a policy on its
+ * file, and `portalAccess`, a mirror of the portal's decision for the admin's
+ * "Check access" tool.
  */
 class FileAccessPolicyService {
-    /**
-     * The access decision for one request's user, loaded once so a listing of N
-     * entries is N map lookups, not N queries.
-     *
-     * - Administrators manage policies and are never restricted by them.
-     * - A path with no policy on itself or any ancestor folder is open to every
-     *   signed-in user (the behaviour before policies existed).
-     * - Otherwise EVERY policy on the path (ancestors and self) must allow: so
-     *   locking a folder locks everything beneath it. A policy allows when it is
-     *   not locked, is published, `now` is inside [available_from, available_until),
-     *   and - for `restricted` - the user holds an explicit `grant` on that policy's
-     *   path. `public` and `authenticated` are equivalent: every route already
-     *   requires a session, so there is no anonymous caller to distinguish.
-     *
-     * ponytail: reads every policy row per request; index by prefix if policies reach thousands.
-     */
-    checkerFor(user, now = Date.now()) {
-        if (!user || user.role === 'admin') return ALLOW_ALL;
+    get LEVELS() { return LEVELS; }
 
-        const policies = new Map();
+    /**
+     * What the portal decides for `userId` (or a visitor, when null) at
+     * `clientPath`. Mirrors files-server-web lib/access-policy.js:
+     *
+     * - per policy: unpublished, before available_from or after available_until
+     *   (both inclusive), or a deny for the user or one of their groups -> hidden;
+     * - a visitor: locked -> "locked" (name shown, sign-in asked), public ->
+     *   the default level, otherwise hidden;
+     * - a signed-in user: restricted -> the highest level granted to them or a
+     *   group; otherwise the default level, raised by a grant;
+     * - over the path: hidden beats locked beats the lowest level. No policy ->
+     *   download. The portal does not exempt administrators.
+     */
+    portalAccess(clientPath, userId = null, now = Date.now()) {
+        validateClientPath(clientPath);
+        let user = null;
+        if (userId !== null) {
+            user = UserRepository.findById(userId);
+            if (!user) throw new AppError('User not found.', 404);
+            if (user.status !== 'active') return { outcome: 'disabled', policies: [] };
+        }
+
+        const byKey = new Map();
         for (const row of FileAccessPolicyRepository.listPolicies()) {
-            try {
-                policies.set(canonical(row.client_path), row);
-            } catch (error) {
-                // A stored path outside the root governs nothing reachable. Anything
-                // else is a bug and must not silently disable enforcement.
-                if (!(error instanceof AppError)) throw error;
+            const key = portalKey(row.client_path);
+            if (!byKey.has(key)) byKey.set(key, []);
+            byKey.get(key).push(row);
+        }
+        const grants = user ? foldGrants([
+            ...UserFilePermissionRepository.listForUser(user.id),
+            ...GroupRepository.listPermissionsForUser(user.id),
+        ]) : new Map();
+
+        const evaluate = (p) => {
+            if (p.is_published !== 1) return 'hidden';
+            if (p.available_from !== null && now < p.available_from) return 'hidden';
+            if (p.available_until !== null && now > p.available_until) return 'hidden';
+            const granted = grants.get(p.file_id);
+            if (granted === DENY) return 'hidden';
+            if (!user) {
+                if (p.is_locked === 1) return 'locked';
+                return p.access_mode === 'public' ? (p.default_level || 'download') : 'hidden';
+            }
+            const base = p.access_mode === 'restricted' ? 0 : rank(p.default_level || 'download');
+            const r = Math.max(base, granted || 0);
+            return r > 0 ? LEVELS[r - 1] : 'hidden';
+        };
+
+        const policies = [];
+        let hidden = false;
+        let locked = false;
+        let level = LEVELS.length;
+        for (const p of governingPaths(clientPath)) {
+            for (const row of byKey.get(portalKey(p)) || []) {
+                const outcome = evaluate(row);
+                policies.push({ path: row.client_path, outcome });
+                if (outcome === 'hidden') hidden = true;
+                else if (outcome === 'locked') locked = true;
+                else level = Math.min(level, rank(outcome));
             }
         }
-        if (policies.size === 0) return ALLOW_ALL;
-
-        const grants = new Map(UserFilePermissionRepository.listForUser(user.id)
-            .map((row) => [row.file_id, row.permission]));
-
-        const allows = (p) => p.is_locked !== 1
-            && p.is_published === 1
-            && (p.available_from === null || now >= p.available_from)
-            && (p.available_until === null || now < p.available_until)
-            && (p.access_mode !== 'restricted' || grants.get(p.file_id) === 'grant');
-
-        // A traversal attempt throws its usual 403 from canonical(), unchanged.
-        const canAccess = (clientPath) => {
-            const key = canonical(clientPath);
-            return selfAndAncestors(key).every((k) => !policies.has(k) || allows(policies.get(k)));
-        };
-
-        const hidesAnythingBelow = (clientPath) => {
-            const key = canonical(clientPath);
-            const base = key === '/' ? '/' : `${key}/`;
-            for (const [k, row] of policies) {
-                if (k !== key && k.startsWith(base) && !allows(row)) return true;
-            }
-            return false;
-        };
-
-        return {
-            canAccess,
-            hidesAnythingBelow,
-            assertCanAccess(clientPath) {
-                if (!canAccess(clientPath)) throw notFound(clientPath);
-            },
-            /**
-             * For operations that act on a whole subtree (delete, move, rename, copy):
-             * refusing is the only safe answer when it holds something this user
-             * cannot see - deleting it would destroy it unseen, copying it would
-             * publish an unprotected duplicate.
-             */
-            assertCanAccessTree(clientPath) {
-                if (!canAccess(clientPath)) throw notFound(clientPath);
-                if (hidesAnythingBelow(clientPath)) {
-                    throw new AppError('This folder contains items you do not have access to.', 403);
-                }
-            },
-        };
+        const outcome = hidden ? 'hidden' : locked ? 'locked' : LEVELS[level - 1];
+        return { outcome, policies };
     }
 
     list() {
@@ -139,11 +141,12 @@ class FileAccessPolicyService {
         return FileAccessPolicyRepository.findPolicyByPath(clientPath);
     }
 
-    setPolicy(clientPath, { isDirectory, accessMode, isPublished, isLocked, availableFrom, availableUntil, actorId }) {
+    setPolicy(clientPath, { isDirectory, accessMode, isPublished, isLocked, availableFrom, availableUntil, defaultLevel, actorId }) {
         validateClientPath(clientPath);
         if (accessMode !== undefined && !ACCESS_MODES.has(accessMode)) {
             throw new AppError('access_mode must be "public", "authenticated", or "restricted".', 400);
         }
+        if (defaultLevel !== undefined) assertLevel(defaultLevel, 'default_level');
         if (availableFrom !== undefined && availableFrom !== null && !Number.isSafeInteger(availableFrom)) {
             throw new AppError('available_from must be an epoch-ms integer or null.', 400);
         }
@@ -162,6 +165,7 @@ class FileAccessPolicyService {
             isLocked: isLocked ?? (existing ? existing.is_locked === 1 : false),
             availableFrom: availableFrom !== undefined ? availableFrom : existing?.available_from ?? null,
             availableUntil: availableUntil !== undefined ? availableUntil : existing?.available_until ?? null,
+            defaultLevel: defaultLevel ?? existing?.default_level ?? 'download',
             actorId,
         });
     }
@@ -171,15 +175,21 @@ class FileAccessPolicyService {
         FileAccessPolicyRepository.deletePolicy(clientPath);
     }
 
-    grantPermission(clientPath, userId, permission, grantedBy) {
-        validateClientPath(clientPath);
-        if (!PERMISSIONS.has(permission)) throw new AppError('permission must be "grant" or "deny".', 400);
-        if (!UserRepository.findById(userId)) throw new AppError('User not found.', 404);
-
+    /** The governed `files` row for a path, or 409 - a grant needs a policy to attach to. */
+    _governedFile(clientPath) {
         const file = FileAccessPolicyRepository.findFileByPath(clientPath);
         if (!file) throw new AppError('Set a policy on this file before granting a permission.', 409);
+        return file;
+    }
 
-        return UserFilePermissionRepository.upsert(file.id, userId, permission, grantedBy);
+    /** `level` defaults to 'download': what a grant meant before levels existed. */
+    grantPermission(clientPath, userId, permission, grantedBy, level = 'download') {
+        validateClientPath(clientPath);
+        if (!PERMISSIONS.has(permission)) throw new AppError('permission must be "grant" or "deny".', 400);
+        assertLevel(level, 'level');
+        if (!UserRepository.findById(userId)) throw new AppError('User not found.', 404);
+        const file = this._governedFile(clientPath);
+        return UserFilePermissionRepository.upsert(file.id, userId, permission, grantedBy, level);
     }
 
     revokePermission(clientPath, userId) {
@@ -194,6 +204,29 @@ class FileAccessPolicyService {
         const file = FileAccessPolicyRepository.findFileByPath(clientPath);
         if (!file) return [];
         return UserFilePermissionRepository.listForFile(file.id);
+    }
+
+    grantGroupPermission(clientPath, groupId, permission, grantedBy, level = 'download') {
+        validateClientPath(clientPath);
+        if (!PERMISSIONS.has(permission)) throw new AppError('permission must be "grant" or "deny".', 400);
+        assertLevel(level, 'level');
+        if (!GroupRepository.findById(groupId)) throw new AppError('Group not found.', 404);
+        const file = this._governedFile(clientPath);
+        return GroupRepository.upsertPermission(file.id, groupId, permission, level, grantedBy);
+    }
+
+    revokeGroupPermission(clientPath, groupId) {
+        validateClientPath(clientPath);
+        const file = FileAccessPolicyRepository.findFileByPath(clientPath);
+        if (!file) return;
+        GroupRepository.revokePermission(file.id, groupId);
+    }
+
+    listGroupPermissions(clientPath) {
+        validateClientPath(clientPath);
+        const file = FileAccessPolicyRepository.findFileByPath(clientPath);
+        if (!file) return [];
+        return GroupRepository.listPermissionsForFile(file.id);
     }
 
     /**
