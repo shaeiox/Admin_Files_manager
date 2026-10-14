@@ -29,7 +29,7 @@
 const Files = (() => {
 
   const AFM = window.AFM;
-  const { $, el, icon, Format, Toast, Modal, ContextMenu, Dropdown, copyToClipboard, Store, FileTypes } = AFM;
+  const { $, el, icon, Format, Toast, Modal, ContextMenu, Dropdown, copyToClipboard, Store, FileTypes, LangIcons } = AFM;
   const esc = AFM.escapeHtml;
 
   /* ══════════════════════════════════════════
@@ -278,7 +278,16 @@ const Files = (() => {
       icon: def ? def.icon : 'file',
       label: def ? def.label : 'File',
       ext: extensionOf(file.name),
+      lang: key === 'code' ? LangIcons[extensionOf(file.name)] || '' : '',
     };
+  }
+
+  /** The type tile: a vendored language logo for known code files, else the line glyph. */
+  function typeIconHtml(t, size) {
+    const glyph = t.lang
+      ? `<img class="lang-icon lang-${esc(t.lang)}" src="assets/icons/lang/${esc(t.lang)}.svg" alt="" width="${size}" height="${size}" decoding="async">`
+      : icon(t.icon, size);
+    return `<div class="ftype-icon ${esc(t.key)}${t.lang ? ' has-lang' : ''}" aria-hidden="true">${glyph}</div>`;
   }
 
   /** One badge text for list, grid and drawer alike. */
@@ -588,7 +597,7 @@ const Files = (() => {
           </td>
           <td class="col-name">
             <div class="fname-cell">
-              <div class="ftype-icon ${esc(t.key)}" aria-hidden="true">${icon(t.icon, 16)}</div>
+              ${typeIconHtml(t, 16)}
               <div class="fname-text">
                 <div class="fname" title="${name}">${name}${starMark(f)}</div>
                 <div class="fpath" title="${esc(f.path)}">${esc(f.path)}</div>
@@ -709,7 +718,7 @@ const Files = (() => {
     }
     return `
       <div class="${cls}">
-        <div class="ftype-icon ${esc(t.key)}" aria-hidden="true">${icon(t.icon, 22)}</div>
+        ${typeIconHtml(t, 22)}
         ${note ? `<span class="preview-note">${note}</span>` : ''}
       </div>`;
   }
@@ -1043,6 +1052,8 @@ const Files = (() => {
   function updateBreadcrumb() {
     const bc = $('#breadcrumb');
     if (bc) bc.innerHTML = renderBreadcrumbHtml(state.currentPath);
+    const up = $('#btnParentFolder');
+    if (up) up.disabled = state.currentPath === '/';
   }
 
   function renderChips() {
@@ -2758,6 +2769,7 @@ const Files = (() => {
     });
 
     bind('#btnRefresh', 'click', () => { loadTree(); loadFiles(); });
+    bind('#btnParentFolder', 'click', () => navigateTo(parentPath(state.currentPath)));
     bind('#btnNewFolder', 'click', () => handleAction('newFolder', state.currentPath));
     bind('#btnTreeNewFolder', 'click', () => handleAction('newFolder', state.currentPath));
     bind('#btnPaste', 'click', () => handleAction('paste'));

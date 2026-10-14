@@ -371,7 +371,8 @@ body[data-page="files"] {
   overflow: hidden;
 }
 
-.ftype-icon svg { width: 16px; height: 16px; position: relative; z-index: 1; }
+.ftype-icon svg,
+.ftype-icon .lang-icon { width: 16px; height: 16px; position: relative; z-index: 1; }
 
 .ftype-icon.folder   { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border-color: rgba(245,158,11,0.2); }
 .ftype-icon.image    { background: rgba(244, 114, 182, 0.12); color: var(--file-image); border-color: rgba(244,114,182,0.2); }
@@ -381,6 +382,10 @@ body[data-page="files"] {
 .ftype-icon.archive  { background: rgba(251, 191, 36, 0.12); color: var(--file-archive); border-color: rgba(251,191,36,0.2); }
 .ftype-icon.code     { background: rgba(251, 146, 60, 0.12); color: var(--file-code); border-color: rgba(251,146,60,0.2); }
 .ftype-icon.other    { background: var(--bg-tag); color: var(--text-tertiary); }
+/* Language logos carry their own colours; a neutral tile keeps them from clashing with the code tint. */
+.ftype-icon.has-lang { background: var(--bg-tag); border-color: var(--border-secondary); }
+/* Monochrome-dark logos vanish on the dark tile. */
+[data-theme="dark"] .lang-icon:is(.lang-rust, .lang-json, .lang-solidity, .lang-gradle) { filter: invert(1); }
 
 .fname-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 
@@ -554,7 +559,7 @@ tr:focus-within .row-actions { opacity: 1; }
   border-radius: var(--radius-ui);
 }
 
-.file-thumb .ftype-icon svg { width: 22px; height: 22px; }
+.file-thumb .ftype-icon :is(svg, .lang-icon) { width: 22px; height: 22px; }
 
 .file-ext-tag {
   position: absolute;
@@ -852,7 +857,7 @@ tr:focus-within .row-actions { opacity: 1; }
   border-radius: var(--radius-lg);
 }
 
-.drawer-preview .ftype-icon svg { width: 26px; height: 26px; }
+.drawer-preview .ftype-icon :is(svg, .lang-icon) { width: 26px; height: 26px; }
 
 .drawer-filename {
   font-size: var(--text-body);

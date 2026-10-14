@@ -2,7 +2,7 @@
 'use strict';
 
 const path = require('path');
-const fs = require('fs');
+const fs = require('node:fs');
 const FileSystemService = require('../services/FileSystemService');
 const MetadataService = require('../services/MetadataService');
 const FileAccessPolicyService = require('../services/FileAccessPolicyService');

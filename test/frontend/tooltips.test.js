@@ -41,6 +41,7 @@ test('every topbar control declares data-tip-pos="bottom"', () => {
   assert.match(FILES_HTML, /data-view="list" data-tip="List view" data-tip-pos="bottom"/);
   assert.match(FILES_HTML, /data-view="grid" data-tip="Grid view" data-tip-pos="bottom"/);
   assert.match(FILES_HTML, /id="btnRefresh" data-tip="Refresh" data-tip-pos="bottom"/);
+  assert.match(FILES_HTML, /id="btnParentFolder" data-tip="Parent folder" data-tip-pos="bottom"/);
   assert.match(UPLOADS_HTML, /data-tip="Notifications" data-tip-pos="bottom"/);
   assert.match(SETTINGS_HTML, /data-tip="Notifications" data-tip-pos="bottom"/);
 });

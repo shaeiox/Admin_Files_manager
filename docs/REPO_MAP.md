@@ -450,6 +450,7 @@ Rules worth knowing before you touch this path:
 | New file-type category / extension | `src/utils/fileTypes.js` (`CATEGORIES` + `EXTENSION_MAP`) **and** `public/assets/js/app.js` `FileTypes` in the same change — `test/utils/fileTypes.test.js` fails if they differ. Both the listing and the Dashboard breakdown classify through `classifyFile()` |
 | New validation rule | `src/utils/validators.js` |
 | New error type / status | `src/utils/AppError.js` (throw it; never `res.status(...).json(...)` an error inline) |
+| New code-language icon | drop the SVG in `public/assets/icons/lang/` (vendored devicon, MIT; never a CDN) and map the extension in `LangIcons` in `public/assets/js/app.js` — the extension must already be in the `code` category; `test/frontend/lang-icons.test.js` checks both |
 | New shared UI component | `public/assets/js/app.js` + `public/assets/css/components.css` |
 | New dashboard panel | `public/assets/js/dashboard.js` (renderer + a `resolvePanelState` input) + a container in `public/index.html` |
 | New page module | new `public/assets/js/<page>.js`, gate on `document.body.dataset.page` |

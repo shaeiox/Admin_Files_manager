@@ -28,7 +28,14 @@ const EXTENSION_MAP = {
     audio: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma'],
     document: ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'md'],
     archive: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso', 'dmg'],
-    code: ['js', 'ts', 'jsx', 'tsx', 'html', 'css', 'scss', 'json', 'xml', 'php', 'py', 'java', 'go', 'rs', 'sh', 'yml', 'yaml', 'sql'],
+    code: [
+      'js', 'mjs', 'cjs', 'ts', 'mts', 'cts', 'jsx', 'tsx', 'html', 'htm', 'css', 'scss', 'sass', 'less', 'json', 'xml',
+      'php', 'py', 'pyw', 'java', 'go', 'rs', 'sh', 'bash', 'zsh', 'ps1', 'psm1', 'bat', 'cmd', 'yml', 'yaml', 'toml',
+      'ini', 'sql', 'c', 'h', 'cpp', 'cc', 'cxx', 'hpp', 'hh', 'cs', 'rb', 'kt', 'kts', 'swift', 'dart', 'lua',
+      'r', 'scala', 'pl', 'pm', 'hs', 'ex', 'exs', 'erl', 'hrl', 'clj', 'cljs', 'cljc', 'vue', 'svelte', 'groovy', 'gradle',
+      'jl', 'zig', 'nim', 'elm', 'fs', 'fsx', 'vb', 'sol', 'graphql', 'gql', 'tf', 'astro', 'coffee', 'f90', 'f95', 'ml',
+      'mli', 'm', 'mm',
+    ],
 };
 
 // Reverse index, built once. Extension keys are stored lowercase.

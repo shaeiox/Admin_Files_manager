@@ -158,6 +158,13 @@
   color: var(--text-primary);
 }
 
+.btn-icon:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
 .btn-icon.is-bordered {
   border-color: var(--border-primary);
 }

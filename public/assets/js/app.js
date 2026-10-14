@@ -22,6 +22,7 @@ const Icons = {
   arrowRight: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   arrowUp: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
   arrowDown: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+  cornerLeftUp: '<path d="m14 9-5-5-5 5"/><path d="M20 20h-7a4 4 0 0 1-4-4V4"/>',
   arrowUpRight: '<path d="M7 17 17 7"/><path d="M7 7h10v10"/>',
   menu: '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
@@ -285,7 +286,34 @@ const FileTypes = {
   audio: { exts: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma'], icon: 'music', label: 'Audio' },
   document: { exts: ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'md'], icon: 'fileText', label: 'Document' },
   archive: { exts: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso', 'dmg'], icon: 'archive', label: 'Archive' },
-  code: { exts: ['js', 'ts', 'jsx', 'tsx', 'html', 'css', 'scss', 'json', 'xml', 'php', 'py', 'java', 'go', 'rs', 'sh', 'yml', 'yaml', 'sql'], icon: 'code', label: 'Code' },
+  code: { exts: [
+    'js', 'mjs', 'cjs', 'ts', 'mts', 'cts', 'jsx', 'tsx', 'html', 'htm', 'css', 'scss', 'sass', 'less', 'json', 'xml',
+    'php', 'py', 'pyw', 'java', 'go', 'rs', 'sh', 'bash', 'zsh', 'ps1', 'psm1', 'bat', 'cmd', 'yml', 'yaml', 'toml',
+    'ini', 'sql', 'c', 'h', 'cpp', 'cc', 'cxx', 'hpp', 'hh', 'cs', 'rb', 'kt', 'kts', 'swift', 'dart', 'lua',
+    'r', 'scala', 'pl', 'pm', 'hs', 'ex', 'exs', 'erl', 'hrl', 'clj', 'cljs', 'cljc', 'vue', 'svelte', 'groovy', 'gradle',
+    'jl', 'zig', 'nim', 'elm', 'fs', 'fsx', 'vb', 'sol', 'graphql', 'gql', 'tf', 'astro', 'coffee', 'f90', 'f95', 'ml',
+    'mli', 'm', 'mm',
+  ], icon: 'code', label: 'Code' },
+};
+
+/**
+ * Code extension -> language logo, served from public/assets/icons/lang/<name>.svg
+ * (vendored devicon, MIT — never a CDN). An extension missing here keeps the generic
+ * `code` glyph; every value must name a file in that folder (test/frontend/lang-icons.test.js).
+ */
+const LangIcons = {
+  js: 'javascript', mjs: 'javascript', cjs: 'javascript',
+  ts: 'typescript', mts: 'typescript', cts: 'typescript',
+  jsx: 'react', tsx: 'react', html: 'html5', htm: 'html5', css: 'css3', scss: 'sass', sass: 'sass',
+  json: 'json', xml: 'xml', php: 'php', py: 'python', pyw: 'python', java: 'java', go: 'go', rs: 'rust',
+  sh: 'bash', bash: 'bash', zsh: 'bash', ps1: 'powershell', psm1: 'powershell', yml: 'yaml', yaml: 'yaml',
+  c: 'c', h: 'c', cpp: 'cplusplus', cc: 'cplusplus', cxx: 'cplusplus', hpp: 'cplusplus', hh: 'cplusplus',
+  cs: 'csharp', rb: 'ruby', kt: 'kotlin', kts: 'kotlin', swift: 'swift', dart: 'dart', lua: 'lua', r: 'r',
+  scala: 'scala', pl: 'perl', pm: 'perl', hs: 'haskell', ex: 'elixir', exs: 'elixir', erl: 'erlang', hrl: 'erlang',
+  clj: 'clojure', cljs: 'clojure', cljc: 'clojure', vue: 'vuejs', svelte: 'svelte', groovy: 'groovy', gradle: 'gradle',
+  jl: 'julia', zig: 'zig', nim: 'nim', elm: 'elm', fs: 'fsharp', fsx: 'fsharp', vb: 'visualbasic', sol: 'solidity',
+  graphql: 'graphql', gql: 'graphql', tf: 'terraform', astro: 'astro', coffee: 'coffeescript',
+  f90: 'fortran', f95: 'fortran', ml: 'ocaml', mli: 'ocaml', m: 'objectivec', mm: 'objectivec',
 };
 
 function resolveType(filename, isFolder = false) {
@@ -1172,7 +1200,7 @@ if (!isLoginPage) {
 window.AFM = {
   Icons, icon, hydrateIcons,
   $, $$, el, on,
-  Format, FileTypes, resolveType,
+  Format, FileTypes, LangIcons, resolveType,
   Toast, Modal, Dropdown, ContextMenu,
   copyToClipboard, Store,
   debounce, throttle, uid, clamp, randBetween, escapeHtml, refreshChrome,
