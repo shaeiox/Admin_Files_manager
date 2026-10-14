@@ -491,6 +491,41 @@
                 </div>
                 <div class="admin-form-error" id="portalError" role="alert" hidden></div>
               </form>
+
+              <form class="settings-group" id="portalNavForm" novalidate>
+                <div class="sg-head">
+                  <div class="sg-title">
+                    <i data-icon="link" data-icon-size="18"></i>
+                    Navbar folders
+                  </div>
+                  <div class="sg-desc">Folders linked in the portal's top navigation, in this order. Each link
+                    follows the folder's access policy: hidden folders never appear, locked ones ask visitors to sign in.</div>
+                </div>
+                <div class="nav-folders-head" aria-hidden="true">
+                  <span>Folder</span><span>Label</span><span>Home grid</span><span></span>
+                </div>
+                <ol class="nav-folders" id="navFolderList"></ol>
+                <p class="nav-folders-empty" id="navFolderEmpty">No folders in the navbar yet.</p>
+                <div class="nav-folders-add">
+                  <button type="button" class="btn btn-ghost btn-sm" id="navFolderAdd">
+                    <i data-icon="plus" data-icon-size="14"></i>
+                    Add folder
+                  </button>
+                </div>
+
+                <div class="portal-actions">
+                  <span class="portal-actions-note">
+                    <i data-icon="info" data-icon-size="14"></i>
+                    Stored in the admin database. The portal picks it up within seconds, no restart.
+                  </span>
+                  <button type="button" class="btn btn-ghost btn-sm" id="navFolderReset" disabled>Discard</button>
+                  <button type="submit" class="btn btn-primary btn-sm" id="navFolderSave" disabled>
+                    <i data-icon="save" data-icon-size="14"></i>
+                    Save navbar
+                  </button>
+                </div>
+                <div class="admin-form-error" id="navFolderError" role="alert" hidden></div>
+              </form>
             </div>
 
             <!-- ══════════════════════

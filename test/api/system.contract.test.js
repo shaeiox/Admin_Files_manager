@@ -145,6 +145,46 @@ test('GET /admin/logs/audit lists the portal.config change with its actor', asyn
     assert.equal(typeof row.actor_username, 'string');
 });
 
+test('PUT /admin/portal/nav stores folders in order (normalized), GET returns them, audit records it', async () => {
+    fs.mkdirSync(path.join(ROOT, 'Docs', 'Guides'), { recursive: true });
+    fs.mkdirSync(path.join(ROOT, 'PVM'), { recursive: true });
+    assert.deepEqual((await send('GET', '/api/v1/admin/portal/nav')).json, { folders: [] });
+
+    const put = await send('PUT', '/api/v1/admin/portal/nav', { folders: [
+        { path: 'PVM/', label: ' Releases ', hideFromHome: true },
+        { path: '\\Docs\\Guides' },
+    ] });
+    assert.equal(put.status, 200, JSON.stringify(put.json));
+    const expected = [
+        { path: '/PVM', label: 'Releases', hideFromHome: true },
+        { path: '/Docs/Guides', label: '', hideFromHome: false },
+    ];
+    assert.deepEqual(put.json.folders, expected);
+    assert.deepEqual((await send('GET', '/api/v1/admin/portal/nav')).json.folders, expected);
+
+    const audit = (await send('GET', '/api/v1/admin/logs/audit')).json;
+    assert.ok(audit.some((r) => r.action === 'portal.nav' && r.outcome === 'success'));
+});
+
+test('PUT /admin/portal/nav refuses bad input with 400/403/404 and keeps the stored list', async () => {
+    fs.writeFileSync(path.join(ROOT, 'file.txt'), 'x');
+    for (const [body, status] of [
+        [{}, 400],
+        [{ folders: [{ path: '/' }] }, 400],
+        [{ folders: [{ path: '/PVM/../..' }] }, 400],
+        [{ folders: [{ path: '/PVM' }, { path: '/pvm' }] }, 400],
+        [{ folders: [{ path: '/PVM', label: 'x'.repeat(41) }] }, 400],
+        [{ folders: [{ path: '/PVM', hideFromHome: 'yes' }] }, 400],
+        [{ folders: [{ path: '/file.txt' }] }, 400],
+        [{ folders: [{ path: '/missing' }] }, 404],
+        [{ folders: Array.from({ length: 13 }, () => ({ path: '/PVM' })) }, 400],
+    ]) {
+        const res = await send('PUT', '/api/v1/admin/portal/nav', body);
+        assert.equal(res.status, status, JSON.stringify(body) + ' -> ' + JSON.stringify(res.json));
+    }
+    assert.equal((await send('GET', '/api/v1/admin/portal/nav')).json.folders.length, 2);
+});
+
 test('GET /auth/me carries APP_VERSION as appVersion', async () => {
     const res = await send('GET', '/api/v1/auth/me');
     assert.equal(res.json.appVersion, '9.8.7');

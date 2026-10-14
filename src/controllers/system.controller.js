@@ -2,6 +2,7 @@
 'use strict';
 
 const PortalService = require('../services/PortalService');
+const PortalNavService = require('../services/PortalNavService');
 const AuditLogRepository = require('../db/repositories/AuditLogRepository');
 
 const MAX_AUDIT_ENTRIES = 1000;
@@ -35,6 +36,36 @@ async function setPortalConfig(req, res, next) {
     }
 }
 
+/** GET /api/admin/portal/nav -> bare `{ folders }` in navbar order. */
+function getPortalNav(req, res, next) {
+    try {
+        return res.json({ folders: PortalNavService.list() });
+    } catch (error) {
+        return next(error);
+    }
+}
+
+/** PUT /api/admin/portal/nav -> envelope. Full replace; the portal picks it up on its next snapshot (no restart). */
+async function setPortalNav(req, res, next) {
+    const audit = (outcome, detail) => AuditLogRepository.record({
+        actorId: req.user ? req.user.id : null,
+        action: 'portal.nav',
+        outcome,
+        targetType: 'portal',
+        detail: detail || null,
+        ip: req.ip,
+        userAgent: req.get('user-agent') || null,
+    });
+    try {
+        const folders = await PortalNavService.set(req.body);
+        audit('success', folders.map((f) => f.path).join(', '));
+        return res.json({ success: true, folders });
+    } catch (error) {
+        audit('failure');
+        return next(error);
+    }
+}
+
 /** GET /api/admin/logs/portal?limit= -> bare `{ available, entries }`, newest first. */
 async function getPortalLog(req, res, next) {
     try {
@@ -54,4 +85,4 @@ function getAuditLog(req, res, next) {
     }
 }
 
-module.exports = { getPortalConfig, setPortalConfig, getPortalLog, getAuditLog };
+module.exports = { getPortalConfig, setPortalConfig, getPortalNav, setPortalNav, getPortalLog, getAuditLog };

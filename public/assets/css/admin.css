@@ -296,6 +296,69 @@
   font-size: var(--text-caption);
 }
 
+/* Navbar folders: one row per link — path, label, home-grid switch, order/remove. */
+#portalNavForm { margin-top: var(--spacing-20); }
+
+.nav-folders-head,
+.nav-folder {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) 112px 104px;
+  gap: var(--spacing-12);
+  align-items: center;
+}
+
+.nav-folders-head {
+  padding: var(--spacing-12) var(--spacing-24) 0;
+  color: var(--text-tertiary);
+  font-size: var(--text-caption);
+}
+
+.nav-folders {
+  list-style: none;
+  margin: 0;
+  padding: var(--spacing-8) var(--spacing-24) 0;
+}
+
+.nav-folder { padding: var(--spacing-8) 0; }
+.nav-folder + .nav-folder { border-top: 1px solid var(--border-secondary); }
+
+.nav-folder-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.nav-folder-tools button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.nav-folder-tools button:hover:not(:disabled) { background: var(--bg-tertiary); color: var(--text-primary); }
+.nav-folder-tools button:disabled { opacity: 0.35; cursor: default; }
+.nav-folder-tools button[data-act="remove"]:hover { color: var(--color-error); }
+
+.nav-folders-empty {
+  margin: 0;
+  padding: var(--spacing-16) var(--spacing-24) 0;
+  color: var(--text-tertiary);
+  font-size: var(--text-caption);
+}
+
+.nav-folders-add { padding: var(--spacing-12) var(--spacing-24) var(--spacing-16); }
+
+@media (max-width: 720px) {
+  .nav-folders-head { display: none; }
+  .nav-folder { grid-template-columns: 1fr auto; }
+  .nav-folder > :first-child { grid-column: 1 / -1; }
+}
+
 /* ── Logs pane ── */
 
 .log-panel { overflow: hidden; }

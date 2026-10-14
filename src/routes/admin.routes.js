@@ -35,6 +35,8 @@ router.delete('/files/permissions', filePolicyController.revokePermission);
 
 router.get('/portal/config', systemController.getPortalConfig);
 router.put('/portal/config', systemController.setPortalConfig);
+router.get('/portal/nav', systemController.getPortalNav);
+router.put('/portal/nav', systemController.setPortalNav);
 router.get('/logs/portal', systemController.getPortalLog);
 router.get('/logs/audit', systemController.getAuditLog);
 

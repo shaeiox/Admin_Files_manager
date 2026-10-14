@@ -9,6 +9,8 @@
  * tasks.md group 4). files is sparse - a row exists only for a path an
  * administrator has set a policy on, not a mirror of the whole tree
  * (design D2).
+ * Migration 3: portal_nav_folders - folders the File Portal links in its
+ * navbar. Access is still decided by file_access_policies on the portal side.
  *
  * Idempotent: migrate() records applied versions in schema_migrations and is
  * a no-op when the stored schema is already current. A stored version newer
@@ -98,6 +100,20 @@ const MIGRATIONS = [
                 UNIQUE (file_id, user_id)
             );
             CREATE INDEX idx_ufp_user_id ON user_file_permissions(user_id);
+        `,
+    },
+    {
+        version: 3,
+        sql: `
+            CREATE TABLE portal_nav_folders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_path TEXT NOT NULL UNIQUE,
+                label TEXT,
+                position INTEGER NOT NULL,
+                hide_from_home INTEGER NOT NULL DEFAULT 0 CHECK (hide_from_home IN (0,1)),
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
         `,
     },
 ];

@@ -469,6 +469,95 @@ const Admin = (() => {
     }
 
     /* ══════════════════════════════════════════
+       PORTAL NAVBAR FOLDERS (admin.sqlite portal_nav_folders)
+       ══════════════════════════════════════════ */
+
+    let navSaved = null;
+
+    function readNavRows() {
+        return $$('#navFolderList .nav-folder').map((row) => ({
+            path: row.querySelector('[data-f="path"]').value.trim(),
+            label: row.querySelector('[data-f="label"]').value.trim(),
+            hideFromHome: row.querySelector('[data-f="hide"]').checked,
+        }));
+    }
+
+    function renderNavRows(folders) {
+        const list = document.getElementById('navFolderList');
+        list.innerHTML = folders.map((f, i) => `
+            <li class="nav-folder">
+                <input class="input input-mono" data-f="path" value="${escapeHtml(f.path)}" placeholder="/Downloads/PVM"
+                    aria-label="Folder path ${i + 1}" autocomplete="off" spellcheck="false" required>
+                <input class="input" data-f="label" value="${escapeHtml(f.label || '')}" placeholder="Folder name"
+                    aria-label="Label ${i + 1}" maxlength="40" autocomplete="off">
+                <label class="admin-switch-label" title="Hide this folder's card on the portal home page">
+                    <span class="switch">
+                        <input type="checkbox" data-f="hide" ${f.hideFromHome ? 'checked' : ''}>
+                        <span class="track" aria-hidden="true"></span>
+                    </span>
+                    <span>Hide</span>
+                </label>
+                <span class="nav-folder-tools">
+                    <button type="button" data-act="up" data-i="${i}" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>${icon('arrowUp', 15)}</button>
+                    <button type="button" data-act="down" data-i="${i}" aria-label="Move down" ${i === folders.length - 1 ? 'disabled' : ''}>${icon('arrowDown', 15)}</button>
+                    <button type="button" data-act="remove" data-i="${i}" aria-label="Remove">${icon('trash', 15)}</button>
+                </span>
+            </li>`).join('');
+        document.getElementById('navFolderEmpty').hidden = folders.length > 0;
+        document.getElementById('navFolderAdd').disabled = folders.length >= 12;
+        updateNavDirty();
+    }
+
+    function updateNavDirty() {
+        const dirty = navSaved !== null && JSON.stringify(readNavRows()) !== JSON.stringify(navSaved);
+        document.getElementById('navFolderSave').disabled = !dirty;
+        document.getElementById('navFolderReset').disabled = !dirty;
+    }
+
+    async function loadPortalNav() {
+        if (!document.getElementById('portalNavForm')) return;
+        try {
+            const res = await window.API.get('/admin/portal/nav', { silent: true });
+            navSaved = (res && res.folders) || [];
+            renderNavRows(navSaved);
+        } catch (error) {
+            const errorEl = document.getElementById('navFolderError');
+            errorEl.textContent = error.message || 'Could not read the navbar folders.';
+            errorEl.hidden = false;
+        }
+    }
+
+    function handleNavTool(event) {
+        const btn = event.target.closest('button[data-act]');
+        if (!btn) return;
+        const rows = readNavRows();
+        const i = Number(btn.dataset.i);
+        if (btn.dataset.act === 'remove') rows.splice(i, 1);
+        else {
+            const j = btn.dataset.act === 'up' ? i - 1 : i + 1;
+            [rows[i], rows[j]] = [rows[j], rows[i]];
+        }
+        renderNavRows(rows);
+    }
+
+    async function handleNavSave(event) {
+        event.preventDefault();
+        const errorEl = document.getElementById('navFolderError');
+        errorEl.hidden = true;
+        document.getElementById('navFolderSave').disabled = true;
+        try {
+            const res = await window.API.put('/admin/portal/nav', { folders: readNavRows() }, { silent: true });
+            navSaved = res.folders;
+            renderNavRows(navSaved);
+            Toast.success('Navbar saved', 'The file portal shows it within a few seconds.');
+        } catch (error) {
+            errorEl.textContent = error.message || 'Could not save the navbar folders.';
+            errorEl.hidden = false;
+            updateNavDirty();
+        }
+    }
+
+    /* ══════════════════════════════════════════
        LOGS (portal trace + admin audit)
        ══════════════════════════════════════════ */
 
@@ -673,12 +762,26 @@ const Admin = (() => {
             portalForm.addEventListener('change', updatePortalDirty);
             document.getElementById('portalReset').addEventListener('click', () => portalSaved && fillPortalForm(portalSaved));
         }
+        const navForm = document.getElementById('portalNavForm');
+        if (navForm) {
+            navForm.addEventListener('submit', handleNavSave);
+            navForm.addEventListener('input', updateNavDirty);
+            navForm.addEventListener('change', updateNavDirty);
+            document.getElementById('navFolderList').addEventListener('click', handleNavTool);
+            document.getElementById('navFolderAdd').addEventListener('click', () => {
+                renderNavRows([...readNavRows(), { path: '', label: '', hideFromHome: false }]);
+                const inputs = $$('#navFolderList [data-f="path"]');
+                inputs[inputs.length - 1].focus();
+            });
+            document.getElementById('navFolderReset').addEventListener('click', () => navSaved && renderNavRows(navSaved));
+        }
         logState = { source: 'portal', level: 'all', query: '', entries: [], available: true };
         bindLogs();
 
         loadUsers();
         loadPolicies();
         loadPortal();
+        loadPortalNav();
 
         if (window.AFM && AFM.Notifications) AFM.Notifications.bindTopbarBell();
     }
