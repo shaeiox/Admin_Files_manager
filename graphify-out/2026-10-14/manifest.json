@@ -42,20 +42,20 @@
     "semantic_hash": ""
   },
   "public/assets/js/files.js": {
-    "mtime": 1791904626.6924691,
-    "seen": 1791955531.9548223,
+    "mtime": 1791969536.7802212,
+    "seen": 1791989997.0284133,
     "ast_hash": "a742ac3f118cab68db37a41cca26e8b6",
     "semantic_hash": ""
   },
   "public/assets/js/settings.js": {
-    "mtime": 1791955428.8993247,
-    "seen": 1791955531.9548357,
-    "ast_hash": "f378914d207d7db24168f6f59fd0b93d",
+    "mtime": 1791969710.8182628,
+    "seen": 1791989997.0284233,
+    "ast_hash": "86434b7d750c6e21ea6803b0d8a9b9fd",
     "semantic_hash": ""
   },
   "public/assets/js/sidebar.js": {
-    "mtime": 1791904626.6954725,
-    "seen": 1791955531.954838,
+    "mtime": 1791969536.7802212,
+    "seen": 1791989997.0284255,
     "ast_hash": "4fdc475b8770165171e74c8f195bf37f",
     "semantic_hash": ""
   },
@@ -396,9 +396,9 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1791955487.4672859,
-    "seen": 1791955531.9552312,
-    "ast_hash": "e3c6d97aed2d232df02c3ff957d0dcc3",
+    "mtime": 1791969710.5401225,
+    "seen": 1791989997.0287333,
+    "ast_hash": "265f5889bba6b381c5b33e87e8af25dc",
     "semantic_hash": ""
   },
   "PROJECT_TREE.md": {
@@ -408,15 +408,15 @@
     "semantic_hash": "6f72ba4f8d01347aabdf0261fa963963"
   },
   "docs/CONTRACTS.md": {
-    "mtime": 1791955428.2675543,
-    "seen": 1791955531.9553423,
-    "ast_hash": "e08e20b69b2ee89ed3648de3f50cbbc8",
+    "mtime": 1791969710.59312,
+    "seen": 1791989997.0288131,
+    "ast_hash": "c36dd217eacb9e78d136e81a04c33a9b",
     "semantic_hash": ""
   },
   "docs/REPO_MAP.md": {
-    "mtime": 1791955492.302617,
-    "seen": 1791955531.9553487,
-    "ast_hash": "7398a9a3c42789d6a4a26c68fe89b100",
+    "mtime": 1791969710.598129,
+    "seen": 1791989997.0288181,
+    "ast_hash": "795ef84dda255b79a68d0da06f8e5042",
     "semantic_hash": ""
   },
   "docs/STRUCTURE.md": {
@@ -456,8 +456,8 @@
     "semantic_hash": ""
   },
   "public/files.html": {
-    "mtime": 1791904626.6964717,
-    "seen": 1791955531.9558458,
+    "mtime": 1791969536.7837455,
+    "seen": 1791989997.029109,
     "ast_hash": "2494e0248249b8360cb38c289968c6a9",
     "semantic_hash": ""
   },
@@ -552,8 +552,8 @@
     "semantic_hash": ""
   },
   "docs/decisions/ADR-002-dashboard-data-architecture.md": {
-    "mtime": 1791955428.5152142,
-    "seen": 1791955531.9553893,
+    "mtime": 1791969710.6001298,
+    "seen": 1791989997.0288315,
     "ast_hash": "67eaca86575f50265b566fd6f24e611b",
     "semantic_hash": ""
   },
@@ -1230,15 +1230,15 @@
     "semantic_hash": ""
   },
   "src/config/dataDir.js": {
-    "mtime": 1791955428.6993747,
-    "seen": 1791955531.954858,
-    "ast_hash": "cddae4ae9ed9fbcf32d814756b1cd990",
+    "mtime": 1791969710.8192618,
+    "seen": 1791989997.0284433,
+    "ast_hash": "d013f9e17750d2a50b3b44a0e8938794",
     "semantic_hash": ""
   },
   "docs/DEPLOYMENT.md": {
-    "mtime": 1791955487.638295,
-    "seen": 1791955531.9553456,
-    "ast_hash": "0e43cb30cd93a6ac5c167d1c59d02423",
+    "mtime": 1791969710.5961244,
+    "seen": 1791989997.0288165,
+    "ast_hash": "9ffcb2840a7e7f33fe0aa200a411e045",
     "semantic_hash": ""
   },
   "docs/decisions/ADR-008-production-deployment.md": {
@@ -1818,237 +1818,255 @@
     "semantic_hash": ""
   },
   "docs-vault/_state/analysis.json": {
-    "mtime": 1791955095.0931103,
-    "seen": 1791955531.9547997,
-    "ast_hash": "7277e04c8510b5363a38de5b87c4d06e",
+    "mtime": 1791969710.579122,
+    "seen": 1791989997.028394,
+    "ast_hash": "ba7eb998e4bb26763f165dc493875bae",
     "semantic_hash": ""
   },
   "docs-vault/Architecture/Dependency Map.md": {
-    "mtime": 1791955172.3336687,
-    "seen": 1791955531.9552379,
-    "ast_hash": "fd2c9c96ae07eb2332e5c07a7159f31d",
+    "mtime": 1791969710.5431201,
+    "seen": 1791989997.0287416,
+    "ast_hash": "efdfedf47ed7e4d282ea6f842b4426ab",
     "semantic_hash": ""
   },
   "docs-vault/Architecture/System Overview.md": {
-    "mtime": 1791955174.6086905,
-    "seen": 1791955531.95524,
-    "ast_hash": "2c49a97d6c814fb361b26266d979d287",
+    "mtime": 1791969710.5451188,
+    "seen": 1791989997.0287435,
+    "ast_hash": "1687b95daea998ba9f171d0eb4bf532f",
     "semantic_hash": ""
   },
   "docs-vault/Cross-Cutting/Authentication and CSRF.md": {
-    "mtime": 1791955286.4284346,
-    "seen": 1791955531.9552424,
-    "ast_hash": "4d85a9b8598e8517373cd0fab312bdb8",
+    "mtime": 1791969710.5461214,
+    "seen": 1791989997.0287454,
+    "ast_hash": "1490d27bb18a64a3ffaf7a956ee46e2a",
     "semantic_hash": ""
   },
   "docs-vault/Cross-Cutting/Concurrency and Consistency.md": {
-    "mtime": 1791955322.962853,
-    "seen": 1791955531.955245,
-    "ast_hash": "3fea98de58ade063a5002dbd7e6927cd",
+    "mtime": 1791969710.5471194,
+    "seen": 1791989997.0287476,
+    "ast_hash": "bc2861c8fc8d7d86839080b36e4c364b",
     "semantic_hash": ""
   },
   "docs-vault/Cross-Cutting/Error Contract and Sanitization.md": {
-    "mtime": 1791955218.0217133,
-    "seen": 1791955531.9552472,
-    "ast_hash": "fa860779826d9bf0cab8becf456d2dd1",
+    "mtime": 1791969710.5481195,
+    "seen": 1791989997.0287495,
+    "ast_hash": "365015b7f1b9a35bbbb5e52a3bd6ace7",
     "semantic_hash": ""
   },
   "docs-vault/Cross-Cutting/Path Containment and Client Paths.md": {
-    "mtime": 1791955175.3343878,
-    "seen": 1791955531.9552495,
-    "ast_hash": "4dfcfdef2505a0c28b22ce114b5fd348",
+    "mtime": 1791969710.5481195,
+    "seen": 1791989997.0287514,
+    "ast_hash": "1fe1ffdfd1ab4a15f6304f8d60cadc89",
     "semantic_hash": ""
   },
   "docs-vault/Cross-Cutting/Truthful Reporting and Unavailability.md": {
-    "mtime": 1791955247.27881,
-    "seen": 1791955531.9552524,
-    "ast_hash": "d04ce4cb4917136eca5728a6b6c270a1",
+    "mtime": 1791969710.550122,
+    "seen": 1791989997.0287535,
+    "ast_hash": "127418d4830421c3d54fd3cd9ebc7fe1",
     "semantic_hash": ""
   },
   "docs-vault/Health/Code Review.md": {
-    "mtime": 1791955345.6048462,
-    "seen": 1791955531.9552553,
-    "ast_hash": "e1609bba593cd77420e4b6c5b0d3cf27",
+    "mtime": 1791969710.5521197,
+    "seen": 1791989997.028755,
+    "ast_hash": "dedf4e6752051c4ef404cc209303c938",
     "semantic_hash": ""
   },
   "docs-vault/Health/Health Summary.md": {
-    "mtime": 1791955172.3359015,
-    "seen": 1791955531.9552572,
-    "ast_hash": "ae11bfc03a1a89da959b5eb78cf9e9f2",
+    "mtime": 1791969710.5531182,
+    "seen": 1791989997.0287566,
+    "ast_hash": "e49798aeaf76e075b38cbc030423f568",
     "semantic_hash": ""
   },
   "docs-vault/Health/Limitations.md": {
-    "mtime": 1791955162.9309785,
-    "seen": 1791955531.9552593,
-    "ast_hash": "d8c69f218ee1249cf87596f08181c395",
+    "mtime": 1791969710.5541215,
+    "seen": 1791989997.0287585,
+    "ast_hash": "98c01f5fbbe5b72f1e93ca5a244e3504",
     "semantic_hash": ""
   },
   "docs-vault/Index.md": {
-    "mtime": 1791955172.337911,
-    "seen": 1791955531.9552615,
-    "ast_hash": "d8d90ae08b36224c6dbe0ec5d73deb8d",
+    "mtime": 1791969710.5541215,
+    "seen": 1791989997.0287607,
+    "ast_hash": "fc7c906f33f1a80efdfeddb6b4784fab",
     "semantic_hash": ""
   },
   "docs-vault/Modules/Auth and Access Control.md": {
-    "mtime": 1791955293.2698126,
-    "seen": 1791955531.9552634,
-    "ast_hash": "6736a2a6d6702183a38da237a5285b43",
+    "mtime": 1791969710.5561202,
+    "seen": 1791989997.0287623,
+    "ast_hash": "82c35824eb844a647211b5db17444d2d",
     "semantic_hash": ""
   },
   "docs-vault/Modules/Deployment Scripts.md": {
-    "mtime": 1791955293.1390843,
-    "seen": 1791955531.9552658,
-    "ast_hash": "fb816343f140c37afb6ae7461ba9f776",
+    "mtime": 1791969710.5571203,
+    "seen": 1791989997.0287642,
+    "ast_hash": "574702f1b43fc6b06287f128449c0e57",
     "semantic_hash": ""
   },
   "docs-vault/Modules/Feature Pages.md": {
-    "mtime": 1791955272.6841898,
-    "seen": 1791955531.9552689,
-    "ast_hash": "a4c1c1c723a66f01d23a27e9b4184909",
+    "mtime": 1791969710.5591207,
+    "seen": 1791989997.0287657,
+    "ast_hash": "d255129b4d5b927a55de480e1742560b",
     "semantic_hash": ""
   },
   "docs-vault/Modules/Files Page.md": {
-    "mtime": 1791955272.573682,
-    "seen": 1791955531.955271,
-    "ast_hash": "a5b7dca4a023e4800cb8b84a91d1a7f4",
+    "mtime": 1791969710.5601203,
+    "seen": 1791989997.028768,
+    "ast_hash": "5edee0b9718eaa760bbab5d8d01f9127",
     "semantic_hash": ""
   },
   "docs-vault/Modules/Frontend Core.md": {
-    "mtime": 1791955161.6886957,
-    "seen": 1791955531.9552732,
-    "ast_hash": "b314b5cfd58bdce07bf54dd9ac83095a",
+    "mtime": 1791969710.5611198,
+    "seen": 1791989997.02877,
+    "ast_hash": "8a721d621a5caff91bd15c5e56e3d1e7",
     "semantic_hash": ""
   },
   "docs-vault/Modules/HTTP API Layer.md": {
-    "mtime": 1791955235.3319926,
-    "seen": 1791955531.9552748,
-    "ast_hash": "d6f6a38b5b73044c35f67fcd27a6e141",
+    "mtime": 1791969710.5621188,
+    "seen": 1791989997.0287719,
+    "ast_hash": "3a08dfc70a07566a849e013a26358e4c",
     "semantic_hash": ""
   },
   "docs-vault/Modules/Metadata and Settings Stores.md": {
-    "mtime": 1791955218.659659,
-    "seen": 1791955531.9552763,
-    "ast_hash": "ff14576f5dd827cb4a82581d6e8fe655",
+    "mtime": 1791969710.5631187,
+    "seen": 1791989997.0287738,
+    "ast_hash": "e1f4837c14533021564037f33ecd29a2",
     "semantic_hash": ""
   },
   "docs-vault/Modules/Server Bootstrap and Config.md": {
-    "mtime": 1791955155.2736945,
-    "seen": 1791955531.9552782,
+    "mtime": 1791969710.5641172,
+    "seen": 1791989997.028776,
     "ast_hash": "c991bbb62e0093fe4e1daf5b25ecbc4b",
     "semantic_hash": ""
   },
   "docs-vault/Modules/Storage Services.md": {
-    "mtime": 1791955332.2756476,
-    "seen": 1791955531.9552796,
-    "ast_hash": "67ef18d260636d49b143ecc5bf3df5ba",
+    "mtime": 1791969710.566129,
+    "seen": 1791989997.0287774,
+    "ast_hash": "ac1ec58f3c72b784744e0cc0cbcd89c6",
     "semantic_hash": ""
   },
   "docs-vault/Onboarding/Debugging Guide.md": {
-    "mtime": 1791955184.592617,
-    "seen": 1791955531.955282,
-    "ast_hash": "c41517a88fad224d6d34e43d70a4d22f",
+    "mtime": 1791969710.568127,
+    "seen": 1791989997.0287795,
+    "ast_hash": "efe4c7e2688a7d84b1180017d3924999",
     "semantic_hash": ""
   },
   "docs-vault/Onboarding/First Contribution.md": {
-    "mtime": 1791955184.190517,
-    "seen": 1791955531.9552836,
-    "ast_hash": "ad72619bf4b2344a0ffc548223157f0a",
+    "mtime": 1791969710.5691214,
+    "seen": 1791989997.028781,
+    "ast_hash": "c3cdf1b55e1d2181d0603c24cb9f76ab",
     "semantic_hash": ""
   },
   "docs-vault/Onboarding/Getting Started.md": {
-    "mtime": 1791955183.9969003,
-    "seen": 1791955531.955286,
-    "ast_hash": "341cf363440f79bd02f3774a0b17fe6f",
+    "mtime": 1791969710.570122,
+    "seen": 1791989997.028783,
+    "ast_hash": "3010350d7af89edfdd87bbcbb2897804",
     "semantic_hash": ""
   },
   "docs-vault/Patterns/Atomic Replace Writes.md": {
-    "mtime": 1791955243.368816,
-    "seen": 1791955531.9552882,
-    "ast_hash": "1e127b88517370a2bcc28f043087078a",
+    "mtime": 1791969710.5721233,
+    "seen": 1791989997.028785,
+    "ast_hash": "334ba01bde4be852537d708acf47e721",
     "semantic_hash": ""
   },
   "docs-vault/Patterns/Bounded Work Budgets.md": {
-    "mtime": 1791955243.5084474,
-    "seen": 1791955531.95529,
-    "ast_hash": "452771d5bbcc1cd138959bd8e1d6a6d4",
+    "mtime": 1791969710.5731215,
+    "seen": 1791989997.0287864,
+    "ast_hash": "02d0c4724329c9a445d0156f538dc37d",
     "semantic_hash": ""
   },
   "docs-vault/Patterns/Explicit Unavailability.md": {
-    "mtime": 1791955243.2110891,
-    "seen": 1791955531.955292,
-    "ast_hash": "66db8558d282412691e02c1858fe67ee",
+    "mtime": 1791969710.574127,
+    "seen": 1791989997.0287883,
+    "ast_hash": "bb96fe72b58e61e441b9ec7ef70f3a89",
     "semantic_hash": ""
   },
   "docs-vault/Patterns/Re-entrant Page Lifecycle.md": {
-    "mtime": 1791955243.6054685,
-    "seen": 1791955531.9552937,
-    "ast_hash": "0de24b4b729f78eaa18f108c109baed0",
+    "mtime": 1791969710.5761232,
+    "seen": 1791989997.0287902,
+    "ast_hash": "7362d840b3690dc3db4135d664f551bc",
     "semantic_hash": ""
   },
   "docs-vault/Patterns/Singleton Services.md": {
-    "mtime": 1791955242.9598854,
-    "seen": 1791955531.9552956,
-    "ast_hash": "da4aec362641cf4ee04134ad3b0a5880",
+    "mtime": 1791969710.57712,
+    "seen": 1791989997.0287921,
+    "ast_hash": "98c6fa0065de89207444532dda033618",
     "semantic_hash": ""
   },
   "docs-vault/_state/modules/auth-and-access-control.md": {
-    "mtime": 1791954678.66375,
-    "seen": 1791955531.9552977,
-    "ast_hash": "a55f7ab69ae6ab4e78ad83701fa734c1",
+    "mtime": 1791969710.5801208,
+    "seen": 1791989997.028794,
+    "ast_hash": "c293249dafc5a932a39375245c0977f3",
     "semantic_hash": ""
   },
   "docs-vault/_state/modules/deployment-scripts.md": {
-    "mtime": 1791954734.7216623,
-    "seen": 1791955531.9552994,
-    "ast_hash": "5347d0c199c815af181a4366df2f385f",
+    "mtime": 1791969710.5821207,
+    "seen": 1791989997.028796,
+    "ast_hash": "1cec8d7ed41787c11c85b1a65edb47eb",
     "semantic_hash": ""
   },
   "docs-vault/_state/modules/feature-pages.md": {
-    "mtime": 1791954667.2682638,
-    "seen": 1791955531.9553015,
-    "ast_hash": "5a235d677e01f852aca9d3fb3303abfb",
+    "mtime": 1791969710.5831172,
+    "seen": 1791989997.0287979,
+    "ast_hash": "8cee599f670e873780fe855329129c98",
     "semantic_hash": ""
   },
   "docs-vault/_state/modules/files-page.md": {
-    "mtime": 1791954676.7450545,
-    "seen": 1791955531.9553037,
-    "ast_hash": "d87227a64c3b7a663e0a38dcc9c8413b",
+    "mtime": 1791969710.5841217,
+    "seen": 1791989997.0287995,
+    "ast_hash": "58b90d8c12fca83c5702dd997d21eb17",
     "semantic_hash": ""
   },
   "docs-vault/_state/modules/frontend-core.md": {
-    "mtime": 1791954717.1068773,
-    "seen": 1791955531.9553058,
-    "ast_hash": "722063ad6e9861757775492c41df706e",
+    "mtime": 1791969710.5851264,
+    "seen": 1791989997.0288012,
+    "ast_hash": "53e1f8abf5dc0590d78ffa66c93bd501",
     "semantic_hash": ""
   },
   "docs-vault/_state/modules/http-api-layer.md": {
-    "mtime": 1791954650.3078895,
-    "seen": 1791955531.9553084,
-    "ast_hash": "8d813c4f87c9210e3d66ea9e9fe2c03c",
+    "mtime": 1791969710.586124,
+    "seen": 1791989997.028803,
+    "ast_hash": "51b4e2a763a3179b21c99c73b55c75e9",
     "semantic_hash": ""
   },
   "docs-vault/_state/modules/metadata-and-settings-stores.md": {
-    "mtime": 1791954626.8040762,
-    "seen": 1791955531.955311,
-    "ast_hash": "9559dd7bb483a2af83b4358ebb1084e1",
+    "mtime": 1791969710.587121,
+    "seen": 1791989997.0288055,
+    "ast_hash": "60f8ab0232fb95b690fe58b4101922b0",
     "semantic_hash": ""
   },
   "docs-vault/_state/modules/server-bootstrap-and-config.md": {
-    "mtime": 1791954629.6120632,
-    "seen": 1791955531.9553144,
-    "ast_hash": "c8ad26999fee334e594cc1e7b5120269",
+    "mtime": 1791969710.5881236,
+    "seen": 1791989997.0288072,
+    "ast_hash": "d71adcad265ac7c53e0f532fb74fc644",
     "semantic_hash": ""
   },
   "docs-vault/_state/modules/storage-services.md": {
-    "mtime": 1791954719.0532515,
-    "seen": 1791955531.9553168,
-    "ast_hash": "92857b28c451920896afd274fd9baef6",
+    "mtime": 1791969710.5901248,
+    "seen": 1791989997.0288098,
+    "ast_hash": "d5d903110566396af31ad6d2439aa66e",
     "semantic_hash": ""
   },
   "docs-vault/_state/synthesis.md": {
-    "mtime": 1791954955.461617,
-    "seen": 1791955531.9553187,
-    "ast_hash": "dd7480fa2096003a5223f5f90fb9ca29",
+    "mtime": 1791969710.5911186,
+    "seen": 1791989997.0288115,
+    "ast_hash": "1cc4383093210aedb7224eda1332a9a4",
+    "semantic_hash": ""
+  },
+  "docs-vault/Architecture/API Reference.md": {
+    "mtime": 1791969710.5421202,
+    "seen": 1791989997.028738,
+    "ast_hash": "9b19361da1b75ebd8fcfa0c87eb60f70",
+    "semantic_hash": ""
+  },
+  "docs-vault/Architecture/Database.md": {
+    "mtime": 1791969710.5431201,
+    "seen": 1791989997.0287402,
+    "ast_hash": "b5f356dba7f719bddd5724aba14b3669",
+    "semantic_hash": ""
+  },
+  "docs/DATABASE.md": {
+    "mtime": 1791969710.5941179,
+    "seen": 1791989997.0288148,
+    "ast_hash": "92ea24383d50b71fa7041e475b060a91",
     "semantic_hash": ""
   }
 }
