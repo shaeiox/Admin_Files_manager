@@ -1,0 +1,20 @@
+filters:
+  and:
+    - 'generated-by == "code-to-docs"'
+
+views:
+  - type: table
+    name: "All Documentation"
+    order:
+      - file.name
+      - title
+      - type
+      - language
+      - complexity
+      - status
+      - canonical-source
+      - dependencies
+      - related-notes
+    groupBy:
+      property: type
+      direction: ASC

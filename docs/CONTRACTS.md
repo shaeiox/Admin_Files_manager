@@ -30,9 +30,15 @@
   | `GET /api/fs/thumbnail/capability` | read | `{ available, formats, maxSize }` — bare object |
   | `GET /api/settings` | read | the settings document — **bare object**, no `success` field |
   | `PUT /api/settings` | write | `{ success, settings }` |
+  | `GET /api/auth/me` | read | `{ id, username, role, status, csrfToken }` — bare object |
+  | `POST /api/auth/login` · `logout` | write | `{ success, user, csrfToken }` · `{ success }` |
+  | `GET /api/admin/users` · `files/policies` · `files/permissions` | read | bare array |
+  | `GET /api/admin/files/policy` | read | bare object, or `null` |
+  | `POST`/`PUT`/`DELETE /api/admin/...` | write | `{ success, user \| policy \| permission }` or `{ success }` |
 
   (Verified against every `res.json` call in `fs.controller.js`, `preview.controller.js`,
-  `dashboard.controller.js` and `settings.controller.js`. `GET /api/fs/download`,
+  `dashboard.controller.js`, `settings.controller.js`, `auth.controller.js`, `users.controller.js`
+  and `filePolicy.controller.js`. `GET /api/fs/download`,
   `POST /api/fs/download-zip` and a successful `GET /api/fs/thumbnail` are streams/bytes and return
   no JSON body.)
 - **Error:** any status with `{ "success": false, "error": "human-readable message" }`. Never a
@@ -43,8 +49,8 @@
   unreadable volume or an unreadable subtree removes only its own contribution instead of failing
   the response. This is the **one genuine departure** from the project's all-or-nothing error
   model: every other endpoint either succeeds wholly or fails wholly with a non-2xx status. The
-  **metadata** capability is the exception and still fails wholly with `500`. See *Failure
-  semantics* below.
+  **metadata** capability also degrades — to empty `activities` / `topFiles` — but carries **no
+  availability flag** yet. See *Failure semantics* below.
 - **Client paths** are POSIX-style strings rooted at `/` relative to `STORAGE_ROOT`
   (e.g. `/media/videos/clip.mp4`). The server rejects anything that escapes the root (`403`).
 - **Timestamps:** file `modified` is a **millisecond epoch number**; activity `time` is ms epoch.
@@ -55,7 +61,7 @@
 
 - **The API is authenticated.** Every endpoint below, except `GET /health` and `POST /auth/login`,
   requires a session (`afm_session` cookie or `Authorization: Bearer`). This closes ADR-003 §9's
-  Critical, scoped to single-tenant authentication — see "Auth endpoints (ADR-009)" above.
+  Critical, scoped to single-tenant authentication — see "Auth endpoints (ADR-009)" below.
 - **CSRF defence is in place.** Every non-GET request requires a session-bound `X-CSRF-Token`
   header, checked before any mutation. **Still open:** a full permission catalogue, per-file access
   policies enforced against a real download, and the Files-portal integration decision are explicit
@@ -97,7 +103,7 @@
 
 - **`/api/v1` is the contract.** Every endpoint in the table below answers under `/api/v1/<resource>`
   with the same status, the same guards and a byte-identical body as under `/api/<resource>`.
-  Resources: `health`, `fs`, `dashboard`, `settings`.
+  Resources: `health`, `auth`, `fs`, `dashboard`, `settings`, `admin`.
 - **`/api` is a compatibility alias, not a second contract.** It is served by the **same router
   instances** (one assembly, `src/routes/api.js`), so the two prefixes cannot drift and a fix lands on
   both. It is retained for existing callers and open tabs. Its removal is **not scheduled**: it needs
@@ -134,30 +140,57 @@
 
 ## Endpoints
 
-| Method | Path | Status | Notes |
-|---|---|---|---|
-| GET | `/api/health` | ✅ live | Liveness check — additive `apiVersion` (ADR-007); `env` removed (`api-security-hardening`) |
-| GET | `/api/dashboard/summary` | ✅ live | Read-only aggregate; bare object, `200` with per-capability degradation |
-| GET | `/api/dashboard/health` | ✅ live | Read-only aggregate; bare array of runtime metric objects |
-| GET | `/api/settings` | ✅ live | Read-only aggregate; **bare** settings document, no envelope |
-| PUT | `/api/settings` | ✅ live | Strict validated **full replace**; `400` on any unknown key or bad value |
-| GET | `/api/fs/tree` | ✅ live | Sidebar tree, exactly 2 levels below the root |
-| GET | `/api/fs/list` | ✅ live | Directory listing, filter/sort/paginate, `starredOnly` |
-| GET | `/api/fs/download` | ✅ live | Stream single file attachment |
-| GET | `/api/fs/thumbnail/capability` | ✅ live | Whether previews can be produced (bare object) |
-| GET | `/api/fs/thumbnail` | ✅ live | Bounded image preview, or an explicit unavailable marker |
-| POST | `/api/fs/folder` | ✅ live | Create directory |
-| POST | `/api/fs/upload` | ✅ live | Multipart upload — **field order matters**, see below |
-| POST | `/api/fs/star` | ✅ live | Toggle or set the starred flag |
-| POST | `/api/fs/download-zip` | ✅ live | Streams a ZIP of up to 500 paths |
-| PUT | `/api/fs/rename` | ✅ live | Same-directory rename |
-| DELETE | `/api/fs/delete` | ✅ live | Bulk delete (≤500 paths); a `200` can be a partial failure |
+Every path is served identically under `/api/v1` (the contract) and `/api` (the alias). **Access**
+column: *public* = no session; *session* = `afm_session` cookie or `Authorization: Bearer`, plus
+`X-CSRF-Token` on every non-GET; *admin* = session whose user has `role = "admin"`.
+
+**Middleware order for every `/api` request** (`server.js`, then `src/routes/api.js`):
+general rate limiter (`/api` only) → `express.json` / `urlencoded` → `morgan` → version-segment
+guard → `GET /health` → `/auth` router (self-gated) → `authenticate` → `csrf` → resource routers
+(`/fs`, `/dashboard`, `/settings`, `/admin` + `requireAdmin`) → `/api` 404 catch-all →
+`errorHandler`.
+
+| Method | Path | Access | Status | Notes |
+|---|---|---|---|---|
+| GET | `/api/health` | public | ✅ live | Liveness check — additive `apiVersion` (ADR-007); `env` removed (`api-security-hardening`) |
+| POST | `/api/auth/login` | public | ✅ live | Issues a session cookie + CSRF token; own per-IP throttle |
+| POST | `/api/auth/logout` | session | ✅ live | Revokes the calling session |
+| GET | `/api/auth/me` | session | ✅ live | Current user + the session's CSRF token |
+| GET | `/api/dashboard/summary` | session | ✅ live | Read-only aggregate; bare object, `200` with per-capability degradation |
+| GET | `/api/dashboard/health` | session | ✅ live | Read-only aggregate; bare array of runtime metric objects |
+| GET | `/api/settings` | session | ✅ live | Read-only aggregate; **bare** settings document, no envelope |
+| PUT | `/api/settings` | session | ✅ live | Strict validated **full replace**; `400` on any unknown key or bad value |
+| GET | `/api/fs/tree` | session | ✅ live | Sidebar tree, exactly 2 levels below the root |
+| GET | `/api/fs/list` | session | ✅ live | Directory listing, filter/sort/paginate, `starredOnly` |
+| GET | `/api/fs/download` | session | ✅ live | Stream single file attachment |
+| GET | `/api/fs/thumbnail/capability` | session | ✅ live | Whether previews can be produced (bare object) |
+| GET | `/api/fs/thumbnail` | session | ✅ live | Bounded image preview, or an explicit unavailable marker |
+| POST | `/api/fs/folder` | session | ✅ live | Create directory |
+| POST | `/api/fs/upload` | session | ✅ live | Multipart upload — **field order matters**, see below |
+| POST | `/api/fs/star` | session | ✅ live | Toggle or set the starred flag |
+| POST | `/api/fs/download-zip` | session | ✅ live | Streams a ZIP of up to 500 paths; CSRF token may be a form field |
+| PUT | `/api/fs/rename` | session | ✅ live | Same-directory rename |
+| PUT | `/api/fs/move` | session | ✅ live | Bulk move into a folder; a `200` can be a partial failure |
+| POST | `/api/fs/copy` | session | ✅ live | Bulk copy into a folder; a `200` can be a partial failure |
+| DELETE | `/api/fs/delete` | session | ✅ live | Bulk delete (≤500 paths); a `200` can be a partial failure |
+| GET | `/api/admin/users` | admin | ✅ live | List accounts |
+| POST | `/api/admin/users` | admin | ✅ live | Create an account (`201`) |
+| POST | `/api/admin/users/:id/status` | admin | ✅ live | Enable / disable; disabling revokes sessions |
+| POST | `/api/admin/users/:id/reset-password` | admin | ✅ live | Set a new password; revokes sessions |
+| POST | `/api/admin/users/:id/revoke-sessions` | admin | ✅ live | Sign the user out everywhere |
+| DELETE | `/api/admin/users/:id` | admin | ✅ live | Delete an account |
+| GET | `/api/admin/files/policies` | admin | ✅ live | Every path with a policy |
+| GET | `/api/admin/files/policy` | admin | ✅ live | One path's policy, or `null` |
+| PUT | `/api/admin/files/policy` | admin | ✅ live | Create or update a policy (stored, **not enforced**) |
+| DELETE | `/api/admin/files/policy` | admin | ✅ live | Remove a policy and its permissions |
+| GET | `/api/admin/files/permissions` | admin | ✅ live | Per-user grants/denies on one path |
+| POST | `/api/admin/files/permissions` | admin | ✅ live | Grant or deny one user (`201`) |
+| DELETE | `/api/admin/files/permissions` | admin | ✅ live | Remove one user's grant/deny |
 
 ### GET /api/health
 
-Liveness + environment probe. **Unchanged by the dashboard work**, and it keeps the envelope because
-it is not an aggregate. Returns the `env` string that the sidebar identity block renders; it is
-**not** a source of runtime metrics. ADR-007 added one field, additively: `apiVersion` — the contract
+Liveness probe; **public** (no session). It keeps the envelope because it is not an aggregate, and
+it is **not** a source of runtime metrics. ADR-007 added one field, additively: `apiVersion` — the contract
 version the responding assembly serves (`1` on both `/api/v1/health` and the `/api/health` alias).
 The handler lives in `src/routes/api.js`, not `server.js`.
 
@@ -180,16 +213,40 @@ resolve to the same session. Every non-GET request — including `/auth/logout` 
 `X-CSRF-Token` header matching the session's issued token, or it is refused with `403` before any
 state changes.
 
+Sessions and accounts are stored in `admin.sqlite` — schema, lifecycle and retention in
+`docs/DATABASE.md`. The token is 32 random bytes (hex); only its SHA-256 is persisted. Sessions last
+a flat **24 hours** from login (no sliding renewal) and end early on logout, account disable,
+password reset, admin revoke or account delete. A session whose user is no longer `active` stops
+validating immediately.
+
 #### POST /api/auth/login → `200` (mutating envelope)
+
+Request (JSON or `application/x-www-form-urlencoded`):
+
+```json
+{ "username": "admin", "password": "..." }
+```
+
+Response:
+
+```http
+Set-Cookie: afm_session=<token>; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400[; Secure]
+```
 
 ```json
 { "success": true, "user": { "id": 1, "username": "admin", "role": "admin" }, "csrfToken": "..." }
 ```
 
-A wrong password and a nonexistent username return the **identical** `401` response — the shape
-never discloses which one occurred. Throttled per-IP (`AFM_LOGIN_RATE_LIMIT_PER_MINUTE`, default
-10/minute) independently of the general `/api` rate limiter. After 10 consecutive failures for one
-account, that account is locked for 15 minutes even against its correct password.
+- `Secure` is added only when `NODE_ENV=production`. The raw token is **only** in the cookie — the
+  body carries no token, so a Bearer client must read the cookie value.
+- Username matching is case-insensitive and trimmed.
+- `401 { "error": "Invalid username or password." }` for every failure: unknown user, wrong
+  password, disabled account, locked account. The shape never discloses which one occurred.
+- No CSRF token is required (there is no session yet).
+- Throttled per-IP by its own limiter (`AFM_LOGIN_RATE_LIMIT_PER_MINUTE`, default 10/minute,
+  `0` disables) **in addition to** the general `/api` write limiter → `429` with `Retry-After`.
+- After 10 consecutive wrong passwords for one account, it is locked for 15 minutes even against
+  its correct password.
 
 #### POST /api/auth/logout → `200` (mutating envelope)
 
@@ -197,14 +254,35 @@ account, that account is locked for 15 minutes even against its correct password
 { "success": true }
 ```
 
-Requires a session and its CSRF token. Revokes exactly the calling session; other sessions for the
-same user are unaffected (bulk revoke is an admin-panel capability, not part of this endpoint).
+Requires a session and its CSRF token. Revokes exactly the calling session and clears the cookie
+(`Max-Age=0`); other sessions for the same user are unaffected (bulk revoke is an admin-panel
+capability, not part of this endpoint). `401` without a session, `403` without the CSRF token.
 
 #### GET /api/auth/me → `200` (bare object — read-only aggregate precedent)
 
 ```json
-{ "id": 1, "username": "admin", "role": "admin", "status": "active" }
+{ "id": 1, "username": "admin", "role": "admin", "status": "active", "csrfToken": "..." }
 ```
+
+`csrfToken` is the calling session's existing secret, re-issued so a reloaded page (which lost
+`api.js`'s in-memory copy) can keep making mutations without logging in again. It is not rotated.
+`401` without a valid session — this is how the SPA detects it must send the user to `/login.html`.
+
+#### Using the API from a script
+
+```bash
+# 1. log in, keep the cookie, capture the CSRF token
+curl -s -c jar -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"..."}' http://localhost:3000/api/v1/auth/login
+# 2. reads need only the session
+curl -s -b jar 'http://localhost:3000/api/v1/fs/list?path=/'
+# 3. every non-GET also needs the token from step 1
+curl -s -b jar -X POST -H 'Content-Type: application/json' -H 'X-CSRF-Token: <csrfToken>' \
+  -d '{"path":"/reports"}' http://localhost:3000/api/v1/fs/folder
+```
+
+`Authorization: Bearer <cookie value>` may replace `-b jar`; the CSRF header is still required on
+mutations.
 
 No `password_hash` or throttle bookkeeping ever leaves `UserService`/`SessionService` — every shape
 returned to a client is stripped of those fields at the service boundary, not the controller.
@@ -214,7 +292,8 @@ returned to a client is stripped of those fields at the service boundary, not th
 Read-only aggregate over the managed tree, its volume, and the metadata store. **Bare object**, no
 envelope (see *Conventions → Success shape*). **Every figure is instantaneous** — see *No history is
 retained* below. Filesystem and volume sources degrade to a `200` with reduced content; a corrupt
-metadata store fails the whole request with `500` (see *Failure semantics*).
+or unreadable metadata store degrades `activities` and `topFiles` to `[]`, also with a `200` and
+with no flag distinguishing "unavailable" from "empty" (see *Failure semantics*).
 
 Top-level keys, all always present and **none ever `null`**: `stats`, `storage`,
 `storageBreakdown`, `activities`, `topFiles`, `health`. The five arrays are **always arrays**, never
@@ -347,8 +426,10 @@ reading for `treeBytes` or `stats[].value`: an empty tree reports 0 files, 0 fol
 This is the **one genuine departure** in the API, and it is recorded separately from the
 response-shape rule because it concerns *failure* semantics, not *shape*: every other endpoint
 either succeeds wholly or fails wholly with a non-2xx status through `AppError` → `errorHandler`.
-Degradation applies to the **filesystem and volume** capabilities only — metadata still fails
-wholly. See ADR-002.
+Degradation applies to the **filesystem and volume** capabilities, which report it through
+`volumeAvailable` / skipped subtrees, and to **metadata**, which `getSummary` catches and serves as
+empty arrays **without** an availability flag — a known gap against the "unknown is not zero" rule.
+See ADR-002, *Amendment*.
 
 ### No history is retained — every Dashboard figure is instantaneous
 
@@ -780,11 +861,11 @@ through to the `/api` catch-all:
 { "success": false, "error": "API endpoint not found" }   // 404
 ```
 
-**Mount order (load-bearing).** `app.use('/api/settings', settingsRoutes)` sits in `server.js`
-**after** `/api/dashboard` and **before** the `/api` 404 catch-all — that catch-all is a
-two-argument middleware which never calls `next()`, so a mount placed after it is permanently
-unreachable and `GET /api/settings` would answer `404` even though the router exists. Pinned by
-`test/api/settings.contract.test.js`.
+**Mount order (load-bearing).** The settings router is mounted at `/settings` inside the single
+assembly `src/routes/api.js`, which `server.js` mounts once **before** the `/api` 404 catch-all —
+that catch-all is a two-argument middleware which never calls `next()`, so a mount placed after it
+is permanently unreachable and `GET /api/settings` would answer `404` even though the router
+exists. Pinned by `test/api/settings.contract.test.js`.
 
 ## Admin endpoints (ADR-009 phase 2)
 
@@ -800,18 +881,58 @@ download. `GET /api/fs/list`, `GET /api/fs/download`, etc. are unmodified by thi
 answer exactly as they did before — any authenticated session can still read any file regardless
 of what's set here. This section manages the data model and the admin UI over it only (design D5).
 
+Data model, constraints and lifecycle: `docs/DATABASE.md`. Every mutating admin call — success
+**and** failure — writes one `audit_logs` row (action names in `docs/DATABASE.md` → *Action
+vocabulary*). There is no endpoint that reads the audit log yet.
+
+Common errors on every route below: `401` no/expired session, `403 "Administrator access
+required."` for a non-admin session, `403 "Missing or invalid CSRF token."` on a non-GET without the
+token, `429` from the general limiter.
+
 ### User management
+
+**User object** (every response that returns a user; `password_hash`, `failed_login_count` and
+`locked_until` are stripped by `UserService._publicShape`, never by the controller):
+
+```json
+{ "id": 2, "username": "alice", "email": "alice@example.com", "role": "user", "status": "active",
+  "created_at": 1760400000000, "updated_at": 1760400000000 }
+```
+
+`:id` is parsed with `Number()`; a non-numeric id finds no row and answers `404 "User not found."`.
 
 | Endpoint | Envelope | Notes |
 |---|---|---|
-| `GET /api/admin/users` | bare array | Each row excludes `password_hash`/`failed_login_count`/`locked_until` — stripped at the service boundary, never the controller. |
-| `POST /api/admin/users` → `201` | `{success, user}` | Body: `{username, password, role?}`. `role` defaults to `"user"`; `409` on a duplicate username (case-insensitive); `400` on a password under 8 characters. |
-| `POST /api/admin/users/:id/status` | `{success, user}` | Body: `{status: "active"\|"disabled"}`. Disabling revokes every active session for that user immediately (`SessionService.revokeAllForUser`). |
-| `POST /api/admin/users/:id/reset-password` | `{success, user}` | Body: `{password}`. Also revokes every active session for that user — a reset password must not leave an old session usable. |
-| `POST /api/admin/users/:id/revoke-sessions` | `{success: true}` | Ends every active session for that user without touching `status`. |
-| `DELETE /api/admin/users/:id` | `{success: true}` | Also revokes sessions (belt-and-suspenders; the user row and its sessions are gone either way via `ON DELETE CASCADE`). |
+| `GET /api/admin/users` | bare array | User objects ordered by `created_at` ascending. |
+| `POST /api/admin/users` → `201` | `{success, user}` | Body: `{username, password, email?, role?}`. `username` trimmed, required (`400`); `password` ≥ 8 characters (`400`); `role` `"admin"`\|`"user"`, default `"user"` (`400` otherwise); `409` on a duplicate username (case-insensitive). `email` is optional and blank becomes `null`; a duplicate email violates the `UNIQUE` constraint and surfaces as a masked `500` (no pre-check). |
+| `POST /api/admin/users/:id/status` | `{success, user}` | Body: `{status: "active"\|"disabled"}` (`400` otherwise, `404` unknown id). Disabling revokes every active session for that user immediately (`SessionService.revokeAllForUser`). |
+| `POST /api/admin/users/:id/reset-password` | `{success, user}` | Body: `{password}` (≥ 8, `400`). Also revokes every active session for that user — a reset password must not leave an old session usable. Does **not** clear an active lockout. |
+| `POST /api/admin/users/:id/revoke-sessions` | `{success: true}` | Ends every active session for that user without touching `status`. Succeeds (no-op) for an unknown id. |
+| `DELETE /api/admin/users/:id` | `{success: true}` | `404` unknown id. Its own sessions and permission rows go via `ON DELETE CASCADE`. **Known defect:** a user referenced by `audit_logs.actor_id` or by a policy's `created_by`/`updated_by`/`granted_by` cannot be deleted — the foreign key has no `ON DELETE` action, so the request fails with a masked `500` (see `docs/DATABASE.md`). |
+
+> [!WARNING]
+> There is no last-admin guard: an admin can disable or delete themselves, or the last active
+> admin, and lock everyone out of this router.
 
 ### File access policies
+
+**Policy object** (`GET …/policy`, `GET …/policies` rows, `PUT …/policy` response): the joined
+`files` + `file_access_policies` row, snake_case, booleans as `0`/`1`, times in epoch ms:
+
+```json
+{ "file_id": 3, "client_path": "/reports/q3.pdf", "is_directory": 0,
+  "policy_id": 3, "access_mode": "restricted", "is_published": 0, "is_locked": 1,
+  "available_from": null, "available_until": 1767225600000,
+  "created_by": 1, "updated_by": 1, "created_at": 1760400000000, "updated_at": 1760400000000 }
+```
+
+**Permission object:** `{ "id", "file_id", "user_id", "permission": "grant"|"deny", "granted_by", "created_at" }`.
+
+Validation (`FileAccessPolicyService`): `path` must pass `validateClientPath` (`400`);
+`accessMode` ∈ `public`/`authenticated`/`restricted`; `availableFrom`/`availableUntil` are
+safe-integer epoch ms or `null`, and `from ≤ until`; `permission` ∈ `grant`/`deny` — all `400`
+otherwise. The path is **not** checked against the disk: a policy can be set on a path that does
+not exist. Request field names are camelCase; response fields are the snake_case column names.
 
 | Endpoint | Envelope | Notes |
 |---|---|---|
@@ -833,13 +954,16 @@ never depends on it.
 
 | Status | Meaning | Typical triggers |
 |---|---|---|
-| `400` | Invalid input | Bad name/path, no file, non-directory for readDir/download, empty batch, **any invalid `PUT /api/settings` payload (unknown key, missing key, wrong type, out-of-enum, over-long, bad client path)** |
-| `403` | Forbidden | Path traversal attempt; storage-root deletion; OS permission denial (`EACCES`/`EPERM`) |
+| `400` | Invalid input | Bad name/path, no file, non-directory for readDir/download, empty batch, **any invalid `PUT /api/settings` payload (unknown key, missing key, wrong type, out-of-enum, over-long, bad client path)**, invalid admin user/policy field |
+| `401` | Unauthenticated | No, expired or revoked session (`"Authentication required."`); failed login (`"Invalid username or password."`) |
+| `403` | Forbidden | Path traversal attempt; storage-root deletion; OS permission denial (`EACCES`/`EPERM`); missing/wrong `X-CSRF-Token` on a non-GET; non-admin session on `/admin/*` |
 | `404` | Not found | Missing item/parent, `ENOENT` |
 | `409` | Conflict | Create/rename/upload collides with an existing item |
 | `413` | Too large | Upload over `UPLOAD_MAX_BYTES`; preview source over 50 MiB |
 | `415` | Unsupported | Preview requested for a non-image or a folder |
 | `422` | Unprocessable | Preview could not be decoded |
+| `429` | Too many requests | General `/api` limiter (60 writes / 600 reads per minute per IP, `AFM_RATE_LIMIT_*_PER_MINUTE`), login throttle, or too many concurrent uploads (`AFM_UPLOAD_MAX_CONCURRENT`). Rate-limit refusals carry `Retry-After` (seconds) |
+| `507` | Insufficient storage | Upload refused because free space is below `AFM_UPLOAD_FREE_SPACE_BYTES`, before any byte is staged |
 | `500` | Server error | Unmapped fs error. Message masked to a generic string. Also raised explicitly by a **corrupt or uninitializable `data/settings.json`** (`SettingsService` → static authored message) |
 
 All errors are produced by throwing `AppError(message, statusCode)` and are serialized centrally by
@@ -881,6 +1005,10 @@ per-capability degradation, so a partial failure is expressed in the payload
 
 ## Data Schemas
 
+The JSON document shapes below are API-adjacent contracts. The SQLite admin database
+(`admin.sqlite`: users, sessions, audit log, file-access policies), the store mechanics and
+operational notes for all three stores are in **`docs/DATABASE.md`**.
+
 ### `data/metadata.json` (MetadataService)
 
 ```json
@@ -912,8 +1040,9 @@ per-capability degradation, so a partial failure is expressed in the payload
 - **Client values only.** `defaultUploadFolder` is a client path, validated by `validateClientPath` +
   per-segment `validateFileName`; the settings layer never resolves it to a host path and no absolute
   OS path is ever written or returned.
-- **No credential, token or key may ever live here** (ADR-006): the file is unauthenticated over HTTP
-  and world-readable on disk, same exposure class as `data/metadata.json`.
+- **No credential, token or key may ever live here** (ADR-006): any session can read it over HTTP
+  (there is no per-key authorization) and it is plain JSON on disk, same exposure class as
+  `data/metadata.json`. Secrets belong in the environment file; identity data in `admin.sqlite`.
 - A corrupt/unparseable file is **not** repaired or defaulted: `_read` throws `AppError(500)` and the
   request fails wholly (ADR-006).
 - Git-ignored by the existing `data/*.json` rule.

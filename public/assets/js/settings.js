@@ -6,7 +6,7 @@
    the application actually reads:
 
      general.workspaceName       → the sidebar brand (app.js)
-     general.defaultUploadFolder → the Uploads page destination
+     general.defaultUploadFolder → validated and stored; no page reads it yet
      appearance.defaultView      → a fresh visit to All Files
 
    The theme stays browser-local in theme.js and is applied

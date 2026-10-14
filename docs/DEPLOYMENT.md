@@ -258,7 +258,7 @@ request-path behaviour and belongs in its own change.
 
 As of 2026-10-04, everything below was verified on **Windows 10, Node 24.15.0** only:
 
-- the suite (772 pass)
+- the suite (1051 pass)
 - the startup validation and graceful-shutdown assertion runs
 - packaging
 - `deploy.sh`'s pre-activation failures, and its lockfile install plus suite gate inside a release

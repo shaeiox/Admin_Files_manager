@@ -276,6 +276,20 @@ Options weighed for the dashboard's data source:
   inconsistent with decision 5 for every other capability. Either catch per-source or state the
   asymmetry as permanent.
 
+## Amendment (2026-10-14) — documentation drift corrected
+
+Decision 5's "scope limit" paragraph does not describe the code. Since the dashboard was built
+(`13d4058`), `getSummary` has wrapped the two `MetadataService` reads in their own `try/catch` and
+serves `activities` / `topFiles` as `[]` on failure; only the tree and volume reads share the bare
+`Promise.all`. So the follow-up "decide whether the metadata capability should degrade" was in effect
+answered *catch per-source* — but without the typed absence decisions 5 and 12 require: there is no
+`activitiesAvailable`-style flag, and the error is not logged, so an unreadable store renders as
+"no activity". That missing flag is an **open decision**, not settled here; until it is made the
+dashboard under-reports rather than fails.
+
+Two other follow-ups are also resolved in code: `POST /api/fs/download-zip` is routed
+(`fs.routes.js`), and the corrupted `MetadataService` comment no longer exists.
+
 ## References
 
 - `src/controllers/dashboard.controller.js` — DTO shaping, colours, the bare payload, and the

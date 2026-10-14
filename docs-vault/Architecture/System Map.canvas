@@ -1,0 +1,239 @@
+{
+  "nodes": [
+    {
+      "id": "server-bootstrap-and-config",
+      "type": "file",
+      "file": "Modules/Server Bootstrap and Config.md",
+      "x": 600,
+      "y": 0,
+      "width": 250,
+      "height": 60
+    },
+    {
+      "id": "http-api-layer",
+      "type": "file",
+      "file": "Modules/HTTP API Layer.md",
+      "x": 900,
+      "y": 0,
+      "width": 250,
+      "height": 60
+    },
+    {
+      "id": "storage-services",
+      "type": "file",
+      "file": "Modules/Storage Services.md",
+      "x": 1500,
+      "y": 0,
+      "width": 250,
+      "height": 60
+    },
+    {
+      "id": "metadata-and-settings-stores",
+      "type": "file",
+      "file": "Modules/Metadata and Settings Stores.md",
+      "x": 1200,
+      "y": 150,
+      "width": 250,
+      "height": 60
+    },
+    {
+      "id": "auth-and-access-control",
+      "type": "file",
+      "file": "Modules/Auth and Access Control.md",
+      "x": 1200,
+      "y": 0,
+      "width": 250,
+      "height": 60
+    },
+    {
+      "id": "frontend-core",
+      "type": "file",
+      "file": "Modules/Frontend Core.md",
+      "x": 300,
+      "y": 0,
+      "width": 250,
+      "height": 60
+    },
+    {
+      "id": "files-page",
+      "type": "file",
+      "file": "Modules/Files Page.md",
+      "x": 0,
+      "y": 300,
+      "width": 250,
+      "height": 60
+    },
+    {
+      "id": "feature-pages",
+      "type": "file",
+      "file": "Modules/Feature Pages.md",
+      "x": 0,
+      "y": 150,
+      "width": 250,
+      "height": 60
+    },
+    {
+      "id": "deployment-scripts",
+      "type": "file",
+      "file": "Modules/Deployment Scripts.md",
+      "x": 0,
+      "y": 0,
+      "width": 250,
+      "height": 60
+    }
+  ],
+  "edges": [
+    {
+      "id": "server-bootstrap-and-config--http-api-layer",
+      "fromNode": "server-bootstrap-and-config",
+      "fromSide": "right",
+      "toNode": "http-api-layer",
+      "toSide": "left",
+      "label": "mounts"
+    },
+    {
+      "id": "server-bootstrap-and-config--auth-and-access-control",
+      "fromNode": "server-bootstrap-and-config",
+      "fromSide": "right",
+      "toNode": "auth-and-access-control",
+      "toSide": "left",
+      "label": "initialises"
+    },
+    {
+      "id": "http-api-layer--storage-services",
+      "fromNode": "http-api-layer",
+      "fromSide": "right",
+      "toNode": "storage-services",
+      "toSide": "left",
+      "label": "calls"
+    },
+    {
+      "id": "http-api-layer--metadata-and-settings-stores",
+      "fromNode": "http-api-layer",
+      "fromSide": "right",
+      "toNode": "metadata-and-settings-stores",
+      "toSide": "left",
+      "label": "reads/writes"
+    },
+    {
+      "id": "http-api-layer--auth-and-access-control",
+      "fromNode": "http-api-layer",
+      "fromSide": "right",
+      "toNode": "auth-and-access-control",
+      "toSide": "left",
+      "label": "authenticates via"
+    },
+    {
+      "id": "storage-services--server-bootstrap-and-config",
+      "fromNode": "storage-services",
+      "fromSide": "bottom",
+      "toNode": "server-bootstrap-and-config",
+      "toSide": "bottom",
+      "label": "reads config"
+    },
+    {
+      "id": "metadata-and-settings-stores--server-bootstrap-and-config",
+      "fromNode": "metadata-and-settings-stores",
+      "fromSide": "bottom",
+      "toNode": "server-bootstrap-and-config",
+      "toSide": "bottom",
+      "label": "reads config"
+    },
+    {
+      "id": "metadata-and-settings-stores--storage-services",
+      "fromNode": "metadata-and-settings-stores",
+      "fromSide": "right",
+      "toNode": "storage-services",
+      "toSide": "left",
+      "label": "uses"
+    },
+    {
+      "id": "auth-and-access-control--server-bootstrap-and-config",
+      "fromNode": "auth-and-access-control",
+      "fromSide": "bottom",
+      "toNode": "server-bootstrap-and-config",
+      "toSide": "bottom",
+      "label": "reads config"
+    },
+    {
+      "id": "auth-and-access-control--storage-services",
+      "fromNode": "auth-and-access-control",
+      "fromSide": "right",
+      "toNode": "storage-services",
+      "toSide": "left",
+      "label": "uses"
+    },
+    {
+      "id": "frontend-core--http-api-layer",
+      "fromNode": "frontend-core",
+      "fromSide": "right",
+      "toNode": "http-api-layer",
+      "toSide": "left",
+      "label": "calls"
+    },
+    {
+      "id": "files-page--frontend-core",
+      "fromNode": "files-page",
+      "fromSide": "right",
+      "toNode": "frontend-core",
+      "toSide": "left",
+      "label": "uses"
+    },
+    {
+      "id": "files-page--http-api-layer",
+      "fromNode": "files-page",
+      "fromSide": "right",
+      "toNode": "http-api-layer",
+      "toSide": "left",
+      "label": "calls"
+    },
+    {
+      "id": "files-page--auth-and-access-control",
+      "fromNode": "files-page",
+      "fromSide": "right",
+      "toNode": "auth-and-access-control",
+      "toSide": "left",
+      "label": "session/CSRF"
+    },
+    {
+      "id": "feature-pages--frontend-core",
+      "fromNode": "feature-pages",
+      "fromSide": "right",
+      "toNode": "frontend-core",
+      "toSide": "left",
+      "label": "uses"
+    },
+    {
+      "id": "feature-pages--http-api-layer",
+      "fromNode": "feature-pages",
+      "fromSide": "right",
+      "toNode": "http-api-layer",
+      "toSide": "left",
+      "label": "calls"
+    },
+    {
+      "id": "feature-pages--auth-and-access-control",
+      "fromNode": "feature-pages",
+      "fromSide": "right",
+      "toNode": "auth-and-access-control",
+      "toSide": "left",
+      "label": "session/CSRF"
+    },
+    {
+      "id": "deployment-scripts--server-bootstrap-and-config",
+      "fromNode": "deployment-scripts",
+      "fromSide": "right",
+      "toNode": "server-bootstrap-and-config",
+      "toSide": "left",
+      "label": "configures/boots"
+    },
+    {
+      "id": "deployment-scripts--http-api-layer",
+      "fromNode": "deployment-scripts",
+      "fromSide": "right",
+      "toNode": "http-api-layer",
+      "toSide": "left",
+      "label": "health-checks"
+    }
+  ]
+}

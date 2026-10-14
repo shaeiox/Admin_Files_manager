@@ -1,0 +1,1358 @@
+{
+  "schema_version": 2,
+  "project": "dimension-files-manager",
+  "modules": [
+    "Server Bootstrap and Config",
+    "HTTP API Layer",
+    "Storage Services",
+    "Metadata and Settings Stores",
+    "Auth and Access Control",
+    "Frontend Core",
+    "Files Page",
+    "Feature Pages",
+    "Deployment Scripts"
+  ],
+  "module_index": {
+    "Server Bootstrap and Config": {
+      "slug": "server-bootstrap-and-config",
+      "purpose": "Loads and validates environment configuration, assembles the Express app, boots the listener, and drains on shutdown.",
+      "roots": [
+        "server.js",
+        "src/config/"
+      ],
+      "entry_points": [
+        "server.js",
+        "src/config/env.js",
+        "src/config/dataDir.js"
+      ],
+      "language": "javascript",
+      "complexity": "medium",
+      "loc": 416,
+      "report": "_state/modules/server-bootstrap-and-config.md",
+      "doc": "Modules/Server Bootstrap and Config.md",
+      "analyzed_at": "2026-10-14T05:05:10Z",
+      "source_commit": "e2698aedbe42c3c2c0cc24c38e3ef2b45c1843ae"
+    },
+    "HTTP API Layer": {
+      "slug": "http-api-layer",
+      "purpose": "Express routers and controllers exposing the versioned filesystem, dashboard and settings REST API.",
+      "roots": [
+        "src/routes/",
+        "src/controllers/",
+        "src/middlewares/"
+      ],
+      "entry_points": [
+        "src/routes/api.js",
+        "src/routes/fs.routes.js",
+        "src/routes/dashboard.routes.js",
+        "src/routes/settings.routes.js",
+        "src/controllers/fs.controller.js",
+        "src/controllers/dashboard.controller.js",
+        "src/controllers/settings.controller.js",
+        "src/controllers/preview.controller.js",
+        "src/middlewares/errorHandler.js"
+      ],
+      "language": "javascript",
+      "complexity": "medium",
+      "loc": 1174,
+      "report": "_state/modules/http-api-layer.md",
+      "doc": "Modules/HTTP API Layer.md",
+      "analyzed_at": "2026-10-14T05:05:10Z",
+      "source_commit": "e2698aedbe42c3c2c0cc24c38e3ef2b45c1843ae"
+    },
+    "Storage Services": {
+      "slug": "storage-services",
+      "purpose": "Sandboxed filesystem access, path containment, uploads, previews, and shared validation/error utilities for the API.",
+      "roots": [
+        "src/services/",
+        "src/utils/"
+      ],
+      "entry_points": [
+        "src/services/FileSystemService.js",
+        "src/services/PathService.js",
+        "src/services/UploadService.js",
+        "src/services/PreviewService.js",
+        "src/utils/validators.js",
+        "src/utils/fileTypes.js",
+        "src/utils/concurrency.js",
+        "src/utils/AppError.js"
+      ],
+      "language": "javascript",
+      "complexity": "medium",
+      "loc": 1615,
+      "report": "_state/modules/storage-services.md",
+      "doc": "Modules/Storage Services.md",
+      "analyzed_at": "2026-10-14T05:05:10Z",
+      "source_commit": "e2698aedbe42c3c2c0cc24c38e3ef2b45c1843ae"
+    },
+    "Metadata and Settings Stores": {
+      "slug": "metadata-and-settings-stores",
+      "purpose": "JSON-file persistence for download counts, stars, activity log, and operator settings, with cached atomic writes.",
+      "roots": [
+        "src/services/"
+      ],
+      "entry_points": [
+        "src/services/MetadataService.js",
+        "src/services/SettingsService.js"
+      ],
+      "language": "javascript",
+      "complexity": "low",
+      "loc": 465,
+      "report": "_state/modules/metadata-and-settings-stores.md",
+      "doc": "Modules/Metadata and Settings Stores.md",
+      "analyzed_at": "2026-10-14T05:05:10Z",
+      "source_commit": "e2698aedbe42c3c2c0cc24c38e3ef2b45c1843ae"
+    },
+    "Auth and Access Control": {
+      "slug": "auth-and-access-control",
+      "purpose": "Session authentication, CSRF, rate limiting, admin user management, and file-access-policy data over SQLite.",
+      "roots": [
+        "src/db/",
+        "src/routes/",
+        "src/controllers/",
+        "src/middlewares/",
+        "src/services/",
+        "src/utils/"
+      ],
+      "entry_points": [
+        "src/routes/auth.routes.js",
+        "src/routes/admin.routes.js",
+        "src/controllers/auth.controller.js",
+        "src/controllers/users.controller.js",
+        "src/controllers/filePolicy.controller.js",
+        "src/middlewares/authenticate.js",
+        "src/middlewares/csrf.js",
+        "src/middlewares/rateLimit.js",
+        "src/middlewares/requireAdmin.js",
+        "src/services/SessionService.js",
+        "src/services/UserService.js",
+        "src/services/FileAccessPolicyService.js",
+        "src/utils/crypto.js",
+        "src/db/connection.js",
+        "src/db/schema.js",
+        "src/db/bootstrap.js"
+      ],
+      "language": "javascript",
+      "complexity": "medium",
+      "loc": 1361,
+      "report": "_state/modules/auth-and-access-control.md",
+      "doc": "Modules/Auth and Access Control.md",
+      "analyzed_at": "2026-10-14T05:05:10Z",
+      "source_commit": "e2698aedbe42c3c2c0cc24c38e3ef2b45c1843ae"
+    },
+    "Frontend Core": {
+      "slug": "frontend-core",
+      "purpose": "Shared SPA runtime: API client, UI toolkit, client router, sidebar, theme, notifications and base CSS design system.",
+      "roots": [
+        "public/assets/js/",
+        "public/assets/css/"
+      ],
+      "entry_points": [
+        "public/assets/js/api.js",
+        "public/assets/js/app.js",
+        "public/assets/js/router.js",
+        "public/assets/js/sidebar.js",
+        "public/assets/js/theme.js",
+        "public/assets/js/notifications.js"
+      ],
+      "language": "javascript",
+      "complexity": "medium",
+      "loc": 6438,
+      "report": "_state/modules/frontend-core.md",
+      "doc": "Modules/Frontend Core.md",
+      "analyzed_at": "2026-10-14T05:05:10Z",
+      "source_commit": "e2698aedbe42c3c2c0cc24c38e3ef2b45c1843ae"
+    },
+    "Files Page": {
+      "slug": "files-page",
+      "purpose": "Browser SPA page for browsing, searching, uploading and mutating files under the storage root.",
+      "roots": [
+        "public/"
+      ],
+      "entry_points": [
+        "public/files.html",
+        "public/assets/js/files.js",
+        "public/assets/css/files.css"
+      ],
+      "language": "javascript",
+      "complexity": "high",
+      "loc": 4526,
+      "report": "_state/modules/files-page.md",
+      "doc": "Modules/Files Page.md",
+      "analyzed_at": "2026-10-14T05:05:10Z",
+      "source_commit": "e2698aedbe42c3c2c0cc24c38e3ef2b45c1843ae"
+    },
+    "Feature Pages": {
+      "slug": "feature-pages",
+      "purpose": "Dashboard, Uploads, Settings, Admin and Login page shells, page modules and page stylesheets of the SPA.",
+      "roots": [
+        "public/"
+      ],
+      "entry_points": [
+        "public/index.html",
+        "public/uploads.html",
+        "public/settings.html",
+        "public/admin.html",
+        "public/login.html",
+        "public/assets/js/dashboard.js",
+        "public/assets/js/uploads.js",
+        "public/assets/js/settings.js",
+        "public/assets/js/admin.js",
+        "public/assets/js/login.js"
+      ],
+      "language": "javascript",
+      "complexity": "high",
+      "loc": 8634,
+      "report": "_state/modules/feature-pages.md",
+      "doc": "Modules/Feature Pages.md",
+      "analyzed_at": "2026-10-14T05:05:10Z",
+      "source_commit": "e2698aedbe42c3c2c0cc24c38e3ef2b45c1843ae"
+    },
+    "Deployment Scripts": {
+      "slug": "deployment-scripts",
+      "purpose": "Package one commit, ship it over SSH, and atomically activate, health-check and roll back releases on the host.",
+      "roots": [
+        "scripts/"
+      ],
+      "entry_points": [
+        "scripts/deploy.sh",
+        "scripts/trigger-deploy.sh"
+      ],
+      "language": "bash",
+      "complexity": "medium",
+      "loc": 931,
+      "report": "_state/modules/deployment-scripts.md",
+      "doc": "Modules/Deployment Scripts.md",
+      "analyzed_at": "2026-10-14T05:05:10Z",
+      "source_commit": "e2698aedbe42c3c2c0cc24c38e3ef2b45c1843ae"
+    }
+  },
+  "dependency_graph": {
+    "Server Bootstrap and Config": [
+      "HTTP API Layer",
+      "Auth and Access Control"
+    ],
+    "HTTP API Layer": [
+      "Storage Services",
+      "Metadata and Settings Stores",
+      "Auth and Access Control"
+    ],
+    "Storage Services": [
+      "Server Bootstrap and Config"
+    ],
+    "Metadata and Settings Stores": [
+      "Server Bootstrap and Config",
+      "Storage Services"
+    ],
+    "Auth and Access Control": [
+      "Server Bootstrap and Config",
+      "Storage Services"
+    ],
+    "Frontend Core": [
+      "HTTP API Layer"
+    ],
+    "Files Page": [
+      "Frontend Core",
+      "HTTP API Layer",
+      "Auth and Access Control"
+    ],
+    "Feature Pages": [
+      "Frontend Core",
+      "HTTP API Layer",
+      "Auth and Access Control"
+    ],
+    "Deployment Scripts": [
+      "Server Bootstrap and Config",
+      "HTTP API Layer"
+    ]
+  },
+  "architecture_type": "modular monolith",
+  "system_patterns": [
+    "Singleton service objects",
+    "AppError error contract with static messages",
+    "Envelope split: bare reads, enveloped mutations",
+    "Explicit unavailability: unknown is not zero",
+    "Bounded work",
+    "Atomic replace writes",
+    "Re-entrant page lifecycle with delegated listeners",
+    "Single client network boundary and silent calls",
+    "Partial-success reporting",
+    "Fail-fast startup gates"
+  ],
+  "files_analyzed": {
+    "src/routes/auth.routes.js": "auth-and-access-control",
+    "src/routes/admin.routes.js": "auth-and-access-control",
+    "src/controllers/auth.controller.js": "auth-and-access-control",
+    "src/controllers/users.controller.js": "auth-and-access-control",
+    "src/controllers/filePolicy.controller.js": "auth-and-access-control",
+    "src/middlewares/authenticate.js": "auth-and-access-control",
+    "src/middlewares/csrf.js": "auth-and-access-control",
+    "src/middlewares/rateLimit.js": "auth-and-access-control",
+    "src/middlewares/requireAdmin.js": "auth-and-access-control",
+    "src/services/SessionService.js": "auth-and-access-control",
+    "src/services/UserService.js": "auth-and-access-control",
+    "src/services/FileAccessPolicyService.js": "auth-and-access-control",
+    "src/utils/crypto.js": "auth-and-access-control",
+    "src/db/connection.js": "auth-and-access-control",
+    "src/db/schema.js": "auth-and-access-control",
+    "src/db/bootstrap.js": "auth-and-access-control",
+    "src/db/repositories/AuditLogRepository.js": "auth-and-access-control",
+    "src/db/repositories/FileAccessPolicyRepository.js": "auth-and-access-control",
+    "src/db/repositories/SessionRepository.js": "auth-and-access-control",
+    "src/db/repositories/UserFilePermissionRepository.js": "auth-and-access-control",
+    "src/db/repositories/UserRepository.js": "auth-and-access-control",
+    "scripts/deploy.sh": "deployment-scripts",
+    "scripts/trigger-deploy.sh": "deployment-scripts",
+    "scripts/git-hooks/post-receive": "deployment-scripts",
+    "scripts/systemd/dimension.service": "deployment-scripts",
+    "scripts/nginx/dimension.conf": "deployment-scripts",
+    "scripts/nginx/cloudavid.conf": "deployment-scripts",
+    "public/index.html": "feature-pages",
+    "public/uploads.html": "feature-pages",
+    "public/settings.html": "feature-pages",
+    "public/admin.html": "feature-pages",
+    "public/login.html": "feature-pages",
+    "public/assets/js/dashboard.js": "feature-pages",
+    "public/assets/js/uploads.js": "feature-pages",
+    "public/assets/js/settings.js": "feature-pages",
+    "public/assets/js/admin.js": "feature-pages",
+    "public/assets/js/login.js": "feature-pages",
+    "public/assets/css/dashboard.css": "feature-pages",
+    "public/assets/css/uploads.css": "feature-pages",
+    "public/assets/css/settings.css": "feature-pages",
+    "public/assets/css/admin.css": "feature-pages",
+    "public/assets/css/login.css": "feature-pages",
+    "public/files.html": "files-page",
+    "public/assets/js/files.js": "files-page",
+    "public/assets/css/files.css": "files-page",
+    "public/assets/js/api.js": "frontend-core",
+    "public/assets/js/app.js": "frontend-core",
+    "public/assets/js/router.js": "frontend-core",
+    "public/assets/js/sidebar.js": "frontend-core",
+    "public/assets/js/theme.js": "frontend-core",
+    "public/assets/js/notifications.js": "frontend-core",
+    "public/assets/css/tokens.css": "frontend-core",
+    "public/assets/css/base.css": "frontend-core",
+    "public/assets/css/themes.css": "frontend-core",
+    "public/assets/css/layout.css": "frontend-core",
+    "public/assets/css/components.css": "frontend-core",
+    "src/routes/api.js": "http-api-layer",
+    "src/routes/fs.routes.js": "http-api-layer",
+    "src/routes/dashboard.routes.js": "http-api-layer",
+    "src/routes/settings.routes.js": "http-api-layer",
+    "src/controllers/fs.controller.js": "http-api-layer",
+    "src/controllers/dashboard.controller.js": "http-api-layer",
+    "src/controllers/settings.controller.js": "http-api-layer",
+    "src/controllers/preview.controller.js": "http-api-layer",
+    "src/middlewares/errorHandler.js": "http-api-layer",
+    "src/services/MetadataService.js": "metadata-and-settings-stores",
+    "src/services/SettingsService.js": "metadata-and-settings-stores",
+    "server.js": "server-bootstrap-and-config",
+    "src/config/env.js": "server-bootstrap-and-config",
+    "src/config/dataDir.js": "server-bootstrap-and-config",
+    "src/services/FileSystemService.js": "storage-services",
+    "src/services/PathService.js": "storage-services",
+    "src/services/UploadService.js": "storage-services",
+    "src/services/PreviewService.js": "storage-services",
+    "src/utils/validators.js": "storage-services",
+    "src/utils/fileTypes.js": "storage-services",
+    "src/utils/concurrency.js": "storage-services",
+    "src/utils/AppError.js": "storage-services"
+  },
+  "git_commit": "e2698aedbe42c3c2c0cc24c38e3ef2b45c1843ae",
+  "timestamp": "2026-10-14T05:05:10Z",
+  "mode": "full",
+  "issues": [
+    {
+      "module": "Server Bootstrap and Config",
+      "id": "cors-origin-normalization-mismatch",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/config/env.js",
+      "lines": "141-182",
+      "summary": "CORS origins validated via URL normalization but matched raw in server.js, so trailing-slash/mixed-case entries never match",
+      "status": "open"
+    },
+    {
+      "module": "Server Bootstrap and Config",
+      "id": "dir-checks-skip-writability",
+      "type": "limitation",
+      "severity": "medium",
+      "file": "src/config/env.js",
+      "lines": "184-199",
+      "summary": "directoryProblems checks only R_OK|X_OK, so a read-only STORAGE_ROOT or AFM_DATA_DIR passes boot then fails per request",
+      "status": "open"
+    },
+    {
+      "module": "Server Bootstrap and Config",
+      "id": "port-not-validated",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/config/env.js",
+      "lines": "41",
+      "summary": "PORT goes unvalidated to app.listen",
+      "status": "open"
+    },
+    {
+      "module": "Server Bootstrap and Config",
+      "id": "no-listen-error-handler",
+      "type": "improvement",
+      "severity": "low",
+      "file": "server.js",
+      "lines": "148-155",
+      "summary": "No 'error' listener on the server, so EADDRINUSE/EACCES crash with a raw stack",
+      "status": "open"
+    },
+    {
+      "module": "Server Bootstrap and Config",
+      "id": "double-signal-false-clean-exit",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "server.js",
+      "lines": "168-184",
+      "summary": "SIGTERM then SIGINT runs shutdown twice and can exit 0 mid-transfer",
+      "status": "open"
+    },
+    {
+      "module": "Server Bootstrap and Config",
+      "id": "morgan-after-limiter-and-parsers",
+      "type": "improvement",
+      "severity": "low",
+      "file": "server.js",
+      "lines": "86-90",
+      "summary": "morgan registered after the rate limiter and body parsers, so 429s and JSON parse failures are not logged",
+      "status": "open"
+    },
+    {
+      "module": "Server Bootstrap and Config",
+      "id": "spa-fallback-masks-missing-assets",
+      "type": "improvement",
+      "severity": "low",
+      "file": "server.js",
+      "lines": "113-120",
+      "summary": "SPA fallback returns index.html 200 for missing static assets",
+      "status": "open"
+    },
+    {
+      "module": "Server Bootstrap and Config",
+      "id": "stale-datadir-comment",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/config/dataDir.js",
+      "lines": "9-11",
+      "summary": "Doc comment says config/env exits without STORAGE_ROOT; it no longer does",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "bulk-raw-error-leak",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/controllers/fs.controller.js",
+      "lines": "348-475",
+      "summary": "Move/copy/delete put raw error messages into failed[] and rethrow as AppError, so absolute paths can bypass errorHandler sanitizing",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "dashboard-metadata-silent-empty",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/controllers/dashboard.controller.js",
+      "lines": "127-140",
+      "summary": "Metadata failure swallowed without logging and becomes [], indistinguishable from no data; AGENTS.md disagrees",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "summary-doc-overstates-degradation",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/controllers/dashboard.controller.js",
+      "lines": "110-125",
+      "summary": "JSDoc says no capability can fail the response, but tree/volume stats in bare Promise.all give a 500",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "star-set-race",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/controllers/fs.controller.js",
+      "lines": "596-599",
+      "summary": "Idempotent star set reads then toggles; concurrent set-true calls can leave the file unstarred",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "zip-duplicate-entry-names",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/controllers/fs.controller.js",
+      "lines": "636-685",
+      "summary": "ZIP entries named by basename only, so same-named files from different folders collide",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "zip-unguarded-req-body",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/controllers/fs.controller.js",
+      "lines": "617",
+      "summary": "downloadZip reads req.body.paths unguarded, giving a 500 instead of 400",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "error-inherits-attachment-headers",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/controllers/fs.controller.js",
+      "lines": "508-527",
+      "summary": "Stream error before first byte returns error JSON with Content-Disposition: attachment",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "zip-double-next",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/controllers/fs.controller.js",
+      "lines": "656-690",
+      "summary": "Archive error listener and rejected finalize() can both call next()",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "errorhandler-no-headerssent-guard",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/middlewares/errorHandler.js",
+      "lines": "24-43",
+      "summary": "Global error handler does not delegate to next(err) when headers already sent",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "list-walks-all-folders-before-paging",
+      "type": "limitation",
+      "severity": "medium",
+      "file": "src/controllers/fs.controller.js",
+      "lines": "168-226",
+      "summary": "getList runs recursive getTreeStats for every folder before paginating",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "bulk-loop-triplicated",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/controllers/fs.controller.js",
+      "lines": "311-485",
+      "summary": "Validation and partial-failure aggregation copied across move, copy and delete",
+      "status": "open"
+    },
+    {
+      "module": "HTTP API Layer",
+      "id": "activity-user-hardcoded-system",
+      "type": "limitation",
+      "severity": "low",
+      "file": "src/controllers/fs.controller.js",
+      "lines": "252-562",
+      "summary": "Activity entries always record user 'system' despite req.user",
+      "status": "open"
+    },
+    {
+      "module": "Storage Services",
+      "id": "mutations-lexical-guard-only",
+      "type": "bug-risk",
+      "severity": "high",
+      "file": "src/services/FileSystemService.js",
+      "lines": "92-301",
+      "summary": "createDirectory/rename/move/copy use only lexical resolveSecurePath, so an in-root symlink/junction lets writes escape the root",
+      "status": "open"
+    },
+    {
+      "module": "Storage Services",
+      "id": "toclientpath-canonical-root-mismatch",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/services/PathService.js",
+      "lines": "101-118",
+      "summary": "toClientPath compares canonical paths to the lexical root; with a symlinked STORAGE_ROOT uploads land in the root",
+      "status": "open"
+    },
+    {
+      "module": "Storage Services",
+      "id": "copy-partial-tree-on-failure",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/services/FileSystemService.js",
+      "lines": "289-300",
+      "summary": "Failed fs.cp leaves a half-copied tree with no cleanup",
+      "status": "open"
+    },
+    {
+      "module": "Storage Services",
+      "id": "copy-erroronexist-noop",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/services/FileSystemService.js",
+      "lines": "290",
+      "summary": "errorOnExist has no effect because force defaults to true",
+      "status": "open"
+    },
+    {
+      "module": "Storage Services",
+      "id": "rename-move-check-then-act",
+      "type": "limitation",
+      "severity": "low",
+      "file": "src/services/FileSystemService.js",
+      "lines": "155-160",
+      "summary": "exists-then-rename collision checks race with concurrent creates",
+      "status": "open"
+    },
+    {
+      "module": "Storage Services",
+      "id": "filename-trim-masks-space-rule",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/utils/validators.js",
+      "lines": "14-52",
+      "summary": "validateFileName trims before the leading/trailing-space check",
+      "status": "open"
+    },
+    {
+      "module": "Storage Services",
+      "id": "filename-length-not-bytes",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/utils/validators.js",
+      "lines": "25",
+      "summary": "255 limit counts UTF-16 units, not bytes, so long multibyte names 500",
+      "status": "open"
+    },
+    {
+      "module": "Storage Services",
+      "id": "nul-in-client-path-500",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/utils/validators.js",
+      "lines": "66-80",
+      "summary": "validateClientPath does not reject NUL bytes",
+      "status": "open"
+    },
+    {
+      "module": "Storage Services",
+      "id": "upload-limits-bypass-config",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/services/UploadService.js",
+      "lines": "52-57",
+      "summary": "Upload limits re-parsed from process.env instead of validated config",
+      "status": "open"
+    },
+    {
+      "module": "Storage Services",
+      "id": "free-space-staging-volume-only",
+      "type": "limitation",
+      "severity": "low",
+      "file": "src/services/UploadService.js",
+      "lines": "256-327",
+      "summary": "Free-space watermark checks only the staging volume and ignores file size",
+      "status": "open"
+    },
+    {
+      "module": "Storage Services",
+      "id": "treestats-dead-unresolved-branch",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/services/FileSystemService.js",
+      "lines": "388-398",
+      "summary": "Unreachable UNRESOLVED catch branch; startSecurePath unused",
+      "status": "open"
+    },
+    {
+      "module": "Metadata and Settings Stores",
+      "id": "shared-tmp-write-race",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/services/MetadataService.js",
+      "lines": "115-127",
+      "summary": "Concurrent unlocked writes share one fixed .tmp path (also SettingsService 105-117)",
+      "status": "open"
+    },
+    {
+      "module": "Metadata and Settings Stores",
+      "id": "cache-mutated-before-write",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/services/MetadataService.js",
+      "lines": "145-313",
+      "summary": "Mutators edit the cache before _write, so a failed write diverges memory from disk",
+      "status": "open"
+    },
+    {
+      "module": "Metadata and Settings Stores",
+      "id": "write-errors-not-apperror",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/services/SettingsService.js",
+      "lines": "105-144",
+      "summary": "_write failures propagate as raw Errors",
+      "status": "open"
+    },
+    {
+      "module": "Metadata and Settings Stores",
+      "id": "rename-delete-ignore-descendants",
+      "type": "limitation",
+      "severity": "medium",
+      "file": "src/services/MetadataService.js",
+      "lines": "268-313",
+      "summary": "renamePath/deletePath match exact keys only, orphaning entries under renamed/deleted folders",
+      "status": "open"
+    },
+    {
+      "module": "Metadata and Settings Stores",
+      "id": "settings-cached-raw",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/services/SettingsService.js",
+      "lines": "80-99",
+      "summary": "Parsed settings cached without shape checks",
+      "status": "open"
+    },
+    {
+      "module": "Metadata and Settings Stores",
+      "id": "top-downloads-retain-after-slice",
+      "type": "limitation",
+      "severity": "low",
+      "file": "src/services/MetadataService.js",
+      "lines": "247-252",
+      "summary": "retain filter runs after slicing, so fewer than limit entries can return",
+      "status": "open"
+    },
+    {
+      "module": "Metadata and Settings Stores",
+      "id": "full-rewrite-unbounded-downloads",
+      "type": "limitation",
+      "severity": "low",
+      "file": "src/services/MetadataService.js",
+      "lines": "115-149",
+      "summary": "Every download rewrites the whole store; keys never pruned; no fsync before rename",
+      "status": "open"
+    },
+    {
+      "module": "Metadata and Settings Stores",
+      "id": "duplicated-store-skeleton",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/services/SettingsService.js",
+      "lines": "63-117",
+      "summary": "_init/_read/_write duplicated across both services",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "user-delete-fk-500",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/db/schema.js",
+      "lines": "50-96",
+      "summary": "FKs to users(id) without ON DELETE make deleting an admin with audit rows a raw 500",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "no-last-admin-guard",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/services/UserService.js",
+      "lines": "41-60",
+      "summary": "An admin can disable/delete themselves or the last active admin",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "lockout-rearms-after-expiry",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/services/SessionService.js",
+      "lines": "27-36",
+      "summary": "failed_login_count not reset on lock expiry, enabling indefinite lockout",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "login-enumeration",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/services/SessionService.js",
+      "lines": "24-29",
+      "summary": "Unknown users skip scrypt (timing leak); non-string password for existing user gives 500 vs 401",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "policy-path-hooks-exact-match",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "src/db/repositories/FileAccessPolicyRepository.js",
+      "lines": "86-94",
+      "summary": "Rename/delete hooks match exact path only; descendant policies go stale",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "policy-flags-untyped",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/services/FileAccessPolicyService.js",
+      "lines": "30-54",
+      "summary": "Policy flags coerced by truthiness, so \"false\" stores 1",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "cookie-decode-throws",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "src/middlewares/authenticate.js",
+      "lines": "10-19",
+      "summary": "Malformed afm_session cookie throws URIError -> 500",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "csrf-compare-not-constant-time",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/middlewares/csrf.js",
+      "lines": "22-23",
+      "summary": "CSRF compare not constant-time; body-field fallback accepted everywhere",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "no-session-audit-retention",
+      "type": "limitation",
+      "severity": "low",
+      "file": "src/db/repositories/SessionRepository.js",
+      "lines": "7-39",
+      "summary": "Expired sessions and audit rows never pruned",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "touch-write-every-request",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/services/SessionService.js",
+      "lines": "54-62",
+      "summary": "Synchronous SQLite UPDATE of last_seen_at on every request",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "duplicated-ttl-and-parser",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/routes/auth.routes.js",
+      "lines": "27-31",
+      "summary": "Session TTL and env parser duplicated",
+      "status": "open"
+    },
+    {
+      "module": "Auth and Access Control",
+      "id": "audit-in-catch-masks-error",
+      "type": "improvement",
+      "severity": "low",
+      "file": "src/controllers/users.controller.js",
+      "lines": "36-94",
+      "summary": "Unguarded audit insert in catch can replace the original AppError with a 500",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "modal-closeall-strands-promises",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "public/assets/js/app.js",
+      "lines": "446-573",
+      "summary": "Modal.closeAll hides confirm/prompt without resolving their promises",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "theme-system-mode-not-persisted",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "public/assets/js/theme.js",
+      "lines": "104-238",
+      "summary": "apply() saves the concrete theme, losing the System preference",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "raw-html-modal-contextmenu",
+      "type": "improvement",
+      "severity": "medium",
+      "file": "public/assets/js/app.js",
+      "lines": "485-655",
+      "summary": "Modal/ContextMenu insert caller strings as raw HTML; escape by default",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "download-errors-invisible",
+      "type": "limitation",
+      "severity": "medium",
+      "file": "public/assets/js/api.js",
+      "lines": "288-400",
+      "summary": "Iframe/form download transports silently swallow error responses",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "clipboard-false-success",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "public/assets/js/app.js",
+      "lines": "689-705",
+      "summary": "execCommand fallback reports success even when copy failed",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "bootstrap-reads-serial-and-noisy",
+      "type": "improvement",
+      "severity": "low",
+      "file": "public/assets/js/app.js",
+      "lines": "997-1031",
+      "summary": "loadGlobalData reads serially, can toast every load, continues after 401",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "csrf-token-race-no-retry",
+      "type": "limitation",
+      "severity": "low",
+      "file": "public/assets/js/api.js",
+      "lines": "55-113",
+      "summary": "Mutations before /auth/me resolves or after rotation lack a valid CSRF token, no retry",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "router-concurrent-beforeleave",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "public/assets/js/router.js",
+      "lines": "182-200",
+      "summary": "Overlapping navigations stack leave-confirm dialogs",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "router-html-cache-never-invalidated",
+      "type": "limitation",
+      "severity": "low",
+      "file": "public/assets/js/router.js",
+      "lines": "35-70",
+      "summary": "Page HTML cached for document lifetime",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "sidebar-width-not-restored-on-resize",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "public/assets/js/sidebar.js",
+      "lines": "103-118",
+      "summary": "Stored sidebar width not reapplied when widening from mobile",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "body-overflow-uncoordinated",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "public/assets/js/app.js",
+      "lines": "453-471",
+      "summary": "Overlays set/clear body overflow independently",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "google-fonts-runtime-dependency",
+      "type": "limitation",
+      "severity": "low",
+      "file": "public/assets/css/tokens.css",
+      "lines": "6-7",
+      "summary": "Render-blocking @import from fonts.googleapis.com in a self-hosted tool",
+      "status": "open"
+    },
+    {
+      "module": "Frontend Core",
+      "id": "initapp-duplicates-refreshchrome",
+      "type": "improvement",
+      "severity": "low",
+      "file": "public/assets/js/app.js",
+      "lines": "1124-1148",
+      "summary": "initApp duplicates refreshChrome",
+      "status": "open"
+    },
+    {
+      "module": "Files Page",
+      "id": "dropped-folder-exists-check-uses-current-page",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "public/assets/js/files.js",
+      "lines": "2108-2134",
+      "summary": "Dropped-folder existence decided from current page; invisible existing folder makes its files silently skipped",
+      "status": "open"
+    },
+    {
+      "module": "Files Page",
+      "id": "upload-tray-hidden-after-reinit",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "public/assets/js/files.js",
+      "lines": "2800-2822",
+      "summary": "init() never renders the upload tray after a page swap",
+      "status": "open"
+    },
+    {
+      "module": "Files Page",
+      "id": "upload-queue-not-global",
+      "type": "limitation",
+      "severity": "low",
+      "file": "public/assets/js/files.js",
+      "lines": "1967-1999",
+      "summary": "Second drop starts a concurrent upload loop",
+      "status": "open"
+    },
+    {
+      "module": "Files Page",
+      "id": "folder-drop-read-errors-silent",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "public/assets/js/files.js",
+      "lines": "2086-2114",
+      "summary": "Folder read errors swallowed; partial upload reports success",
+      "status": "open"
+    },
+    {
+      "module": "Files Page",
+      "id": "policy-modal-escape-never-resolves",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "public/assets/js/files.js",
+      "lines": "1638-1720",
+      "summary": "Access-policy modal promise pending forever on Escape; backdrop leak",
+      "status": "open"
+    },
+    {
+      "module": "Files Page",
+      "id": "policy-prefill-overwrites-edits",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "public/assets/js/files.js",
+      "lines": "1709-1718",
+      "summary": "Async policy prefill can overwrite operator edits",
+      "status": "open"
+    },
+    {
+      "module": "Files Page",
+      "id": "star-failure-double-toast",
+      "type": "improvement",
+      "severity": "low",
+      "file": "public/assets/js/files.js",
+      "lines": "1759-1760",
+      "summary": "Star failure shows two toasts",
+      "status": "open"
+    },
+    {
+      "module": "Files Page",
+      "id": "column-breakpoints-duplicated",
+      "type": "limitation",
+      "severity": "low",
+      "file": "public/assets/js/files.js",
+      "lines": "83-87",
+      "summary": "COLUMN_BREAKPOINTS duplicates files.css media queries",
+      "status": "open"
+    },
+    {
+      "module": "Feature Pages",
+      "id": "login-open-redirect-backslash-bypass",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "public/assets/js/login.js",
+      "lines": "18-24",
+      "summary": "safeRedirectTarget accepts /\\evil.example and /%09/evil.example",
+      "status": "open"
+    },
+    {
+      "module": "Feature Pages",
+      "id": "dashboard-poll-starts-after-destroy",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "public/assets/js/dashboard.js",
+      "lines": "1073-1093",
+      "summary": "Late loadSummary after destroy() starts an unstoppable health poll",
+      "status": "open"
+    },
+    {
+      "module": "Feature Pages",
+      "id": "forced-verify-returns-stale-inflight",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "public/assets/js/uploads.js",
+      "lines": "598-609",
+      "summary": "verifyDestination force:true returns a stale in-flight check",
+      "status": "open"
+    },
+    {
+      "module": "Feature Pages",
+      "id": "settings-header-claims-missing-consumer",
+      "type": "improvement",
+      "severity": "low",
+      "file": "public/assets/js/settings.js",
+      "lines": "5-10",
+      "summary": "Header claims defaultUploadFolder feeds Uploads; it does not",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "out-dir-rm-rf",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "scripts/trigger-deploy.sh",
+      "lines": "46-79",
+      "summary": "Ship mode honours caller OUT_DIR then rm -rf's it",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "manual-rollback-no-restore",
+      "type": "bug-risk",
+      "severity": "medium",
+      "file": "scripts/deploy.sh",
+      "lines": "166-182",
+      "summary": "Failed manual rollback leaves service on unhealthy release, exits 0",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "systemd-readwritepaths-hardcoded",
+      "type": "limitation",
+      "severity": "medium",
+      "file": "scripts/systemd/dimension.service",
+      "lines": "52-54",
+      "summary": "ReadWritePaths hard-coded; other storage paths read-only at runtime",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "failed-releases-consume-retention",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "scripts/deploy.sh",
+      "lines": "137-155",
+      "summary": "Failed releases take retention slots, pruning good ones",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "superseded-doc-mismatch",
+      "type": "improvement",
+      "severity": "low",
+      "file": "scripts/deploy.sh",
+      "lines": "24-202",
+      "summary": "Header and code disagree on superseded semantics",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "deploy-epoch-unvalidated",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "scripts/deploy.sh",
+      "lines": "185-263",
+      "summary": "Non-numeric epoch disables the stale-commit guard",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "app-root-containment-lexical",
+      "type": "improvement",
+      "severity": "low",
+      "file": "scripts/deploy.sh",
+      "lines": "234-235",
+      "summary": "APP_ROOT containment check is a raw string compare",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "ssh-opts-word-splitting",
+      "type": "improvement",
+      "severity": "low",
+      "file": "scripts/trigger-deploy.sh",
+      "lines": "77-78",
+      "summary": "Unquoted SSH_OPTS globs and splits",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "package-dir-leak",
+      "type": "improvement",
+      "severity": "low",
+      "file": "scripts/trigger-deploy.sh",
+      "lines": "46-79",
+      "summary": "No EXIT trap; mktemp dir leaks on die",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "lock-timeout-clobbers-record",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "scripts/deploy.sh",
+      "lines": "322-326",
+      "summary": "Lock timeout overwrites last-deploy.json without the lock",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "start-limit-wrong-section",
+      "type": "bug-risk",
+      "severity": "low",
+      "file": "scripts/systemd/dimension.service",
+      "lines": "32-33",
+      "summary": "StartLimitIntervalSec belongs in [Unit]",
+      "status": "open"
+    },
+    {
+      "module": "Deployment Scripts",
+      "id": "synchronous-push-deploy",
+      "type": "limitation",
+      "severity": "low",
+      "file": "scripts/git-hooks/post-receive",
+      "lines": "28-42",
+      "summary": "git push blocks through the whole deploy",
+      "status": "open"
+    }
+  ],
+  "sessions": [
+    {
+      "type": "generate",
+      "timestamp": "2026-10-14T05:05:10Z",
+      "git_commit_start": null,
+      "git_commit_end": "e2698aedbe42c3c2c0cc24c38e3ef2b45c1843ae",
+      "mode": "full",
+      "modules_affected": [
+        "Server Bootstrap and Config",
+        "HTTP API Layer",
+        "Storage Services",
+        "Metadata and Settings Stores",
+        "Auth and Access Control",
+        "Frontend Core",
+        "Files Page",
+        "Feature Pages",
+        "Deployment Scripts"
+      ],
+      "issues_resolved": [],
+      "issues_introduced": [
+        "cors-origin-normalization-mismatch",
+        "dir-checks-skip-writability",
+        "port-not-validated",
+        "no-listen-error-handler",
+        "double-signal-false-clean-exit",
+        "morgan-after-limiter-and-parsers",
+        "spa-fallback-masks-missing-assets",
+        "stale-datadir-comment",
+        "bulk-raw-error-leak",
+        "dashboard-metadata-silent-empty",
+        "summary-doc-overstates-degradation",
+        "star-set-race",
+        "zip-duplicate-entry-names",
+        "zip-unguarded-req-body",
+        "error-inherits-attachment-headers",
+        "zip-double-next",
+        "errorhandler-no-headerssent-guard",
+        "list-walks-all-folders-before-paging",
+        "bulk-loop-triplicated",
+        "activity-user-hardcoded-system",
+        "mutations-lexical-guard-only",
+        "toclientpath-canonical-root-mismatch",
+        "copy-partial-tree-on-failure",
+        "copy-erroronexist-noop",
+        "rename-move-check-then-act",
+        "filename-trim-masks-space-rule",
+        "filename-length-not-bytes",
+        "nul-in-client-path-500",
+        "upload-limits-bypass-config",
+        "free-space-staging-volume-only",
+        "treestats-dead-unresolved-branch",
+        "shared-tmp-write-race",
+        "cache-mutated-before-write",
+        "write-errors-not-apperror",
+        "rename-delete-ignore-descendants",
+        "settings-cached-raw",
+        "top-downloads-retain-after-slice",
+        "full-rewrite-unbounded-downloads",
+        "duplicated-store-skeleton",
+        "user-delete-fk-500",
+        "no-last-admin-guard",
+        "lockout-rearms-after-expiry",
+        "login-enumeration",
+        "policy-path-hooks-exact-match",
+        "policy-flags-untyped",
+        "cookie-decode-throws",
+        "csrf-compare-not-constant-time",
+        "no-session-audit-retention",
+        "touch-write-every-request",
+        "duplicated-ttl-and-parser",
+        "audit-in-catch-masks-error",
+        "modal-closeall-strands-promises",
+        "theme-system-mode-not-persisted",
+        "raw-html-modal-contextmenu",
+        "download-errors-invisible",
+        "clipboard-false-success",
+        "bootstrap-reads-serial-and-noisy",
+        "csrf-token-race-no-retry",
+        "router-concurrent-beforeleave",
+        "router-html-cache-never-invalidated",
+        "sidebar-width-not-restored-on-resize",
+        "body-overflow-uncoordinated",
+        "google-fonts-runtime-dependency",
+        "initapp-duplicates-refreshchrome",
+        "dropped-folder-exists-check-uses-current-page",
+        "upload-tray-hidden-after-reinit",
+        "upload-queue-not-global",
+        "folder-drop-read-errors-silent",
+        "policy-modal-escape-never-resolves",
+        "policy-prefill-overwrites-edits",
+        "star-failure-double-toast",
+        "column-breakpoints-duplicated",
+        "login-open-redirect-backslash-bypass",
+        "dashboard-poll-starts-after-destroy",
+        "forced-verify-returns-stale-inflight",
+        "settings-header-claims-missing-consumer",
+        "out-dir-rm-rf",
+        "manual-rollback-no-restore",
+        "systemd-readwritepaths-hardcoded",
+        "failed-releases-consume-retention",
+        "superseded-doc-mismatch",
+        "deploy-epoch-unvalidated",
+        "app-root-containment-lexical",
+        "ssh-opts-word-splitting",
+        "package-dir-leak",
+        "lock-timeout-clobbers-record",
+        "start-limit-wrong-section",
+        "synchronous-push-deploy"
+      ]
+    }
+  ]
+}

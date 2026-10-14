@@ -5,7 +5,8 @@
 > (Dashboard / Files / Uploads / Settings). Node's filesystem **is** the database; a JSON file
 > (`data/metadata.json`) tracks downloads, stars, and activity.
 >
-> **Read this first, then `docs/REPO_MAP.md` (navigation) and `docs/CONTRACTS.md` (API/data schemas).**
+> **Read this first, then `docs/REPO_MAP.md` (navigation), `docs/CONTRACTS.md` (API/data schemas) and
+> `docs/DATABASE.md` (SQLite + JSON stores).**
 > Foundational decisions live in `docs/decisions/`.
 
 ## Tech Stack
@@ -17,7 +18,7 @@
 | Validation | Custom (`src/utils/validators.js`) | No Zod/Joi — validate via `validateFileName` / `validateClientPath` |
 | Uploads | Multer 2.x (`diskStorage`, via `UploadService`) | Streams to a hidden staging file inside `STORAGE_ROOT`, then moved into place; never buffer into memory |
 | Archiving | Archiver 8.x | ZIP streams are piped, never collected in memory |
-| Persistence | JSON files via `MetadataService` / `SettingsService` | Atomic temp-file-then-rename writes; singleton instances; `data/*.json` is git-ignored |
+| Persistence | JSON files via `MetadataService` / `SettingsService`; `node:sqlite` (`admin.sqlite`) for identity via `src/db/` | JSON: atomic temp-file-then-rename writes, singleton instances. SQLite: synchronous, forward-only migrations in `src/db/schema.js`, SQL only in `src/db/repositories/`. All under `AFM_DATA_DIR`, git-ignored. See `docs/DATABASE.md` |
 | Frontend | Vanilla JS + CSS (no bundler) | Modules attach to `window` (`window.API`, `window.AFM.*`); `<script>` tag load order matters. `router.js` navigates between the four pages without a reload (ADR-005) |
 | Logging | Morgan (`dev` format) | Errors also logged via `console.error` in `errorHandler` |
 | Dev tooling | Nodemon | Ignores `data/*` and `public/*` |
@@ -27,7 +28,7 @@
 ```bash
 npm run dev      # Start with nodemon (http://localhost:3000)
 npm start        # Start in production mode
-npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 772 tests, exits 0:
+npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 1051 tests, exits 0:
                  # services, API contracts (live server, incl. versioning.contract), frontend modules in a vm
                  # (incl. api-boundary), integration, guardrails.
 ```
@@ -173,9 +174,11 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 77
   `GET /api/dashboard/summary` drops only the contribution it could not obtain: `storage.usedBytes` / `storage.totalBytes`
   go `null` with `volumeAvailable: false` when the volume is unreadable, and an unreadable subdirectory is skipped by the
   tree walk. So a **200 does not by itself mean every field is populated** — check the per-capability flags before
-  rendering. **Metadata is the exception:** `MetadataService._read` throws for a corrupt/unreadable store and `getSummary`
-  uses `Promise.all`, so that case is a 500, not a degraded 200. Don't extend this pattern to sources that currently
-  fail wholly without deciding which behaviour you want per capability.
+  rendering. **Metadata degrades too, but without a flag:** `getSummary` catches a `MetadataService` failure (corrupt or
+  unreadable store) and serves `activities` / `topFiles` as `[]` with a 200, so an empty feed is currently
+  indistinguishable from an unavailable one (open gap — see ADR-002 "Amendment"). Only the tree and volume reads are
+  awaited bare, so an unexpected throw there is still a 500. Don't extend this pattern to sources that currently fail
+  wholly without deciding which behaviour you want per capability.
 - **Settings persist in a real store; the theme does not.** `SettingsService` keeps a JSON document at
   `data/settings.json` behind `GET`/`PUT /api/settings` (bare read, enveloped validated full replace;
   ADR-006). The Settings page persists exactly three keys — `general.workspaceName` (sidebar brand,

@@ -24,6 +24,9 @@ admin-files-manager/
 │   ├── nginx/cloudavid.conf      # Two-domain live config: files. = static portal, admin. = basic-auth proxy to :3000
 │   └── nginx/README.md           # Runbook for cloudavid.conf: install, certs, htpasswd, verification, troubleshooting
 ├── temp/                         # Scratch (git-ignored; never discovered by npm test)
+├── docs-vault/                   # Generated Obsidian vault (code-to-docs skill): module docs at 3 levels, architecture,
+│                                 #   patterns, onboarding, health. _state/ is its incremental contract — refresh with
+│                                 #   /code-to-docs-update, never hand-edit. Hand-written docs/ stays authoritative.
 │
 ├── src/                          # ─── Backend ───
 │   ├── config/
@@ -205,6 +208,7 @@ admin-files-manager/
 └── docs/                         # ─── Project brain (reference docs, NOT runtime code) ───
     ├── REPO_MAP.md               # ← you are here (this file is the authoritative map)
     ├── CONTRACTS.md              # API + data schemas (+ deployment contract)
+    ├── DATABASE.md               # Persistence: admin.sqlite schema/migrations/lifecycle + the two JSON stores
     ├── DEPLOYMENT.md             # Operator runbook: host layout, config table, install, deploy, rollback, logs
     ├── architecture.md           # Frontend-era deep-dive. Read its §0 "Status" first:
     │                             # design-system sections are current, "mock data" ones are not
