@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "public/assets/js/app.js": {
-    "mtime": 1792000581.3239944,
-    "seen": 1792001002.7245376,
+    "mtime": 1792001810.162048,
+    "seen": 1792002386.0603392,
     "ast_hash": "263f42a76bf18bb6c4ce63fdb210120b",
     "semantic_hash": ""
   },
@@ -42,9 +42,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/files.js": {
-    "mtime": 1791991670.6096606,
-    "seen": 1792001002.7245421,
-    "ast_hash": "5e1f9c4195babf0da94c3779b5ea37f7",
+    "mtime": 1792002318.07902,
+    "seen": 1792002386.0603437,
+    "ast_hash": "83dbf3090d3aadd3dad6d0331c12617b",
     "semantic_hash": ""
   },
   "public/assets/js/settings.js": {
@@ -84,15 +84,15 @@
     "semantic_hash": ""
   },
   "src/config/env.js": {
-    "mtime": 1792000581.1895523,
-    "seen": 1792001002.724578,
+    "mtime": 1792001810.162048,
+    "seen": 1792002386.0603788,
     "ast_hash": "a1a41ce8ff8f2aa1d2ec76560e11ab4b",
     "semantic_hash": ""
   },
   "src/controllers/fs.controller.js": {
-    "mtime": 1791991670.610661,
-    "seen": 1792001002.7245867,
-    "ast_hash": "e684cbb2f79c99cc6a801f0554907f72",
+    "mtime": 1792002257.323326,
+    "seen": 1792002386.0603883,
+    "ast_hash": "9056d4060f74d68a8eb4c2b332e2f991",
     "semantic_hash": ""
   },
   "src/middlewares/errorHandler.js": {
@@ -108,9 +108,9 @@
     "semantic_hash": ""
   },
   "src/services/FileSystemService.js": {
-    "mtime": 1791904626.7174819,
-    "seen": 1791955531.9549348,
-    "ast_hash": "061d979c0e829efe2c6c0f0cd2ba286d",
+    "mtime": 1792002244.8818953,
+    "seen": 1792002386.0604537,
+    "ast_hash": "50cbd0d892bf95faad297b5f6194b925",
     "semantic_hash": ""
   },
   "src/services/MetadataService.js": {
@@ -408,14 +408,14 @@
     "semantic_hash": "6f72ba4f8d01347aabdf0261fa963963"
   },
   "docs/CONTRACTS.md": {
-    "mtime": 1792000788.9772644,
-    "seen": 1792001002.7250311,
-    "ast_hash": "73a59a58617c110bd628d878c70fc7b6",
+    "mtime": 1792002360.6512175,
+    "seen": 1792002386.0608087,
+    "ast_hash": "a03bbbafa1aa599deec36bc49f3153d7",
     "semantic_hash": ""
   },
   "docs/REPO_MAP.md": {
-    "mtime": 1792000788.993873,
-    "seen": 1792001002.7250366,
+    "mtime": 1792001810.0773506,
+    "seen": 1792002386.060815,
     "ast_hash": "4ce4d4d24535a447a1639c04da30f2de",
     "semantic_hash": ""
   },
@@ -456,27 +456,27 @@
     "semantic_hash": ""
   },
   "public/files.html": {
-    "mtime": 1792000596.4468942,
-    "seen": 1792001002.7253313,
-    "ast_hash": "b540547ab6e29403c2928b036557e838",
+    "mtime": 1792001810.162048,
+    "seen": 1792002386.0611317,
+    "ast_hash": "1789a497f787ca8f73f3f581bd3de284",
     "semantic_hash": ""
   },
   "public/index.html": {
-    "mtime": 1792000596.3803914,
-    "seen": 1792001002.7253327,
-    "ast_hash": "637549ffc4a696a896f6dc3df7a41d09",
+    "mtime": 1792001810.162048,
+    "seen": 1792002386.0611336,
+    "ast_hash": "9903489580d049155d3047b08c79f824",
     "semantic_hash": ""
   },
   "public/settings.html": {
-    "mtime": 1792000596.5622067,
-    "seen": 1792001002.7253368,
-    "ast_hash": "8daca677820de668c000477ea0702a7d",
+    "mtime": 1792001810.162048,
+    "seen": 1792002386.061138,
+    "ast_hash": "2b4ad7414f7ea2efcc3006b67beb7726",
     "semantic_hash": ""
   },
   "public/uploads.html": {
-    "mtime": 1792000596.5027857,
-    "seen": 1792001002.7253385,
-    "ast_hash": "762901e69855160a6c216d164722f763",
+    "mtime": 1792001810.162048,
+    "seen": 1792002386.06114,
+    "ast_hash": "224377b3264223cf4fd59b1c7cc7f25c",
     "semantic_hash": ""
   },
   "src/controllers/dashboard.controller.js": {
@@ -564,9 +564,9 @@
     "semantic_hash": ""
   },
   ".claude/launch.json": {
-    "mtime": 1792000884.95985,
-    "seen": 1792001002.7245128,
-    "ast_hash": "d87276d9aa6a76b04f95d2559540a269",
+    "mtime": 1792001023.8994956,
+    "seen": 1792002386.0603144,
+    "ast_hash": "244bde233aa5d0d3fca96585b8bb8e35",
     "semantic_hash": ""
   },
   "src/controllers/preview.controller.js": {
@@ -594,9 +594,9 @@
     "semantic_hash": ""
   },
   "test/api/fs.contract.test.js": {
-    "mtime": 1791904626.7224727,
-    "seen": 1791955531.9549797,
-    "ast_hash": "83d0e99471dafd94a908c203960e8b4f",
+    "mtime": 1792002324.7612178,
+    "seen": 1792002386.0605025,
+    "ast_hash": "ee92445eee6397e1bc10d99ebfec636e",
     "semantic_hash": ""
   },
   "test/frontend/files.test.js": {
@@ -1548,9 +1548,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/admin.js": {
-    "mtime": 1792000699.069151,
-    "seen": 1792001002.7245328,
-    "ast_hash": "db7294571f9533492746846ad6cc0255",
+    "mtime": 1792001810.1464045,
+    "seen": 1792002386.0603337,
+    "ast_hash": "393c3fb035b9c76dac3802eff238fb86",
     "semantic_hash": ""
   },
   "public/assets/js/login.js": {
@@ -1560,8 +1560,8 @@
     "semantic_hash": ""
   },
   "src/controllers/auth.controller.js": {
-    "mtime": 1792000581.2701492,
-    "seen": 1792001002.7245798,
+    "mtime": 1792001810.162048,
+    "seen": 1792002386.060381,
     "ast_hash": "840f2605e412a73a6d3c75fe7f674ad3",
     "semantic_hash": ""
   },
@@ -1590,8 +1590,8 @@
     "semantic_hash": ""
   },
   "src/db/repositories/AuditLogRepository.js": {
-    "mtime": 1792000573.6780615,
-    "seen": 1792001002.7246037,
+    "mtime": 1792001810.162048,
+    "seen": 1792002386.0604053,
     "ast_hash": "ec6c46137dd7bd201e2ebf048dc89a15",
     "semantic_hash": ""
   },
@@ -1644,8 +1644,8 @@
     "semantic_hash": ""
   },
   "src/routes/admin.routes.js": {
-    "mtime": 1792000573.8888788,
-    "seen": 1792001002.7246318,
+    "mtime": 1792001810.162048,
+    "seen": 1792002386.0604358,
     "ast_hash": "577d6a1018e92d6afbee05e376a70933",
     "semantic_hash": ""
   },
@@ -1806,9 +1806,9 @@
     "semantic_hash": ""
   },
   "public/admin.html": {
-    "mtime": 1792000705.5997334,
-    "seen": 1792001002.7253294,
-    "ast_hash": "98ed99db472df0199ba2010515f1ec39",
+    "mtime": 1792001810.1464045,
+    "seen": 1792002386.06113,
+    "ast_hash": "303b8aebad82eb850560b540eff5803e",
     "semantic_hash": ""
   },
   "public/login.html": {
@@ -2070,21 +2070,21 @@
     "semantic_hash": ""
   },
   "src/controllers/system.controller.js": {
-    "mtime": 1792000573.7324994,
-    "seen": 1792001002.7245936,
-    "ast_hash": "70554ac23bc7922d0902bf9f340480c6",
+    "mtime": 1792001810.162048,
+    "seen": 1792002386.0603957,
+    "ast_hash": "f60e2cb82fc2717bfb911647fa7c102e",
     "semantic_hash": ""
   },
   "src/services/PortalService.js": {
-    "mtime": 1792000557.1497915,
-    "seen": 1792001002.7246556,
-    "ast_hash": "9b9065f444148fa17ac003f4557ccc75",
+    "mtime": 1792001810.1745796,
+    "seen": 1792002386.0604608,
+    "ast_hash": "54aa23329d6e3dd56de8ae5e029ba319",
     "semantic_hash": ""
   },
   "test/api/system.contract.test.js": {
-    "mtime": 1792000819.265214,
-    "seen": 1792001002.7247071,
-    "ast_hash": "bf9df4bf7b64dade5f4b6e753652351d",
+    "mtime": 1792001810.1750329,
+    "seen": 1792002386.060514,
+    "ast_hash": "2a5770fb739960847dcfdb488eb15bfb",
     "semantic_hash": ""
   }
 }

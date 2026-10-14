@@ -1,17 +1,17 @@
 # Graph Report - Admin-Files-Manager-fixed  (2026-10-14)
 
 ## Corpus Check
-- 331 files · ~543,740 words
+- 331 files · ~544,279 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 23 file(s) not represented in the graph (top: .css 10, (none) 7, .conf 2)
 
 ## Summary
-- 5378 nodes · 7826 edges · 306 communities (295 shown, 11 thin omitted)
+- 5380 nodes · 7828 edges · 293 communities (281 shown, 12 thin omitted)
 - Extraction: 80% EXTRACTED · 20% INFERRED · 0% AMBIGUOUS · INFERRED: 1534 edges (avg confidence: 0.93)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `10b33ace`
+- Built from commit: `2b9ccc06`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -29,14 +29,14 @@
 - Optimization Patterns
 - package.json
 - ADDED Requirements
-- SessionService.test.js
+- FileAccessPolicyService.test.js
 - Git Workflow and Versioning
-- MetadataService
+- js/api.js
 - server.js
 - Constraint-Driven Development
 - Performance Optimization
 - Context Engineering
-- login.test.js
+- ref_node_assert
 - Frontend UI Engineering
 - Requirement: Summary Field Contract
 - ADDED Requirements
@@ -53,23 +53,23 @@
 - idea-refine.sh
 - ADDED Requirements
 - Requirement: Separator-Boundary Path Containment
-- live-server.test.js
+- MetadataService.js
 - dashboard.test.js
 - ADDED Requirements
-- Design
+- csp.test.js
 - AGENTS.md - Dimension Files Manager operating rules
 - PathService.test.js
-- ._read
+- Decisions
 - ADDED Requirements
 - ADDED Requirements
 - app.test.js
 - Shipping and Launch
-- ref_node_assert
+- FileSystemService.volume.test.js
 - dashboard.contract.test.js
 - ref_node_fs
 - FileSystemService.tree.test.js
-- FileSystemService.rename.test.js
-- MetadataService.dashboard.test.js
+- ref_node_os
+- Design
 - ADDED Requirements
 - CI/CD and Automation
 - ADDED Requirements
@@ -80,7 +80,7 @@
 - ADDED Requirements
 - Requirement: Every Removed Defect Has A Failing-Then-Passing Check
 - Source-Driven Development
-- AdminDatabase
+- resolveDataDir
 - opencode.json
 - Requirement: Capability Claims Match Server Behaviour
 - Requirement: Download Ranking Is Computed Server-Side
@@ -156,7 +156,7 @@
 - ADDED Requirements
 - Requirement: Option Toggles Reach The Server
 - init
-- resolveStorageDisplay
+- Frontend Core
 - ADDED Requirements
 - loadApi
 - ADDED Requirements
@@ -182,10 +182,10 @@
 - Impact
 - routes/api.js
 - ADDED Requirements
-- fileTypes.test.js
+- dashboard.controller.js
 - Requirement: Bare Response Envelope
 - ADDED Requirements
-- UserService.js
+- UserService
 - Requirement: Tenant Directories Are Usable On Every Supported Host
 - Requirement: File And Folder Counting
 - ADDED Requirements
@@ -194,7 +194,7 @@
 - ADDED Requirements
 - deploy.sh
 - Tasks
-- connection.js
+- ref_node_test
 - Requirement: Separator-Boundary Path Containment
 - DEPLOYMENT.md — Operator Runbook
 - Medium severity
@@ -208,13 +208,13 @@
 - SessionService.js
 - Decision
 - rate-limit.test.js
-- Acceptance Criteria
+- env.js
 - Requirement: Partial Capability Failure
-- csp.test.js
+- error-disclosure.test.js
 - trigger-deploy.sh
-- .toggleStar
+- MetadataService
 - AppError
-- cors.enabled.test.js
+- Proposal
 - Decision
 - Requirement: The Database Honours The Hardened Deployment Unit
 - Requirement: Throttling Is Layered And Cannot Be Side-Stepped
@@ -241,7 +241,7 @@
 - settings.routes.js
 - Requirement: Downloads Are Authorized And Not Navigable
 - Requirement: No Unauthenticated Surface Serves Tenant Content
-- admin.routes.js
+- users.controller.js
 - ADDED Requirements
 - ADDED Requirements
 - Requirement: Policies Are Time-Bounded And Evaluated At Request Time
@@ -255,7 +255,7 @@
 - Requirement: Cross-Origin Access Is Off Unless Explicitly Configured
 - Requirement: Refusals Disclose As Little As Possible
 - Requirement: No Operating-System Path Leakage
-- Admin database — `admin.sqlite` (ADR-009)
+- Schema
 - Requirement: Authorization Is Atomic Across A Batch
 - Requirement: Authorization Is Batched For A Listing
 - Requirement: Denials And Missing Resources Are Indistinguishable Across Tenants
@@ -274,51 +274,38 @@
 - Requirement: A Resource Record Never Directs Filesystem Access On Its Own
 - Requirement: Resolution Uses A Stated Lookup Strategy
 - Requirement: Every Other Endpoint Requires A Credential
-- settingsService.test.js
-- MetadataService.js
+- express
+- header-hygiene.test.js
 - FileSystemService.move.test.js
 - admin.contract.test.js
 - Tasks
 - First Contribution
 - Decision
 - .getTreeStats
-- filePolicy.controller.js
-- Limitations & Improvements
-- login.js
+- sandbox
+- shutdown
 - Repositories
-- error-disclosure.test.js
-- Decision
 - PortalService.js
 - Interview Me
 - Requirement: Partial Capability Failure
 - Requirement: The Summary Requires Authentication And A Declared Permission
 - Files Page
 - Requirement: Filesystem Router Separation
-- toggleTo
 - Intermediate
 - Common failures
-- downloadZip
+- Low severity
 - Getting Started
-- deployment-scripts.md
+- .touch
 - Proposal
-- validateSettingsPayload
 - Beginner
 - Design
 - FileSystemService.copy.test.js
-- FileAccessPolicyRepository
 - FileSystemService.js
-- FileAccessPolicyService.test.js
-- .getActivities
 - auth.controller.js
-- users.controller.js
 - MetadataService.schema.test.js
 - Tasks
 - Migration Plan
-- dashboard.controller.js
 - PreviewService.js
-- action
-- files-page.md
-- rateLimit.js
 - authenticate.js
 - Nginx: Determination, Compatibility And Staged Removal
 
@@ -339,12 +326,12 @@
   docs-vault/Modules/Feature Pages.md → public/assets/js/app.js
 - `Key Concepts` --references--> `escapeHtml()`  [INFERRED]
   docs-vault/Modules/Files Page.md → public/assets/js/app.js
-- `Key Files` --references--> `escapeHtml()`  [INFERRED]
-  docs-vault/_state/modules/files-page.md → public/assets/js/app.js
 - `Frontend state model` --references--> `escapeHtml()`  [INFERRED]
   openspec/changes/archive/2026-10-03-dashboard-real-data/design.md → public/assets/js/app.js
-- `Security` --references--> `escapeHtml()`  [INFERRED]
-  openspec/changes/files-page-correctness/proposal.md → public/assets/js/app.js
+- `Frontend Impact (P0-5) — this is a build, not a patch` --references--> `resolveIdentityDisplay()`  [INFERRED]
+  openspec/changes/saas-identity-and-tenancy/design.md → public/assets/js/app.js
+- `5. Consumers` --references--> `loadGlobalData()`  [INFERRED]
+  openspec/changes/settings-page-correctness/tasks.md → public/assets/js/app.js
 
 ## Import Cycles
 - None detected.
@@ -358,7 +345,7 @@
 - **Agent Quality Bar Enforcement Stack** — _agents_skills_constraint_driven_development_skill, _agents_skills_constraint_driven_development_references_floor_guard, _agents_skills_ci_cd_and_automation_skill, _agents_skills_code_review_and_quality_skill, _agents_skills_git_workflow_and_versioning_skill [INFERRED 0.85]
 - **Untrusted Input Boundary Discipline** — _agents_skills_api_and_interface_design_skill_validate_at_boundaries, _agents_skills_browser_testing_with_devtools_skill_untrusted_browser_content, _agents_skills_debugging_and_error_recovery_skill_error_output_as_untrusted_data, _agents_skills_context_engineering_skill_trust_levels [INFERRED 0.85]
 
-## Communities (306 total, 11 thin omitted)
+## Communities (293 total, 12 thin omitted)
 
 ### Community 0 - "ADDED Requirements"
 Cohesion: 0.04
@@ -397,8 +384,8 @@ Cohesion: 0.14
 Nodes (13): Feeding CI Failures Back to Agents, Debugging and Error Recovery, Error-Specific Patterns, Bisection for Regression Bugs, Instrumentation Guidelines, The Triage Checklist, Observability and Instrumentation, Mandatory Correlation IDs (+5 more)
 
 ### Community 9 - "app.js"
-Cohesion: 0.08
-Nodes (41): initApp duplicates refreshChrome, Code Review Notes, How It Works: Main Flow, Dependencies, Architecture, Complexity, Dependencies, Internal Patterns (+33 more)
+Cohesion: 0.06
+Nodes (54): initApp duplicates refreshChrome, Beginner, Code Review Notes, How It Works: Main Flow, Key Concepts, What Is This?, Dependencies, Architecture (+46 more)
 
 ### Community 10 - "Optimization Patterns"
 Cohesion: 0.28
@@ -412,17 +399,17 @@ Nodes (25): description, devDependencies, nodemon, directories, doc, engines, no
 Cohesion: 0.05
 Nodes (41): ADDED Requirements, Files UI Quality, Purpose, Regression Requirements, Requirement: Dense Controls Fit Narrow Viewports, Requirement: Destructive Actions State Their Scope, Requirement: Detail Views Are Consistent, Requirement: States Are Visually Distinct (+33 more)
 
-### Community 13 - "SessionService.test.js"
-Cohesion: 0.11
-Nodes (17): { hashPassword }, ADR-0009, UserRepository, AdminDatabase, ADR-0009, hashPassword(), AdminDatabase, assert (+9 more)
+### Community 13 - "FileAccessPolicyService.test.js"
+Cohesion: 0.07
+Nodes (28): AdminDatabase, ADR-0009, { hashPassword }, ADR-0009, UserRepository, hashPassword(), AdminDatabase, AppError (+20 more)
 
 ### Community 14 - "Git Workflow and Versioning"
 Cohesion: 0.11
 Nodes (19): Code Review and Quality, Finding Severity Labels, Multi-Model Review Pattern, Structural Remedies, Restartable Session Boundaries, Changelog Maintenance, Doubt-Driven Development, Step 3 DOUBT: Adversarial Fresh-Context Reviewer (+11 more)
 
-### Community 15 - "MetadataService"
-Cohesion: 0.14
-Nodes (25): DATABASE.md — Persistence Reference, Metadata store — `metadata.json`, Overview, Settings store — `settings.json`, Which store do I use?, 1. A dedicated JSON document at `data/settings.json`, not XML, 1. `node:sqlite` is the persistence engine, additive to the existing JSON stores, Metadata and Settings Stores (+17 more)
+### Community 15 - "js/api.js"
+Cohesion: 0.10
+Nodes (21): checklist..md - Linux File-System Migration Checklist, Static-Prototype-to-Backed-UI Migration Checklist (API bridge, global data injection, dashboard, file browser, mutations, XHR upload, settings), /api/fs Endpoint Table (tree, list, download, folder, upload, rename, delete, download-zip), Module Boundary Diagram (browser -> window.API -> HTTP -> routes -> controllers -> services), ADR-0007, ADR-0009, Dashboard, Files (+13 more)
 
 ### Community 16 - "server.js"
 Cohesion: 0.11
@@ -440,9 +427,9 @@ Nodes (13): The Five-Axis Review, Code Simplification, Claude Code Simplifier Pl
 Cohesion: 0.28
 Nodes (8): Context Engineering, Confusion Management, The Context Hierarchy, Context Packing Strategies, The Inline Planning Pattern, Lost in the Middle Effect, Rules Files, Documentation for Agents
 
-### Community 20 - "login.test.js"
-Cohesion: 0.08
-Nodes (19): API_SRC, assert, fs, ADR-0009, path, { test, describe }, vm, APP_JS (+11 more)
+### Community 20 - "ref_node_assert"
+Cohesion: 0.07
+Nodes (22): assert, config, { test, describe }, API_SRC, assert, fs, ADR-0009, path (+14 more)
 
 ### Community 21 - "Frontend UI Engineering"
 Cohesion: 0.13
@@ -473,8 +460,8 @@ Cohesion: 0.08
 Nodes (17): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders, childAuthHeaders, fs, http, MetadataService, net (+9 more)
 
 ### Community 28 - "HTTP API Layer.md"
-Cohesion: 0.11
-Nodes (43): Administration — `/admin` ([[Auth and Access Control]]), API Reference, Conventions, Dashboard and settings, Endpoints, Files — `/fs` ([[HTTP API Layer]] → [[Storage Services]]), Known API defects, Request pipeline (+35 more)
+Cohesion: 0.14
+Nodes (34): Administration — `/admin` ([[Auth and Access Control]]), API Reference, Conventions, Dashboard and settings, Endpoints, Files — `/fs` ([[HTTP API Layer]] → [[Storage Services]]), Known API defects, Request pipeline (+26 more)
 
 ### Community 29 - "ADDED Requirements"
 Cohesion: 0.05
@@ -500,9 +487,9 @@ Nodes (35): ADDED Requirements, Purpose, Requirement: Bulk Queue Actions Are Pre
 Cohesion: 0.06
 Nodes (35): filesystem-security Specification, Purpose, Requirement: Filesystem-Derived Strings Are Escaped Before Markup Insertion, Requirement: No Absolute Path In Any Response, Requirement: Reverse Client-Path Conversion Is Consistent, Requirement: Separator-Boundary Path Containment, Requirement: Single Resolution Basis, Requirement: Storage Root Deletion Remains Blocked (+27 more)
 
-### Community 37 - "live-server.test.js"
-Cohesion: 0.11
-Nodes (15): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders, { execFileSync }, fs, fsp, http, ADR-0007 (+7 more)
+### Community 37 - "MetadataService.js"
+Cohesion: 0.08
+Nodes (20): data/metadata.json Schema (downloads map, starred array, activities array capped at 50, ms-epoch times), path, fs, path, { resolveDataDir }, { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders (+12 more)
 
 ### Community 38 - "dashboard.test.js"
 Cohesion: 0.12
@@ -512,21 +499,21 @@ Nodes (13): assert, createFormatStub(), DASHBOARD_SRC, dashboardSource, fs, INDE
 Cohesion: 0.06
 Nodes (32): ADDED Requirements, Purpose, Regression Requirements, Requirement: Destination Must Exist and Be a Directory, Requirement: Destination Precedes the File Part, Requirement: Dropped Directories Are Uploaded, Requirement: Existing Files Are Never Silently Destroyed, Requirement: The Reported Path Is the Path Actually Written (+24 more)
 
-### Community 40 - "Design"
-Cohesion: 0.33
-Nodes (5): Design, Goals / Non-Goals, Migration Plan, Open Questions, Risks / Trade-offs
+### Community 40 - "csp.test.js"
+Cohesion: 0.12
+Nodes (14): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders, DATA, fs, http, MetadataService, os (+6 more)
 
 ### Community 41 - "AGENTS.md - Dimension Files Manager operating rules"
-Cohesion: 0.06
-Nodes (46): AGENTS.md - Dimension Files Manager operating rules, Response Envelope Contract ({ success: true, data } / { success: false, error }), architecture.md - Legacy Deep-Dive Architecture Document, Global Namespace Map (window.AFM, Theme, Sidebar, Dashboard, Files, Uploads - no other globals), Mock Data Extension Points (replace dashboard.js arrays, files.js makeFiles(), uploads.js tick() with real API/XHR calls), Two-Layer Token Model (immutable raw palette in tokens.css, themed semantic tokens in themes.css; components must consume Layer 2 only), backend-checklist.md - Node.js Backend Build Checklist, Eight-Phase Backend Plan (setup, security/FS services, metadata, read APIs, mutation APIs, streaming upload, telemetry, settings) (+38 more)
+Cohesion: 0.09
+Nodes (25): AGENTS.md - Dimension Files Manager operating rules, Response Envelope Contract ({ success: true, data } / { success: false, error }), architecture.md - Legacy Deep-Dive Architecture Document, Global Namespace Map (window.AFM, Theme, Sidebar, Dashboard, Files, Uploads - no other globals), Mock Data Extension Points (replace dashboard.js arrays, files.js makeFiles(), uploads.js tick() with real API/XHR calls), Two-Layer Token Model (immutable raw palette in tokens.css, themed semantic tokens in themes.css; components must consume Layer 2 only), backend-checklist.md - Node.js Backend Build Checklist, Eight-Phase Backend Plan (setup, security/FS services, metadata, read APIs, mutation APIs, streaming upload, telemetry, settings) (+17 more)
 
 ### Community 42 - "PathService.test.js"
 Cohesion: 0.13
 Nodes (12): AppError, assert, ENV_MODULE, fs, NORMALIZED_ROOT_SPELLINGS, os, path, SERVICE_MODULE (+4 more)
 
-### Community 43 - "._read"
-Cohesion: 0.17
-Nodes (9): D10 — The notice is repurposed, and its pinned test is updated, D12 — Frontend state model after the honesty pass, D2 — Schema v1 persists only what works, D4 — PUT is a strict, validated full replace, D5 — Corrupt store fails wholly (500), mirroring `MetadataService._read`, D6 — Defaults materialize on first read, D9 — Consumers fetch silently, fall back to current behaviour, Decisions (+1 more)
+### Community 43 - "Decisions"
+Cohesion: 0.12
+Nodes (16): Context, D10 — The notice is repurposed, and its pinned test is updated, D12 — Frontend state model after the honesty pass, D2 — Schema v1 persists only what works, D3 — Envelope: bare read, enveloped write, handler-thrown errors, D4 — PUT is a strict, validated full replace, D5 — Corrupt store fails wholly (500), mirroring `MetadataService._read`, D6 — Defaults materialize on first read (+8 more)
 
 ### Community 44 - "ADDED Requirements"
 Cohesion: 0.06
@@ -544,29 +531,29 @@ Nodes (11): APP_PATH, APP_SOURCE, assert, brandNodes(), fs, ADR-0009, mountSideb
 Cohesion: 0.22
 Nodes (10): Definition of Done, Verification Checkpoints, Feature Flag Strategy, Monitoring and Observability, Post-Launch Verification, Pre-Launch Checklist, Rollback Strategy, Rollout Decision Thresholds (+2 more)
 
-### Community 48 - "ref_node_assert"
-Cohesion: 0.07
-Nodes (21): assert, config, { test, describe }, ADMIN_HTML, ADMIN_JS, assert, fs, ADR-0009 (+13 more)
+### Community 48 - "FileSystemService.volume.test.js"
+Cohesion: 0.17
+Nodes (9): assert, ENV_MODULE, fs, os, path, PATHSERVICE_MODULE, SERVICE_MODULE, { test, describe, after } (+1 more)
 
 ### Community 49 - "dashboard.contract.test.js"
 Cohesion: 0.12
 Nodes (13): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders, fs, get(), http, MetadataService, os (+5 more)
 
 ### Community 50 - "ref_node_fs"
-Cohesion: 0.07
-Nodes (22): assert, fs, gitignore, path, pkg, ROOT, { test, describe }, assert (+14 more)
+Cohesion: 0.05
+Nodes (31): ADMIN_HTML, ADMIN_JS, assert, fs, ADR-0009, path, ROOT_DIR, ROUTER_JS (+23 more)
 
 ### Community 51 - "FileSystemService.tree.test.js"
 Cohesion: 0.17
 Nodes (9): assert, ENV_MODULE, fs, os, path, PATHSERVICE_MODULE, SERVICE_MODULE, { test, describe, after } (+1 more)
 
-### Community 52 - "FileSystemService.rename.test.js"
-Cohesion: 0.15
-Nodes (10): AppError, assert, ENV_MODULE, fs, os, path, PATHSERVICE_MODULE, SERVICE_MODULE (+2 more)
+### Community 52 - "ref_node_os"
+Cohesion: 0.05
+Nodes (32): AppError, AppError, assert, ENV_MODULE, fs, os, path, PATHSERVICE_MODULE (+24 more)
 
-### Community 53 - "MetadataService.dashboard.test.js"
-Cohesion: 0.18
-Nodes (9): assert, freshStore(), fs, fsp, MetadataServiceSingleton, os, path, { test, describe, before, after, beforeEach } (+1 more)
+### Community 53 - "Design"
+Cohesion: 0.25
+Nodes (7): Context, Design, Goals, Goals / Non-Goals, Human Approval Points, Migration Plan, Non-Goals
 
 ### Community 54 - "ADDED Requirements"
 Cohesion: 0.07
@@ -585,8 +572,8 @@ Cohesion: 0.06
 Nodes (30): ADDED Requirements, Purpose, Requirement: Failure Bodies Are Of A Known Shape, Requirement: Failure Messages Are Displayable And Non-Volatile, Requirement: Internal Paths Are Not Disclosed, Requirement: Stack Traces Are Never Disclosed, Requirement: Upload Failures Carry A Machine-Readable Kind, Scenario: A collision is distinguishable (+22 more)
 
 ### Community 58 - "Phase 6 — Shared Frontend Contract"
-Cohesion: 0.09
-Nodes (21): ADR-005 — Client-Side Navigation Between the Four Pages, Alternatives rejected, Consequences, Context, Decision, File ownership (no two agents touch the same file), Non-negotiables, Phase 6 — Shared Frontend Contract (+13 more)
+Cohesion: 0.17
+Nodes (11): File ownership (no two agents touch the same file), Non-negotiables, Phase 6 — Shared Frontend Contract, Seam 1 — Sidebar storage (Agent A implements; B and C only empty the markup), Seam 2 — Sidebar identity (Agent A implements; B and C only empty the markup), Seam 5 — Historical affordances (Agent B removes; Agent C empties), Seam 6 — Storage donut units, Seam 8 — Panel states (+3 more)
 
 ### Community 59 - "Skill Discovery Map"
 Cohesion: 0.32
@@ -608,9 +595,9 @@ Nodes (30): ADDED Requirements, Purpose, Requirement: Documentation Tracks The S
 Cohesion: 0.38
 Nodes (7): Cite Your Sources, Detect Stack and Versions, Docs vs. Existing Code Conflict Detection, Fetch Official Documentation, Implement Following Documented Patterns, Source-Driven Development, Source Hierarchy of Authority
 
-### Community 64 - "AdminDatabase"
-Cohesion: 0.11
-Nodes (20): Connection, System-Wide Patterns, Concurrency & State, Patterns Used, How tests isolate stores, Code excerpt, How to apply it in new code, Singleton Services (+12 more)
+### Community 64 - "resolveDataDir"
+Cohesion: 0.12
+Nodes (20): Admin database — `admin.sqlite` (ADR-009), Connection, Known defects (tracked in `docs-vault/Health/Code Review.md`), Migrations, Operations, Tests, System-Wide Patterns, Patterns Used (+12 more)
 
 ### Community 66 - "Requirement: Capability Claims Match Server Behaviour"
 Cohesion: 0.06
@@ -673,8 +660,8 @@ Cohesion: 0.07
 Nodes (26): ADDED Requirements, Markup Escaping And Security Boundary, Purpose, Regression Requirements, Requirement: A Content Security Policy Is A Recorded Decision, Requirement: Cross-Origin Access Is A Recorded Decision, Requirement: Filesystem-Derived Strings Are Escaped Before Insertion, Requirement: Response Messages Do Not Disclose Filesystem Detail (+18 more)
 
 ### Community 81 - "fs.controller.js"
-Cohesion: 0.06
-Nodes (51): Amendment (2026-10-14) — documentation drift corrected, Bulk partial-failure loop triplicated, Concurrency & State, Design Rationale, Intermediate, Module Interactions, Patterns Used, Performance Characteristics (+43 more)
+Cohesion: 0.05
+Nodes (69): Bulk partial-failure loop triplicated, Idempotent star set races (read-then-toggle), Download failures are invisible to the user, getList walks every listed folder before paginating, Concurrency & State, Design Rationale, Intermediate, Invariants & Constraints (+61 more)
 
 ### Community 82 - "ADDED Requirements"
 Cohesion: 0.08
@@ -717,8 +704,8 @@ Cohesion: 0.09
 Nodes (22): Purpose, Requirement: Capacity Is Nullable And Declared Unavailable, Requirement: Storage Root Containment Determines The Volume, Requirement: Three Distinct Quantities, Requirement: Volume Availability Reflects A Real Reading, Requirement: Volume Usage Uses Available-Block Semantics, Requirements, Scenario: Available volume is declared available (+14 more)
 
 ### Community 92 - "files.test.js"
-Cohesion: 0.09
-Nodes (22): activeTreePaths(), APP_SRC, assert, booted(), bootedWith(), dirtied(), expectAt(), FILES_CSS (+14 more)
+Cohesion: 0.08
+Nodes (25): activeTreePaths(), APP_SRC, assert, booted(), bootedWith(), dirtied(), event(), expectAt() (+17 more)
 
 ### Community 93 - "ADDED Requirements"
 Cohesion: 0.07
@@ -757,8 +744,8 @@ Cohesion: 0.12
 Nodes (12): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders, fs, http, MetadataService, os, path (+4 more)
 
 ### Community 103 - ".rename"
-Cohesion: 0.11
-Nodes (34): 1. Upload placement is decided after the body is parsed, Known Gaps, Module by Module, Known Gaps, Bulk handlers leak unsanitized error messages, Mutating operations use only the lexical path guard, Free-space watermark checks only the staging volume, Rename and move collision checks are check-then-act (+26 more)
+Cohesion: 0.09
+Nodes (39): 1. Upload placement is decided after the body is parsed, Concurrency and Consistency, Known Gaps, Module by Module, Shutdown Ordering, The Concern, Where the Single-Writer Assumption Breaks, Known Gaps (+31 more)
 
 ### Community 104 - "Acceptance Criteria"
 Cohesion: 0.10
@@ -770,7 +757,7 @@ Nodes (9): 0. Preconditions and ownership gates (no source changes), 1. Contract
 
 ### Community 107 - "Low severity"
 Cohesion: 0.06
-Nodes (36): A malformed session cookie becomes a 500, A NUL byte in a client path becomes a 500, Access-policy flags coerced by truthiness, Access-policy modal never settles on Escape, APP_ROOT containment check is lexical, Async policy prefill can overwrite operator edits, Audit write in a catch can mask the original error, body overflow has three uncoordinated owners (+28 more)
+Nodes (35): A malformed session cookie becomes a 500, A NUL byte in a client path becomes a 500, Access-policy flags coerced by truthiness, Access-policy modal never settles on Escape, APP_ROOT containment check is lexical, Async policy prefill can overwrite operator edits, Audit write in a catch can mask the original error, body overflow has three uncoordinated owners (+27 more)
 
 ### Community 108 - "Decisions"
 Cohesion: 0.12
@@ -781,8 +768,8 @@ Cohesion: 0.11
 Nodes (17): §0 gate verdicts, 0. Gate — verify the server contract, and record shared-file ownership, 2. Error disclosure pinning and failure taxonomy, 3. Queue derivations and correctness, 4. Rendering cost, 5. Honesty and copy, 6. Interaction, 7. Accessibility and responsive density (+9 more)
 
 ### Community 110 - "Decisions"
-Cohesion: 0.22
-Nodes (8): D1. Role is a two-value column, not a permission catalogue, D3. Session mechanics: cookie + bearer, flat expiry, D5. No enforcement wiring in this change, D6. Audit logging: flat, fixed retention, D7. Bootstrap: operator-supplied, never a default, Decisions, Design, Migration Steps
+Cohesion: 0.33
+Nodes (6): D1. Role is a two-value column, not a permission catalogue, D3. Session mechanics: cookie + bearer, flat expiry, D5. No enforcement wiring in this change, D6. Audit logging: flat, fixed retention, D7. Bootstrap: operator-supplied, never a default, Decisions
 
 ### Community 111 - "Test-Driven Development"
 Cohesion: 0.16
@@ -793,8 +780,8 @@ Cohesion: 0.14
 Nodes (13): `/api/health` vs `/api/dashboard/health` — two different things, File ownership, Known pre-existing issues — record, do NOT fix in this phase, Live payload — `GET /api/dashboard/summary`, Load average is deliberately absent, New files that REPO_MAP must list, No history is retained, Phase 7 — Verified Facts (normative for all P7 agents) (+5 more)
 
 ### Community 113 - "escapeHtml"
-Cohesion: 0.12
-Nodes (15): Modal and ContextMenu insert caller strings as raw HTML, D15 - Escape everything derived from the filesystem, Context, Decisions, Design, Goals / Non-Goals, Migration Plan, Risks / Trade-offs (+7 more)
+Cohesion: 0.06
+Nodes (30): Modal and ContextMenu insert caller strings as raw HTML, Complexity, Dependencies, Internal Patterns, Key Files, Limitations & Improvements, Public API, D15 - Escape everything derived from the filesystem (+22 more)
 
 ### Community 114 - "Tasks"
 Cohesion: 0.22
@@ -805,16 +792,16 @@ Cohesion: 0.33
 Nodes (5): booted(), httpError(), loadUploads(), settle(), settleAll()
 
 ### Community 116 - "Decisions"
-Cohesion: 0.12
-Nodes (16): D10 — Remove historical affordances; record no history, D11 — `node:test`, no dependency, no `engines`, D12 — Self-terminating polling; adopt the existing pattern, D13 — Metadata bootstrap owned by `MetadataService`; restore `data/.gitkeep`, D14 — Sidebar scope is all four pages, D1 — Mount `/api/dashboard` before the `/api` catch-all, D2 — Bare responses, not `{success, data}`, D3 — No `DashboardService` (+8 more)
+Cohesion: 0.07
+Nodes (29): Architecture, Cross-platform considerations, D10 — Remove historical affordances; record no history, D11 — `node:test`, no dependency, no `engines`, D12 — Self-terminating polling; adopt the existing pattern, D13 — Metadata bootstrap owned by `MetadataService`; restore `data/.gitkeep`, D14 — Sidebar scope is all four pages, D1 — Mount `/api/dashboard` before the `/api` catch-all (+21 more)
 
 ### Community 117 - "validateStartup"
-Cohesion: 0.13
-Nodes (21): PORT is never validated, Stale doc comment in dataDir.js, Directory checks do not test writability, Patterns Used, 2. Directory checks do not test writability — Limitation (medium), Complexity, Internal Patterns, Key Files (+13 more)
+Cohesion: 0.14
+Nodes (22): CORS allowlist validated normalized but matched raw, PORT is never validated, Stale doc comment in dataDir.js, Code Review Notes, Patterns Used, 1. CORS allowlist is validated in normalized form but matched as a raw string — Bug or Risk (medium), 2. Directory checks do not test writability — Limitation (medium), 3. `PORT` is never validated — Bug or Risk (low) (+14 more)
 
 ### Community 118 - "loadFiles"
-Cohesion: 0.15
-Nodes (9): Architecture, D8 - Keep selection across reloads by pruning, not by clearing, Data and control flow changes, Error handling, Exact components affected, Root cause per defect, loadFiles(), sandbox (+1 more)
+Cohesion: 0.29
+Nodes (7): Architecture, D8 - Keep selection across reloads by pruning, not by clearing, Data and control flow changes, Error handling, Exact components affected, loadFiles(), makeDocument()
 
 ### Community 119 - "ADDED Requirements"
 Cohesion: 0.08
@@ -833,8 +820,8 @@ Cohesion: 0.33
 Nodes (6): Requirement: Queue Items Have A Closed, Observable Lifecycle, Scenario: A file that cannot be queued is named, not merely counted, Scenario: Adding a file yields a queued item, Scenario: Cancelling removes the item from the queue, Scenario: Clearing completed rows is distinct from cancelling, Scenario: Pause and resume return an item to the queue
 
 ### Community 123 - "FileAccessPolicyService.js"
-Cohesion: 0.09
-Nodes (19): `file_access_policies` (migration 2), FileAccessPolicyService, getThumbnail(), PreviewService, { validateClientPath }, AdminDatabase, ADR-0009, ACCESS_MODES (+11 more)
+Cohesion: 0.10
+Nodes (17): `file_access_policies` (migration 2), AdminDatabase, ADR-0009, AdminDatabase, ADR-0009, ACCESS_MODES, ALLOW_ALL, canonical() (+9 more)
 
 ### Community 124 - "Requirement: Dashboard Health Is A Separate Endpoint From Liveness"
 Cohesion: 0.08
@@ -857,8 +844,8 @@ Cohesion: 0.13
 Nodes (16): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, assertRefused(), authHeaders, fs, http, os, path (+8 more)
 
 ### Community 130 - "stopPropagation"
-Cohesion: 0.12
-Nodes (16): D11 — The page module keeps its contract; interference removed, Acceptance Criteria, Capabilities, Concurrent-change coordination, Consumers, Form integrity, Guardrails and docs, Impact (+8 more)
+Cohesion: 0.13
+Nodes (15): Root cause per defect, D11 — The page module keeps its contract; interference removed, Acceptance Criteria, Capabilities, Consumers, Form integrity, Guardrails and docs, Modified Capabilities (+7 more)
 
 ### Community 131 - "Requirement: Failure Reasons Are Distinguishable"
 Cohesion: 0.50
@@ -893,12 +880,12 @@ Cohesion: 0.67
 Nodes (3): Requirement: Option Toggles Reach The Server, Scenario: A presented option is transmitted, Scenario: An option with no server behaviour is removed
 
 ### Community 139 - "init"
-Cohesion: 0.06
-Nodes (42): Forced destination re-check returns a stale in-flight result, Stored sidebar width not restored when widening from mobile, Upload tray hidden after a page re-init, Advanced, API Reference, Beginner, Code Review Notes, Concurrency & State (+34 more)
+Cohesion: 0.05
+Nodes (47): Forced destination re-check returns a stale in-flight result, Stored sidebar width not restored when widening from mobile, Upload tray hidden after a page re-init, Advanced, API Reference, Beginner, Code Review Notes, Concurrency & State (+39 more)
 
-### Community 140 - "resolveStorageDisplay"
-Cohesion: 0.10
-Nodes (22): Advanced, API Reference, Beginner, Concurrency & State, Design Rationale, Failure Modes, Frontend Core, Intermediate (+14 more)
+### Community 140 - "Frontend Core"
+Cohesion: 0.17
+Nodes (12): Advanced, API Reference, Concurrency & State, Design Rationale, Failure Modes, Frontend Core, Intermediate, Invariants & Constraints (+4 more)
 
 ### Community 141 - "ADDED Requirements"
 Cohesion: 0.06
@@ -941,8 +928,8 @@ Cohesion: 0.14
 Nodes (12): assert, COMPONENTS_CSS, FILES_HTML, FILES_JS, fs, INDEX_HTML, path, ROOT_DIR (+4 more)
 
 ### Community 153 - "ADDED Requirements"
-Cohesion: 0.09
-Nodes (22): ADDED Requirements, Purpose, Requirement: A Database Is Added Alongside The Existing JSON Stores, Not Instead Of Them, Requirement: Business Logic Is Independent Of The Engine, Requirement: Counters And Multi-Record Operations Are Atomic, Requirement: Statistics That Cannot Be Measured Are Declared Unavailable, Requirement: The Database Honours The Hardened Deployment Unit, Requirement: The Engine Is Selected From The Runtime And Adds No Dependency (+14 more)
+Cohesion: 0.08
+Nodes (25): ADDED Requirements, Purpose, Requirement: A Database Is Added Alongside The Existing JSON Stores, Not Instead Of Them, Requirement: Business Logic Is Independent Of The Engine, Requirement: Counters And Multi-Record Operations Are Atomic, Requirement: Identity Failures Fail The Request; Advisory-Analytics Rules Elsewhere Are Unchanged, Requirement: Statistics That Cannot Be Measured Are Declared Unavailable, Requirement: The Database Honours The Hardened Deployment Unit (+17 more)
 
 ### Community 154 - "Requirement: Activity Shape Is Reused, Not Redesigned"
 Cohesion: 0.09
@@ -981,16 +968,16 @@ Cohesion: 0.15
 Nodes (12): Capabilities, Code, Impact, Modified Capabilities, New Capabilities, Out of scope, Proposal, Security (+4 more)
 
 ### Community 164 - "routes/api.js"
-Cohesion: 0.11
-Nodes (17): express, adminRoutes, { authenticate }, authRoutes, csrf, dashboardRoutes, express, fsRoutes (+9 more)
+Cohesion: 0.12
+Nodes (14): AppError, ADR-0009, SAFE_METHODS, adminRoutes, { authenticate }, authRoutes, csrf, dashboardRoutes (+6 more)
 
 ### Community 165 - "ADDED Requirements"
 Cohesion: 0.06
 Nodes (31): ADDED Requirements, Purpose, Requirement: A Documented Configuration Template Exists, Requirement: Configuration Is Read Once Per Process Start, Requirement: Configuration Precedence Is Deterministic, Requirement: Optional Variables Have Declared Defaults, Requirement: Production Configuration Is Delivered Out Of Band, Requirement: Required Configuration Is Declared And Enforced At Startup (+23 more)
 
-### Community 166 - "fileTypes.test.js"
-Cohesion: 0.18
-Nodes (10): CATEGORIES, EXTENSION_LOOKUP, EXTENSION_MAP, APP_PATH, assert, { CATEGORIES, EXTENSION_MAP, classifyFile, emptyBreakdown }, CONTROLLER_PATH, fs (+2 more)
+### Community 166 - "dashboard.controller.js"
+Cohesion: 0.11
+Nodes (17): BREAKDOWN_COLORS, { CATEGORIES }, FileAccessPolicyService, FileSystemService, getHealth(), MetadataService, path, CATEGORIES (+9 more)
 
 ### Community 167 - "Requirement: Bare Response Envelope"
 Cohesion: 0.40
@@ -1000,9 +987,9 @@ Nodes (5): Requirement: Bare Response Envelope, Scenario: Bare shape matches rea
 Cohesion: 0.07
 Nodes (27): ADDED Requirements, Purpose, Requirement: Client Identity Is Forwarded, Requirement: Proxy Configuration Is Version Controlled, Requirement: Proxy Request Size Is Not Lower Than The Application Limit, Requirement: Proxy Timeouts Exceed The Longest Legitimate Request, Requirement: Request Bodies Are Not Duplicated In Proxy Buffers, Requirement: The Proxy Does Not Duplicate Single-Page-Application Fallback Behaviour (+19 more)
 
-### Community 169 - "UserService.js"
-Cohesion: 0.26
-Nodes (6): No guard against removing the last active admin, AppError, { hashPassword }, ADR-0009, UserRepository, UserService
+### Community 169 - "UserService"
+Cohesion: 0.42
+Nodes (3): No guard against removing the last active admin, AppError, UserService
 
 ### Community 170 - "Requirement: Tenant Directories Are Usable On Every Supported Host"
 Cohesion: 0.10
@@ -1036,16 +1023,16 @@ Nodes (18): atomic_link(), cmd_deploy(), cmd_receive(), cmd_rollback(), cmd_ssh(
 Cohesion: 0.20
 Nodes (9): 1. Configuration & Validation (env surface), 2. CORS Default-Off (server.js), 4. Rate Limiting (middleware), 5. Upload Resource Governance, 6. CSP + Inline-Script Removal (frontend shells), 7. Header Hygiene + Health Disclosure, 8. Metadata Service Schema Integrity, 9. Docs & Deployment (+1 more)
 
-### Community 178 - "connection.js"
-Cohesion: 0.12
-Nodes (15): { DatabaseSync }, fs, ADR-0009, { migrate }, path, { resolveDataDir }, ADR-0009, migrate() (+7 more)
+### Community 178 - "ref_node_test"
+Cohesion: 0.08
+Nodes (24): { DatabaseSync }, fs, ADR-0009, { migrate }, path, { resolveDataDir }, ADR-0009, migrate() (+16 more)
 
 ### Community 179 - "Requirement: Separator-Boundary Path Containment"
 Cohesion: 0.11
 Nodes (18): ADDED Requirements, MODIFIED Requirements, Purpose, Requirement: Resolution Requires An Established Boundary, Requirement: Separator-Boundary Path Containment, Scenario: An unestablished context falls back to the configured root, Scenario: Classic parent traversal is rejected, Scenario: Climbing out of a tenant root into a sibling tenant is rejected (+10 more)
 
 ### Community 180 - "DEPLOYMENT.md — Operator Runbook"
-Cohesion: 0.14
+Cohesion: 0.17
 Nodes (12): Configuration, Deploy, DEPLOYMENT.md — Operator Runbook, First install (one host), Host layout, Persistence, backup and restore, ⚠ Read first: this service is not safe to expose publicly, Restarts, timeouts and limits (+4 more)
 
 ### Community 181 - "Medium severity"
@@ -1081,8 +1068,8 @@ Cohesion: 0.12
 Nodes (17): Advanced, API Reference, Beginner, Code Review Notes, Concurrency & State, Deployment Scripts, Design Rationale, Failure Modes (+9 more)
 
 ### Community 189 - "SessionService.js"
-Cohesion: 0.13
-Nodes (14): `sessions` (migration 1), Session TTL and rate parser duplicated, Synchronous SQLite write on every request, Complexity, ADR-0009, SessionRepository, SessionService, UserRepository (+6 more)
+Cohesion: 0.10
+Nodes (19): Session TTL and rate parser duplicated, Complexity, Key Files, Limitations & Improvements, Public API, { hashPassword }, ADR-0009, UserRepository (+11 more)
 
 ### Community 190 - "Decision"
 Cohesion: 0.22
@@ -1092,33 +1079,33 @@ Nodes (8): ADR-004 — Upload Page Integrity: Consume the Shared Upload Contract
 Cohesion: 0.13
 Nodes (14): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders, DATA, fs, http, MetadataService, os (+6 more)
 
-### Community 192 - "Acceptance Criteria"
-Cohesion: 0.12
-Nodes (15): Acceptance Criteria, Accessibility, Capabilities, Data integrity, Guardrails, Modified Capabilities, New Capabilities, Preserved, not changed (+7 more)
+### Community 192 - "env.js"
+Cohesion: 0.25
+Nodes (7): dotenv, config, dotenv, fs, ADR-0009, path, { resolveDataDir }
 
 ### Community 193 - "Requirement: Partial Capability Failure"
 Cohesion: 0.40
 Nodes (5): Requirement: Partial Capability Failure, Scenario: Metadata store unavailable, Scenario: Partial-failure convention is documented, Scenario: Storage capacity unavailable, Scenario: Storage root unreadable
 
-### Community 194 - "csp.test.js"
-Cohesion: 0.05
-Nodes (40): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, fs, http, MetadataService, os, path, PORTAL (+32 more)
+### Community 194 - "error-disclosure.test.js"
+Cohesion: 0.04
+Nodes (51): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders, DATA, fs, http, MetadataService, os (+43 more)
 
 ### Community 195 - "trigger-deploy.sh"
 Cohesion: 1.00
 Nodes (3): die(), log(), trigger-deploy.sh script
 
-### Community 197 - ".toggleStar"
-Cohesion: 0.14
-Nodes (18): Governing Rules, Store write failures escape as raw errors, Advanced, API Reference, Code Review Notes, Concurrency & State, Failure Modes, Performance Characteristics (+10 more)
+### Community 197 - "MetadataService"
+Cohesion: 0.05
+Nodes (73): DATABASE.md — Persistence Reference, Metadata store — `metadata.json`, Overview, Settings store — `settings.json`, Which store do I use?, 1. A dedicated JSON document at `data/settings.json`, not XML, 2. Persist only what works — a scope rule, not a key list, 4. A corrupt store fails wholly with 500 — it is never repaired or defaulted (+65 more)
 
 ### Community 198 - "AppError"
-Cohesion: 0.05
-Nodes (76): Lifecycle, Request Lifecycle for a Mutation (middleware chain -> route -> validate -> resolveSecurePath -> async fs -> non-blocking metadata -> envelope), Architecture Decisions, Architecture Type, Module Map, Request Lifecycle, System Overview, Module by Module (+68 more)
+Cohesion: 0.08
+Nodes (56): Lifecycle, Architecture Decisions, Architecture Type, Module Map, Request Lifecycle, System Overview, Module by Module, Error Contract and Sanitization (+48 more)
 
-### Community 199 - "cors.enabled.test.js"
-Cohesion: 0.14
-Nodes (13): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders, DATA, fs, http, MetadataService, os (+5 more)
+### Community 199 - "Proposal"
+Cohesion: 0.29
+Nodes (6): Capabilities, Impact, Modified Capabilities, New Capabilities, Proposal, Why
 
 ### Community 200 - "Decision"
 Cohesion: 0.14
@@ -1133,7 +1120,7 @@ Cohesion: 0.18
 Nodes (11): Requirement: Throttling Is Layered And Cannot Be Side-Stepped, Scenario: A login throttle cannot lock out a legitimate account, Scenario: Authenticated traffic is bounded per account, Scenario: Expensive File Operations Are Bounded, Scenario: Free Space Is Governed Per Volume, Not Per Tenant, Scenario: One tenant cannot exhaust the process for others, Scenario: Pre-authentication attempts are bounded by origin, Scenario: Sensitive Operations Are Bounded More Strictly (+3 more)
 
 ### Community 203 - "CloudAvid on nginx — install, verify, operate"
-Cohesion: 0.20
+Cohesion: 0.17
 Nodes (10): 0. What must already exist, 1. Certificate — it must cover BOTH names, 2. Basic-auth file (before the first reload!), 3. Install the config, 4. Verify (every behaviour is asserted this way), 5. How the portal is cached (and how to ship an update), 6. What changed vs. the original pasted config — and why, 7. Admin vhost — the parts that are load-bearing (+2 more)
 
 ### Community 204 - "auth.contract.test.js"
@@ -1161,16 +1148,16 @@ Cohesion: 0.14
 Nodes (12): 1. systemd, not a process manager or container, 2. The data directory is an explicit input (`AFM_DATA_DIR`), 3. Configuration fails at startup, not per request, 4. Graceful shutdown with ordered timeouts, 5. One host-side deploy mechanism, separate triggers, 6. The artifact is an allow-list `git archive` of one commit, 7. Hygiene at the source, 8. Exposure stays gated on authentication (+4 more)
 
 ### Community 210 - "auth.routes.js"
-Cohesion: 0.13
-Nodes (12): AppError, ADR-0009, SAFE_METHODS, authController, { authenticate }, { createRateLimit }, csrf, express (+4 more)
+Cohesion: 0.12
+Nodes (13): AppError, READ_PER_MINUTE, WRITE_METHODS, WRITE_PER_MINUTE, authController, { authenticate }, { createRateLimit }, csrf (+5 more)
 
 ### Community 211 - "Requirement: Symbolic Links And Junctions Are Not Followed On Read Or Download"
 Cohesion: 0.22
 Nodes (8): ADDED Requirements, Requirement: Symbolic Links And Junctions Are Not Followed On Read Or Download, Scenario: A link to a path inside the root still resolves, Scenario: An outside-target link is refused for archiving, Scenario: An outside-target link is refused for download, Scenario: An outside-target link is refused for preview, Scenario: Broken links are refused, not streamed, Spec Delta
 
 ### Community 212 - "PathService"
-Cohesion: 0.06
-Nodes (48): ADR-002 — Dashboard Data Architecture: Real Aggregates, Typed Absences, Bounded Walks, Consequences, Context, Module by Module, toClientPath compares a canonical path to the lexical root, Beginner, Design Rationale, How It Works: Main Flow (+40 more)
+Cohesion: 0.08
+Nodes (34): Dead UNRESOLVED branch in getTreeStats, toClientPath compares a canonical path to the lexical root, Beginner, Design Rationale, How It Works: Main Flow, Invariants & Constraints, Key Concepts, Performance Characteristics (+26 more)
 
 ### Community 213 - "stats"
 Cohesion: 0.14
@@ -1181,24 +1168,24 @@ Cohesion: 0.13
 Nodes (15): 1. Prepare the host (once), 2. Create a deploy key (on the Git server machine), 3. First deploy, by hand and watched, 4. Install the push trigger (in the bare repository), 5. Push, CI/CD Guide — Dimension Files Manager, Everyday commands, Not set up yet / not verified (+7 more)
 
 ### Community 215 - "SessionRepository"
-Cohesion: 0.29
-Nodes (3): AdminDatabase, ADR-0009, SessionRepository
+Cohesion: 0.14
+Nodes (9): 1. Decision records and database substrate, 3. Bootstrap, 4. File-access policy data model, 5. Admin panel (frontend), 6. Documentation, Tasks, AdminDatabase, ADR-0009 (+1 more)
 
 ### Community 216 - "Three-Tier Boundary System (Always / Ask First / Never)"
 Cohesion: 0.29
 Nodes (6): Data Classification Table, Schema Validation at Boundaries, Data Classification, Three-Tier Boundary System (Always / Ask First / Never), Spec Document Six Core Areas, Boundaries (Always / Ask First / Never)
 
 ### Community 217 - "validateClientPath"
-Cohesion: 0.15
-Nodes (13): 3. `PUT` is a strict, validated full replace — unknown keys are a 400, Governing Rules, How a Path Travels, Path Containment and Client Paths, The Concern, Three Stores Keyed by Path, Non-negotiable checklist, D2. File-access policy is per-file; `files` is sparse (+5 more)
+Cohesion: 0.08
+Nodes (32): 3. `PUT` is a strict, validated full replace — unknown keys are a 400, Request Lifecycle for a Mutation (middleware chain -> route -> validate -> resolveSecurePath -> async fs -> non-blocking metadata -> envelope), Governing Rules, How a Path Travels, Path Containment and Client Paths, The Concern, Three Stores Keyed by Path, Architecture (+24 more)
 
 ### Community 218 - "Proposal"
 Cohesion: 0.29
 Nodes (6): Impact, Modified Capabilities, New Capabilities, Proposal, What Changes, Why
 
 ### Community 219 - "Advanced"
-Cohesion: 0.15
-Nodes (13): Advanced, Beginner, Database, Design Rationale, Failure Modes, How It Works: Main Flow, Intermediate, Invariants & Constraints (+5 more)
+Cohesion: 0.13
+Nodes (14): Advanced, Beginner, Concurrency & State, Database, Design Rationale, Failure Modes, How It Works: Main Flow, Intermediate (+6 more)
 
 ### Community 220 - "Requirement: Policy Evaluation Is Deterministic And Fails Closed"
 Cohesion: 0.29
@@ -1224,9 +1211,9 @@ Nodes (6): Requirement: Downloads Are Authorized And Not Navigable, Scenario: A 
 Cohesion: 0.33
 Nodes (6): Requirement: No Unauthenticated Surface Serves Tenant Content, Scenario: No Proxy Location Serves Tenant Content Directly, Scenario: No Public Directory Listing Of Tenant Content Exists, Scenario: Previously Published Content Is Migrated, Not Left Reachable, Scenario: The Existing Proxy Gate Is Removed Last, Scenario: The Static Portal Is Not Tenant Content
 
-### Community 226 - "admin.routes.js"
-Cohesion: 0.11
-Nodes (11): AuditLogRepository, PortalService, AppError, ADR-0009, express, filePolicyController, ADR-0009, requireAdmin (+3 more)
+### Community 226 - "users.controller.js"
+Cohesion: 0.06
+Nodes (29): audit(), AuditLogRepository, deletePolicy(), FileAccessPolicyService, grantPermission(), revokePermission(), setPolicy(), AuditLogRepository (+21 more)
 
 ### Community 227 - "ADDED Requirements"
 Cohesion: 0.13
@@ -1280,9 +1267,9 @@ Nodes (5): Requirement: Refusals Disclose As Little As Possible, Scenario: A ref
 Cohesion: 0.50
 Nodes (4): Requirement: No Operating-System Path Leakage, Scenario: Filenames are basenames only, Scenario: No drive letter reaches the client, Scenario: Server error messages carry no filesystem detail
 
-### Community 240 - "Admin database — `admin.sqlite` (ADR-009)"
-Cohesion: 0.22
-Nodes (9): Admin database — `admin.sqlite` (ADR-009), Known defects (tracked in `docs-vault/Health/Code Review.md`), Migrations, Operations, Schema, `schema_migrations`, Tests, `user_file_permissions` (migration 2) (+1 more)
+### Community 240 - "Schema"
+Cohesion: 0.13
+Nodes (14): `audit_logs` (migration 1), `files` (migration 2), Schema, `schema_migrations`, `user_file_permissions` (migration 2), `users` (migration 1), ADR-005 — Client-Side Navigation Between the Four Pages, Alternatives rejected (+6 more)
 
 ### Community 241 - "Requirement: Authorization Is Atomic Across A Batch"
 Cohesion: 0.50
@@ -1352,13 +1339,13 @@ Nodes (3): Requirement: Resolution Uses A Stated Lookup Strategy, Scenario: The 
 Cohesion: 0.67
 Nodes (3): Requirement: Every Other Endpoint Requires A Credential, Scenario: An anonymous caller is refused everywhere else, Scenario: The static shell is not a data surface
 
-### Community 259 - "settingsService.test.js"
-Cohesion: 0.08
-Nodes (21): Complexity, Dependencies, Key Files, path, resolveDataDir(), fs, path, { resolveDataDir } (+13 more)
+### Community 259 - "express"
+Cohesion: 0.29
+Nodes (6): express, dashboardController, express, router, echoApp(), get()
 
-### Community 260 - "MetadataService.js"
-Cohesion: 0.06
-Nodes (27): data/metadata.json Schema (downloads map, starred array, activities array capped at 50, ms-epoch times), AppError, fs, path, { resolveDataDir }, { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders (+19 more)
+### Community 260 - "header-hygiene.test.js"
+Cohesion: 0.13
+Nodes (13): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders, DATA, fs, http, MetadataService, os (+5 more)
 
 ### Community 261 - "FileSystemService.move.test.js"
 Cohesion: 0.15
@@ -1381,35 +1368,19 @@ Cohesion: 0.20
 Nodes (9): 2. A two-value `role` column, not a permission catalogue, 3. File access policy is per-file, not per-directory-inherited, 4. The database has no consumer at the download path yet, 5. Sequencing: identity first, file-policy tables in parallel, enforcement deferred, ADR-009 — Admin Identity, Database, and File-Access Policies, Alternatives rejected, Consequences, Context (+1 more)
 
 ### Community 266 - ".getTreeStats"
-Cohesion: 0.14
-Nodes (22): Decision, References, Module by Module, getSummary doc comment overstates degradation, Bounded Work Budgets, Code excerpt, How to apply it in new code, Pitfalls and known violations (+14 more)
+Cohesion: 0.10
+Nodes (31): ADR-002 — Dashboard Data Architecture: Real Aggregates, Typed Absences, Bounded Walks, Amendment (2026-10-14) — documentation drift corrected, Consequences, Context, Decision, References, Module by Module, getSummary doc comment overstates degradation (+23 more)
 
-### Community 267 - "filePolicy.controller.js"
-Cohesion: 0.19
-Nodes (9): audit(), AuditLogRepository, deletePolicy(), FileAccessPolicyService, grantPermission(), revokePermission(), setPolicy(), AdminDatabase (+1 more)
-
-### Community 268 - "Limitations & Improvements"
-Cohesion: 0.13
-Nodes (17): A second shutdown signal reports a clean exit mid-transfer, CORS allowlist validated normalized but matched raw, Advanced, Code Review Notes, Concurrency & State, Failure Modes, Invariants & Constraints, Performance Characteristics (+9 more)
-
-### Community 269 - "login.js"
-Cohesion: 0.60
-Nodes (5): handleSubmit(), hideError(), safeRedirectTarget(), setBusy(), showError()
+### Community 268 - "shutdown"
+Cohesion: 0.25
+Nodes (8): A second shutdown signal reports a clean exit mid-transfer, Advanced, Concurrency & State, Failure Modes, Invariants & Constraints, Performance Characteristics, 5. A second shutdown signal reports a clean exit while transfers are still in flight — Bug or Risk (low), shutdown()
 
 ### Community 270 - "Repositories"
-Cohesion: 0.14
-Nodes (6): Repositories, Concurrency & State, 1. Decision records and database substrate, AuditLogRepository, UserFilePermissionRepository, UserRepository
-
-### Community 271 - "error-disclosure.test.js"
 Cohesion: 0.12
-Nodes (12): { applyBootstrapEnv, redirectAdminDb, login: authLogin }, assert, authHeaders, fs, http, MetadataService, os, path (+4 more)
-
-### Community 272 - "Decision"
-Cohesion: 0.14
-Nodes (12): 2. Persist only what works — a scope rule, not a key list, 4. A corrupt store fails wholly with 500 — it is never repaired or defaulted, 5. No credential may ever live in this document, 6. The danger zone is deferred to an auth-gated change, not reimplemented, ADR-006 — Settings Store: Format, Scope and Validation, Alternatives rejected, Consequences, Context (+4 more)
+Nodes (6): Repositories, D4. Database substrate: `node:sqlite`, additive, repository-bounded, AuditLogRepository, FileAccessPolicyRepository, UserFilePermissionRepository, UserRepository
 
 ### Community 273 - "PortalService.js"
-Cohesion: 0.18
+Cohesion: 0.16
 Nodes (5): AppError, fs, path, PORTAL_KEYS, PortalService
 
 ### Community 274 - "Interview Me"
@@ -1432,10 +1403,6 @@ Nodes (11): API Reference, Beginner, Design Rationale, Files Page, How It Works:
 Cohesion: 0.50
 Nodes (4): Requirement: Filesystem Router Separation, Scenario: Dedicated route module, Scenario: No new service tier, Scenario: Route module contains no business logic
 
-### Community 279 - "toggleTo"
-Cohesion: 0.50
-Nodes (3): event(), toggleTo(), btn
-
 ### Community 280 - "Intermediate"
 Cohesion: 0.20
 Nodes (10): API Reference, Beginner, Design Rationale, How It Works: Main Flow, Intermediate, Key Concepts, Module Interactions, Server Bootstrap and Config (+2 more)
@@ -1444,25 +1411,21 @@ Nodes (10): API Reference, Beginner, Design Rationale, How It Works: Main Flow, 
 Cohesion: 0.20
 Nodes (10): 401 Authentication required, 403 responses, 409 on upload, rename or create folder, 500 "Metadata store could not be read", Common failures, Dashboard shows `—` or nulls, Debugging Guide, Known bugs worth knowing (+2 more)
 
-### Community 282 - "downloadZip"
-Cohesion: 0.05
-Nodes (40): Activity log always records user "system", Column-hiding breakpoints duplicated between JS and CSS, CSRF token exists only after /auth/me resolves, with no retry, Deployment runs synchronously inside the push, Download failures are invisible to the user, Fonts load from Google at runtime, getList walks every listed folder before paginating, getTopDownloads can return fewer than limit entries (+32 more)
+### Community 282 - "Low severity"
+Cohesion: 0.13
+Nodes (15): Activity log always records user "system", Column-hiding breakpoints duplicated between JS and CSS, CSRF token exists only after /auth/me resolves, with no retry, Deployment runs synchronously inside the push, Directory checks do not test writability, Fonts load from Google at runtime, getTopDownloads can return fewer than limit entries, Limitations (+7 more)
 
 ### Community 283 - "Getting Started"
 Cohesion: 0.29
 Nodes (7): 1. Install, 2. Configure `.env`, 3. Run, 4. First login, 5. Tour of the app, 6. Where to read next, Getting Started
 
-### Community 284 - "deployment-scripts.md"
-Cohesion: 0.29
-Nodes (6): Architecture, Complexity, Dependencies, Internal Patterns, Key Files, Public API
+### Community 284 - ".touch"
+Cohesion: 0.13
+Nodes (12): `sessions` (migration 1), Failed releases consume retention slots, Synchronous SQLite write on every request, Expired sessions and audit rows are never pruned, Performance Characteristics, Architecture, Complexity, Dependencies (+4 more)
 
 ### Community 285 - "Proposal"
-Cohesion: 0.22
-Nodes (8): Capabilities, Impact, Modified Capabilities, New Capabilities, Preserved, not changed, Proposal, What Changes, Why
-
-### Community 286 - "validateSettingsPayload"
-Cohesion: 0.26
-Nodes (12): Settings store is cached raw without shape checks, Bug or Risk — Settings store is cached raw without shape checks (low), 1. Settings store (service + validation), normalizeStore(), AppError, SETTINGS_SECTIONS, SETTINGS_VIEWS, settingsSection() (+4 more)
+Cohesion: 0.29
+Nodes (6): Capabilities, Impact, Modified Capabilities, New Capabilities, Proposal, Why
 
 ### Community 287 - "Beginner"
 Cohesion: 0.50
@@ -1476,61 +1439,29 @@ Nodes (12): ADR Documentation, API Impact, Classification, Context, Design, Fron
 Cohesion: 0.15
 Nodes (10): AppError, assert, ENV_MODULE, fs, os, path, PATHSERVICE_MODULE, SERVICE_MODULE (+2 more)
 
-### Community 290 - "FileAccessPolicyRepository"
-Cohesion: 0.21
-Nodes (4): `files` (migration 2), AdminDatabase, FileAccessPolicyRepository, ADR-0009
-
 ### Community 291 - "FileSystemService.js"
 Cohesion: 0.18
 Nodes (7): { classifyFile, emptyBreakdown }, fs, os, PathService, config, fs, path
 
-### Community 292 - "FileAccessPolicyService.test.js"
-Cohesion: 0.17
-Nodes (11): AdminDatabase, AppError, assert, FileAccessPolicyService, fs, { hashPassword }, ADR-0009, os (+3 more)
-
-### Community 293 - ".getActivities"
-Cohesion: 0.27
-Nodes (9): Design Rationale, Intermediate, Module Interactions, Patterns Used, Trade-offs, Pitfalls and known violations, Internal Patterns, 5. Metadata aggregation and contract freeze (+1 more)
-
 ### Community 294 - "auth.controller.js"
 Cohesion: 0.24
 Nodes (9): AppError, clearSessionCookie(), config, login(), logout(), me(), { SESSION_COOKIE }, SessionService (+1 more)
-
-### Community 295 - "users.controller.js"
-Cohesion: 0.27
-Nodes (9): audit(), AuditLogRepository, create(), remove(), resetPassword(), revokeSessions(), SessionService, setStatus() (+1 more)
 
 ### Community 296 - "MetadataService.schema.test.js"
 Cohesion: 0.18
 Nodes (9): assert, DB, fs, MetadataService, os, path, { test, describe, beforeEach, after }, TMP (+1 more)
 
 ### Community 297 - "Tasks"
-Cohesion: 0.22
-Nodes (8): 2. Dashboard API — route and controller skeleton, 4. Storage capacity, 7. Documentation, 8. Integration verification, 9. Final review, Definition of Done, Dependency chain, Tasks
+Cohesion: 0.20
+Nodes (9): 1. Prerequisite — path containment security, 2. Dashboard API — route and controller skeleton, 4. Storage capacity, 7. Documentation, 8. Integration verification, 9. Final review, Definition of Done, Dependency chain (+1 more)
 
 ### Community 298 - "Migration Plan"
-Cohesion: 0.22
-Nodes (8): Data Disposition — Confirmed Against The Repository, Deployment Sequence (P0-13) — the runner must be invoked, Filesystem Relocation Strategy (P0-4, P0-12), Migration Plan, Migration Principles, Rollback, What Migrates, What Is Discarded, 8. Troubleshooting
-
-### Community 299 - "dashboard.controller.js"
-Cohesion: 0.25
-Nodes (7): BREAKDOWN_COLORS, { CATEGORIES }, FileAccessPolicyService, FileSystemService, getHealth(), MetadataService, path
+Cohesion: 0.15
+Nodes (12): Cardinalities And Constraints (Summary), Data Disposition — Confirmed Against The Repository, Data Model Specification, Deployment Sequence (P0-13) — the runner must be invoked, Entity Reference, ER Shape, Filesystem Relocation Strategy (P0-4, P0-12), Migration Plan (+4 more)
 
 ### Community 300 - "PreviewService.js"
-Cohesion: 0.25
-Nodes (6): { classifyFile }, FileSystemService, path, PathService, PREVIEW_FORMATS, transformer
-
-### Community 301 - "action"
-Cohesion: 0.33
-Nodes (6): `audit_logs` (migration 1), Cardinalities And Constraints (Summary), Data Model Specification, Entity Reference, ER Shape, action()
-
-### Community 302 - "files-page.md"
-Cohesion: 0.33
-Nodes (5): Complexity, Internal Patterns, Key Files, Limitations & Improvements, Public API
-
-### Community 303 - "rateLimit.js"
-Cohesion: 0.33
-Nodes (4): AppError, READ_PER_MINUTE, WRITE_METHODS, WRITE_PER_MINUTE
+Cohesion: 0.14
+Nodes (10): FileAccessPolicyService, getThumbnail(), PreviewService, { validateClientPath }, { classifyFile }, FileSystemService, path, PathService (+2 more)
 
 ### Community 304 - "authenticate.js"
 Cohesion: 0.40
@@ -1548,16 +1479,16 @@ Nodes (5): Compatibility impact of retiring, Determination: **Option A — retir
 
 ## Knowledge Gaps
 - **2900 isolated node(s):** `idea-refine.sh script`, `$schema`, `plugin`, `name`, `version` (+2895 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 3231 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 3233 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **12 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **What is the exact relationship between `The Review Checklist` and `CONSTRAINTS.md`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `MetadataService` connect `MetadataService` to `stopPropagation`, `settingsService.test.js`, `MetadataService.js`, `.getTreeStats`, `Decision`, `Proposal`, `validateSettingsPayload`, `.getActivities`, `Design`, `._read`, `MetadataService.dashboard.test.js`, `Impact`, `AdminDatabase`, `Acceptance Criteria`, `.toggleStar`, `AppError`, `fs.controller.js`, `PathService`, `Low severity`, `Decisions`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
+- **Why does `MetadataService` connect `MetadataService` to `resolveDataDir`, `validateClientPath`, `MetadataService.js`, `AppError`, `.rename`, `Proposal`, `.getTreeStats`, `Low severity`, `Decisions`, `Repositories`, `fs.controller.js`, `ref_node_fs`, `PathService`, `Decisions`, `Impact`, `ref_node_os`, `ADDED Requirements`, `Proposal`?**
+  _High betweenness centrality (0.033) - this node is a cross-community bridge._
 - **Are the 70 inferred relationships involving `AppError` (e.g. with `D9 — Never serialise a stack; no disclosure opt-in` and `1. A dedicated JSON document at `data/settings.json`, not XML`) actually correct?**
   _`AppError` has 70 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `idea-refine.sh script`, `$schema`, `plugin` to the rest of the system?**
@@ -1566,5 +1497,5 @@ _Questions this graph is uniquely positioned to answer:_
   _Cohesion score 0.04081632653061224 - nodes in this community are weakly interconnected._
 - **What is the exact relationship between `architecture.md - Legacy Deep-Dive Architecture Document` and `STRUCTURE.md - Frontend-Era Project Structure Map`?**
   _Edge tagged AMBIGUOUS (relation: references) - confidence is low._
-- **Why does `AppError` connect `AppError` to `settingsService.test.js`, `MetadataService.js`, `.getTreeStats`, `MetadataService`, `HTTP API Layer.md`, `validateSettingsPayload`, `.getActivities`, `AGENTS.md - Dimension Files Manager operating rules`, `Medium severity`, `Decision`, `.toggleStar`, `fs.controller.js`, `PathService`, `validateClientPath`, `Decisions`, `.rename`, `Acceptance Criteria`, `Low severity`, `Tasks`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Why does `validateClientPath()` connect `validateClientPath` to `resolveDataDir`, `stopPropagation`, `MetadataService`, `AppError`, `.rename`, `Proposal`, `AGENTS.md - Dimension Files Manager operating rules`, `MetadataService.schema.test.js`, `Low severity`, `Decisions`, `init`, `PreviewService.js`, `Schema`, `fs.controller.js`, `Tasks`, `PathService`, `Decisions`, `FileAccessPolicyService.js`?**
+  _High betweenness centrality (0.024) - this node is a cross-community bridge._

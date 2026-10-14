@@ -30,9 +30,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/app.js": {
-    "mtime": 1792001810.162048,
-    "seen": 1792002386.0603392,
-    "ast_hash": "263f42a76bf18bb6c4ce63fdb210120b",
+    "mtime": 1792005221.724286,
+    "seen": 1792005364.8418243,
+    "ast_hash": "7ec262725e8647ccf4ed124cdaaae42d",
     "semantic_hash": ""
   },
   "public/assets/js/dashboard.js": {
@@ -42,9 +42,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/files.js": {
-    "mtime": 1792002318.07902,
-    "seen": 1792002386.0603437,
-    "ast_hash": "83dbf3090d3aadd3dad6d0331c12617b",
+    "mtime": 1792005221.7262864,
+    "seen": 1792005364.8418283,
+    "ast_hash": "d4c00aada11b0b81d02f1c3f08aa45aa",
     "semantic_hash": ""
   },
   "public/assets/js/settings.js": {
@@ -90,9 +90,9 @@
     "semantic_hash": ""
   },
   "src/controllers/fs.controller.js": {
-    "mtime": 1792002257.323326,
-    "seen": 1792002386.0603883,
-    "ast_hash": "9056d4060f74d68a8eb4c2b332e2f991",
+    "mtime": 1792005240.278045,
+    "seen": 1792005364.841867,
+    "ast_hash": "f9cd3645d925d6500c4ff7a035145a2a",
     "semantic_hash": ""
   },
   "src/middlewares/errorHandler.js": {
@@ -108,8 +108,8 @@
     "semantic_hash": ""
   },
   "src/services/FileSystemService.js": {
-    "mtime": 1792002244.8818953,
-    "seen": 1792002386.0604537,
+    "mtime": 1792002971.4980278,
+    "seen": 1792005364.8419206,
     "ast_hash": "50cbd0d892bf95faad297b5f6194b925",
     "semantic_hash": ""
   },
@@ -408,15 +408,15 @@
     "semantic_hash": "6f72ba4f8d01347aabdf0261fa963963"
   },
   "docs/CONTRACTS.md": {
-    "mtime": 1792002360.6512175,
-    "seen": 1792002386.0608087,
-    "ast_hash": "a03bbbafa1aa599deec36bc49f3153d7",
+    "mtime": 1792005221.7212873,
+    "seen": 1792005364.8422103,
+    "ast_hash": "dabb61e060a8dcbc53e6e65de1aa1631",
     "semantic_hash": ""
   },
   "docs/REPO_MAP.md": {
-    "mtime": 1792001810.0773506,
-    "seen": 1792002386.060815,
-    "ast_hash": "4ce4d4d24535a447a1639c04da30f2de",
+    "mtime": 1792005343.7341638,
+    "seen": 1792005364.8422148,
+    "ast_hash": "0bd0d7cce83d631bf957628d8e1cc956",
     "semantic_hash": ""
   },
   "docs/STRUCTURE.md": {
@@ -456,9 +456,9 @@
     "semantic_hash": ""
   },
   "public/files.html": {
-    "mtime": 1792001810.162048,
-    "seen": 1792002386.0611317,
-    "ast_hash": "1789a497f787ca8f73f3f581bd3de284",
+    "mtime": 1792005221.7262864,
+    "seen": 1792005364.842467,
+    "ast_hash": "b2a494a3e6281ac238ad185e2722970a",
     "semantic_hash": ""
   },
   "public/index.html": {
@@ -492,9 +492,9 @@
     "semantic_hash": ""
   },
   "src/utils/fileTypes.js": {
-    "mtime": 1791060952.7551937,
-    "seen": 1791088819.505831,
-    "ast_hash": "1f3336d752337ad7180165d2b399e9a3",
+    "mtime": 1792005221.7272868,
+    "seen": 1792005364.8419468,
+    "ast_hash": "835e5825a64894eb0f3f6e7a5d70bb0d",
     "semantic_hash": ""
   },
   "test/api/dashboard.contract.test.js": {
@@ -594,8 +594,8 @@
     "semantic_hash": ""
   },
   "test/api/fs.contract.test.js": {
-    "mtime": 1792002324.7612178,
-    "seen": 1792002386.0605025,
+    "mtime": 1792002971.5136745,
+    "seen": 1792005364.8419614,
     "ast_hash": "ee92445eee6397e1bc10d99ebfec636e",
     "semantic_hash": ""
   },
@@ -996,9 +996,9 @@
     "semantic_hash": ""
   },
   "test/frontend/tooltips.test.js": {
-    "mtime": 1791904626.7347436,
-    "seen": 1791955531.9550354,
-    "ast_hash": "65c1c2566992f17efd5b9ec9e31bf8c3",
+    "mtime": 1792005221.7282865,
+    "seen": 1792005364.8420043,
+    "ast_hash": "a19f2e65db65f77fc56f33e0f133b73b",
     "semantic_hash": ""
   },
   "openspec/changes/notification-panel-and-tooltip-placement/.openspec.yaml": {
@@ -1548,9 +1548,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/admin.js": {
-    "mtime": 1792001810.1464045,
-    "seen": 1792002386.0603337,
-    "ast_hash": "393c3fb035b9c76dac3802eff238fb86",
+    "mtime": 1792004989.4456239,
+    "seen": 1792005364.8418188,
+    "ast_hash": "0450597ba966f691befc23b4f11ef8ac",
     "semantic_hash": ""
   },
   "public/assets/js/login.js": {
@@ -1620,9 +1620,9 @@
     "semantic_hash": ""
   },
   "src/db/schema.js": {
-    "mtime": 1791904626.7104802,
-    "seen": 1791955531.9549017,
-    "ast_hash": "a9eee42de6711ce84b50f1c2298eb5fe",
+    "mtime": 1792004989.4456239,
+    "seen": 1792005364.841894,
+    "ast_hash": "cda917e4f81c823e5d53814cf1d2cd15",
     "semantic_hash": ""
   },
   "src/middlewares/authenticate.js": {
@@ -1644,9 +1644,9 @@
     "semantic_hash": ""
   },
   "src/routes/admin.routes.js": {
-    "mtime": 1792001810.162048,
-    "seen": 1792002386.0604358,
-    "ast_hash": "577d6a1018e92d6afbee05e376a70933",
+    "mtime": 1792004989.4456239,
+    "seen": 1792005364.8419068,
+    "ast_hash": "37ce4e6fcdfef4e1747d445dd4715692",
     "semantic_hash": ""
   },
   "src/routes/auth.routes.js": {
@@ -1806,9 +1806,9 @@
     "semantic_hash": ""
   },
   "public/admin.html": {
-    "mtime": 1792001810.1464045,
-    "seen": 1792002386.06113,
-    "ast_hash": "303b8aebad82eb850560b540eff5803e",
+    "mtime": 1792004989.4456239,
+    "seen": 1792005364.8424642,
+    "ast_hash": "60914a94d224a363064d075cca715a70",
     "semantic_hash": ""
   },
   "public/login.html": {
@@ -2070,9 +2070,9 @@
     "semantic_hash": ""
   },
   "src/controllers/system.controller.js": {
-    "mtime": 1792001810.162048,
-    "seen": 1792002386.0603957,
-    "ast_hash": "f60e2cb82fc2717bfb911647fa7c102e",
+    "mtime": 1792004989.4456239,
+    "seen": 1792005364.8418734,
+    "ast_hash": "85ec4897686ef1d99564924ae42914d0",
     "semantic_hash": ""
   },
   "src/services/PortalService.js": {
@@ -2082,9 +2082,321 @@
     "semantic_hash": ""
   },
   "test/api/system.contract.test.js": {
-    "mtime": 1792001810.1750329,
-    "seen": 1792002386.060514,
-    "ast_hash": "2a5770fb739960847dcfdb488eb15bfb",
+    "mtime": 1792004989.4456239,
+    "seen": 1792005364.8419712,
+    "ast_hash": "d32fcb71a9bf43a9e77634a42044af6f",
+    "semantic_hash": ""
+  },
+  "src/services/PortalNavService.js": {
+    "mtime": 1792004989.4456239,
+    "seen": 1792005364.8419259,
+    "ast_hash": "7933f644e24a526f625ca1f6f1c94962",
+    "semantic_hash": ""
+  },
+  "test/frontend/lang-icons.test.js": {
+    "mtime": 1792005154.0867002,
+    "seen": 1792005364.8419948,
+    "ast_hash": "492e1b9e5f0a157779da51024f1f7d8f",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/LICENSE-devicon.txt": {
+    "mtime": 1792005057.4788442,
+    "seen": 1792005364.8424656,
+    "ast_hash": "138396be18f3ebaab24904c6cd990361",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/astro.svg": {
+    "mtime": 1792005056.9323795,
+    "seen": 1792005364.842478,
+    "ast_hash": "0e8ad705a574bc277dd7a403041d5f04",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/bash.svg": {
+    "mtime": 1792005052.8305583,
+    "seen": 1792005364.8424795,
+    "ast_hash": "1e36264dbc2d407bce305b1eec3d4b46",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/c.svg": {
+    "mtime": 1792005053.0784867,
+    "seen": 1792005364.8424804,
+    "ast_hash": "7984f1f99e00b58e6402c5624e1dc298",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/clojure.svg": {
+    "mtime": 1792005054.7545447,
+    "seen": 1792005364.8424814,
+    "ast_hash": "034dfd4a003b2bd609f1519b7c058f49",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/coffeescript.svg": {
+    "mtime": 1792005057.0591178,
+    "seen": 1792005364.8424828,
+    "ast_hash": "583889b533514dcfacd1ac79602f3874",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/cplusplus.svg": {
+    "mtime": 1792005053.182403,
+    "seen": 1792005364.8424838,
+    "ast_hash": "e5b135b00998f9cd69a38eed9b1eee81",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/csharp.svg": {
+    "mtime": 1792005053.309515,
+    "seen": 1792005364.8424845,
+    "ast_hash": "ec7be0a3500b106a4e451fd951e1c717",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/css3.svg": {
+    "mtime": 1792005051.816385,
+    "seen": 1792005364.8424854,
+    "ast_hash": "a55118403c13e2719d453b74dffa80f8",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/dart.svg": {
+    "mtime": 1792005053.7590852,
+    "seen": 1792005364.8424869,
+    "ast_hash": "11b770f163584b0e8cbba1f7bc626f55",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/elixir.svg": {
+    "mtime": 1792005054.4914415,
+    "seen": 1792005364.8424878,
+    "ast_hash": "dc5e47f5c026d9a15c63d2e7d17e2364",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/elm.svg": {
+    "mtime": 1792005056.2144864,
+    "seen": 1792005364.842489,
+    "ast_hash": "cb6e974d26e4c5047cd9c829b3161f7e",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/erlang.svg": {
+    "mtime": 1792005054.6016197,
+    "seen": 1792005364.8424902,
+    "ast_hash": "b39ba127e268dd652a1707f26557d410",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/fortran.svg": {
+    "mtime": 1792005057.1864326,
+    "seen": 1792005364.8424911,
+    "ast_hash": "02fb797fdf5c9118a8e7345ac0654e8b",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/fsharp.svg": {
+    "mtime": 1792005056.3396268,
+    "seen": 1792005364.8424919,
+    "ast_hash": "155830dedf851e1ab97b872046dcb67b",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/go.svg": {
+    "mtime": 1792005052.5656028,
+    "seen": 1792005364.8424933,
+    "ast_hash": "e00964c1cfdf3ebef54b76b0a034c667",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/gradle.svg": {
+    "mtime": 1792005055.7097385,
+    "seen": 1792005364.8424942,
+    "ast_hash": "4037d67fbfe5726dcb62efa1a2276c81",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/graphql.svg": {
+    "mtime": 1792005056.6821997,
+    "seen": 1792005364.8424954,
+    "ast_hash": "6ec4ebfc8814a9a0f2825ee7b8e18da0",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/groovy.svg": {
+    "mtime": 1792005055.4609149,
+    "seen": 1792005364.8424964,
+    "ast_hash": "beed3d310abb1453f853c2153d73ab5c",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/haskell.svg": {
+    "mtime": 1792005054.372455,
+    "seen": 1792005364.8424976,
+    "ast_hash": "74c8bb7666d6f241c82c541fc595ed87",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/html5.svg": {
+    "mtime": 1792005051.6705968,
+    "seen": 1792005364.8424985,
+    "ast_hash": "16d07e8682a531f3bc1e9fb01bd59740",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/java.svg": {
+    "mtime": 1792005052.451861,
+    "seen": 1792005364.8424997,
+    "ast_hash": "459bbae2e96a2410c5b429eb941a4c11",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/javascript.svg": {
+    "mtime": 1792005051.3222857,
+    "seen": 1792005364.842501,
+    "ast_hash": "0c1f700da144243c526f252e59362138",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/json.svg": {
+    "mtime": 1792005052.038714,
+    "seen": 1792005364.8425019,
+    "ast_hash": "adb3897e12d43cd2a87b3da2dc080a1b",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/julia.svg": {
+    "mtime": 1792005055.8397093,
+    "seen": 1792005364.8425028,
+    "ast_hash": "7910b23c09b1c780c3419bad38a8bf73",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/kotlin.svg": {
+    "mtime": 1792005053.5547435,
+    "seen": 1792005364.842504,
+    "ast_hash": "df64e60cd6f3e98007374fd721c4cc1b",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/lua.svg": {
+    "mtime": 1792005053.877996,
+    "seen": 1792005364.842505,
+    "ast_hash": "d1c7c4f56de7b6ca09c46e0243dfaebc",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/nim.svg": {
+    "mtime": 1792005056.1086173,
+    "seen": 1792005364.842506,
+    "ast_hash": "fb371aa47d37744cba540a062adc3e23",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/objectivec.svg": {
+    "mtime": 1792005057.4219139,
+    "seen": 1792005364.8425071,
+    "ast_hash": "611b22eba29c734d9947e2d2127398ce",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/ocaml.svg": {
+    "mtime": 1792005057.3008585,
+    "seen": 1792005364.8425083,
+    "ast_hash": "fa9a5765de6815708d30c7001a278158",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/perl.svg": {
+    "mtime": 1792005054.267206,
+    "seen": 1792005364.8425093,
+    "ast_hash": "14d43ca3f847b425b09f5fc5eb43f09f",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/php.svg": {
+    "mtime": 1792005052.27003,
+    "seen": 1792005364.8425102,
+    "ast_hash": "2d61a3b7505e53fa3185bdf8da7b6f8e",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/powershell.svg": {
+    "mtime": 1792005055.3404984,
+    "seen": 1792005364.8425114,
+    "ast_hash": "4d11027cf9f2cbb819c3da75b6e610f3",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/python.svg": {
+    "mtime": 1792005052.3546574,
+    "seen": 1792005364.8425124,
+    "ast_hash": "71374043d9b3d9ea7fa09976a747d475",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/r.svg": {
+    "mtime": 1792005053.9965634,
+    "seen": 1792005364.8425133,
+    "ast_hash": "234b558e7edb8f20660435e2d3ff46ed",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/react.svg": {
+    "mtime": 1792005051.5645373,
+    "seen": 1792005364.8425145,
+    "ast_hash": "4f81f37c8c72270f6c343b8814c10ea8",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/ruby.svg": {
+    "mtime": 1792005053.402404,
+    "seen": 1792005364.8425157,
+    "ast_hash": "a9982b573baaa385cfa842477a6445c2",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/rust.svg": {
+    "mtime": 1792005052.7014084,
+    "seen": 1792005364.8425164,
+    "ast_hash": "ee265cd7405e40d7702c46dbfca3208a",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/sass.svg": {
+    "mtime": 1792005051.9384046,
+    "seen": 1792005364.8425179,
+    "ast_hash": "73682a7d388de609573d1df94de83b8b",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/scala.svg": {
+    "mtime": 1792005054.1566849,
+    "seen": 1792005364.8425188,
+    "ast_hash": "0fdeb739eef430c1dcc22aacf0c6dd58",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/solidity.svg": {
+    "mtime": 1792005056.5636165,
+    "seen": 1792005364.8425195,
+    "ast_hash": "cf521f7e443d8793af3dcd75dc90942e",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/svelte.svg": {
+    "mtime": 1792005055.1220183,
+    "seen": 1792005364.8425205,
+    "ast_hash": "f481a4c97150076941649604723d5ad5",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/swift.svg": {
+    "mtime": 1792005053.650989,
+    "seen": 1792005364.8425217,
+    "ast_hash": "714948ba4cf994b64135be84ced494e2",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/terraform.svg": {
+    "mtime": 1792005056.7908158,
+    "seen": 1792005364.8425229,
+    "ast_hash": "17e9dc6b9437c6b4d374c394c687e3c9",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/typescript.svg": {
+    "mtime": 1792005051.4313576,
+    "seen": 1792005364.8425238,
+    "ast_hash": "c06d3c068de68e5654d05552e26e3452",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/visualbasic.svg": {
+    "mtime": 1792005056.4438171,
+    "seen": 1792005364.8425248,
+    "ast_hash": "6852fa86c28e673f1676e6d46daa350a",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/vuejs.svg": {
+    "mtime": 1792005054.9424214,
+    "seen": 1792005364.842526,
+    "ast_hash": "72d93ebdd9d9cdd1c1e81073aff06b79",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/xml.svg": {
+    "mtime": 1792005052.1652539,
+    "seen": 1792005364.842527,
+    "ast_hash": "48958bdbe7d7ac0343d1b6e5ef798b6f",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/yaml.svg": {
+    "mtime": 1792005052.9661725,
+    "seen": 1792005364.842528,
+    "ast_hash": "ffc4df70fa4e4dc3ea0e5a76317c2536",
+    "semantic_hash": ""
+  },
+  "public/assets/icons/lang/zig.svg": {
+    "mtime": 1792005056.0143301,
+    "seen": 1792005364.842529,
+    "ast_hash": "3d13c507e21731bde20770ec4d288323",
     "semantic_hash": ""
   }
 }
