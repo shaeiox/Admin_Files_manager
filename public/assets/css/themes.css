@@ -5,6 +5,7 @@
 
 /* ── ۱. تم پیش‌فرض پروژه (Dark) ── */
 :root {
+  color-scheme: dark;
   --bg-primary: #0a0a0a;
   --bg-secondary: #161616;
   --bg-tertiary: rgba(212, 212, 212, 0.06);
@@ -82,6 +83,7 @@
 /* ── ۲. تشخیص اتوماتیک تم لایت توسط مرورگر (بدون جاوااسکریپت) ── */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
+    color-scheme: light;
     /* تمامی متغیرهای تم لایت */
     --bg-primary: #fafafa;
     --bg-secondary: #ffffff;
@@ -160,6 +162,7 @@
 
 /* ── ۳. اورراید اجباری دستی تم لایت (زمانی که کاربر روی کلید لایت کلیک می‌کند) ── */
 [data-theme="light"] {
+  color-scheme: light;
   --bg-primary: #fafafa;
   --bg-secondary: #ffffff;
   --bg-tertiary: rgba(0, 0, 0, 0.03);
@@ -236,6 +239,7 @@
 
 /* ── ۴. اورراید اجباری دستی تم دارک ── */
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg-primary: #0a0a0a;
   --bg-secondary: #161616;
   --bg-tertiary: rgba(212, 212, 212, 0.06);

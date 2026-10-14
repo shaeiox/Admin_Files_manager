@@ -371,7 +371,7 @@
   background-position: right 12px center;
 }
 
-.select option {
+select option {
   background: var(--bg-dropdown);
   color: var(--text-primary);
 }
