@@ -765,8 +765,8 @@ const Files = (() => {
     if (kind === 'search') {
       title = `Nothing here matches “${esc(state.search)}”`;
       desc = state.filter !== 'all'
-        ? `The search is limited to ${esc(chip ? chip.label.toLowerCase() : state.filter)} in this folder.`
-        : 'The search covers names in this folder only.';
+        ? `The search is limited to ${esc(chip ? chip.label.toLowerCase() : state.filter)} in this folder and its subfolders.`
+        : 'The search covers names in this folder and all its subfolders.';
       actions = `<button type="button" class="btn btn-ghost btn-sm" data-clear="search">Clear search${state.filter !== 'all' ? ' and filter' : ''}</button>`;
     } else if (kind === 'filter') {
       title = `No ${esc(chip ? chip.label.toLowerCase() : state.filter)} in this folder`;
@@ -912,6 +912,9 @@ const Files = (() => {
       state.total = total;
       state.counts = res && res.counts && typeof res.counts === 'object' ? res.counts : null;
       state.selected = pruneSelection(state.selected, files);
+      if (res && res.searchTruncated) {
+        Toast.warning('Search stopped early', 'This folder tree is too large to search fully; results are partial.');
+      }
     } catch (e) {
       if (reqId !== listRequestId) return;
       state.files = [];

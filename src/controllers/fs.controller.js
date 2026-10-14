@@ -161,12 +161,20 @@ async function getList(req, res, next) {
         const access = FileAccessPolicyService.checkerFor(req.user);
         access.assertCanAccess(targetPath);
 
-        // Fails the whole request when the target itself is unreadable.
-        const rawItems = await FileSystemService.readDirectory(targetPath);
+        // Fails the whole request when the target itself is unreadable. A search
+        // covers every subdirectory of the target (bounded walk); a plain
+        // listing is the target's direct children.
+        let searchTruncated = false;
+        let found;
+        if (search) {
+            ({ matches: found, truncated: searchTruncated } = await FileSystemService.searchTree(targetPath, search));
+        } else {
+            found = (await FileSystemService.readDirectory(targetPath))
+                .filter((item) => !item.name.startsWith('.'))
+                .map((item) => ({ name: item.name, path: targetPath === '/' ? `/${item.name}` : `${targetPath}/${item.name}` }));
+        }
         // Hidden entries are dropped BEFORE counting, so total/counts never reveal them.
-        const candidates = rawItems.filter((item) =>
-            !item.name.startsWith('.') && (!search || item.name.toLowerCase().includes(search))
-            && access.canAccess(targetPath === '/' ? `/${item.name}` : `${targetPath}/${item.name}`));
+        const candidates = found.filter((item) => access.canAccess(item.path));
 
         // One store read primes the metadata cache, so the concurrent per-entry
         // lookups below are cache hits rather than N racing cold reads.
@@ -174,7 +182,7 @@ async function getList(req, res, next) {
 
         let skipped = 0;
         const enriched = await mapWithConcurrency(candidates, LIST_ENRICH_CONCURRENCY, async (item) => {
-            const itemClientPath = targetPath === '/' ? `/${item.name}` : `${targetPath}/${item.name}`;
+            const itemClientPath = item.path;
 
             let stats;
             try {
@@ -233,11 +241,9 @@ async function getList(req, res, next) {
         const startIndex = (page - 1) * limit;
         const paginatedItems = filteredItems.slice(startIndex, startIndex + limit);
 
-        res.json({
-            items: paginatedItems,
-            total,
-            counts
-        });
+        const body = { items: paginatedItems, total, counts };
+        if (search) body.searchTruncated = searchTruncated;
+        res.json(body);
     } catch (error) {
         next(error);
     }

@@ -951,6 +951,20 @@ describe('GET /api/fs/list?starredOnly=true', () => {
         const plain = await getJson('/api/fs/list?path=/lib');
         assert.equal(plain.total, 3, 'without the flag nothing is filtered');
     });
+
+    test('search reaches every subdirectory depth below the target, never above or hidden', async () => {
+        writeFile('srch/a/b/c/d/e/needle-deep.txt', 'D');
+        writeFile('srch/needle-top.txt', 'T');
+        writeFile('srch/a/.hidden/needle-dot.txt', 'H');
+        writeFile('needle-outside.txt', 'O');
+        const res = await getJson('/api/fs/list?path=/srch&search=NEEDLE&sort=name&dir=asc');
+        assert.deepEqual(res.items.map((i) => i.path), ['/srch/a/b/c/d/e/needle-deep.txt', '/srch/needle-top.txt']);
+        assert.equal(res.total, 2);
+        assert.equal(res.searchTruncated, false);
+
+        const plain = await getJson('/api/fs/list?path=/srch');
+        assert.equal(plain.searchTruncated, undefined, 'listing without search is unchanged');
+    });
 });
 
 /* ══════════════════════════════════════════

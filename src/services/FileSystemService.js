@@ -500,6 +500,54 @@ class FileSystemService {
     }
 
     /**
+     * Case-insensitive name search across EVERY subdirectory of `clientPath`.
+     * Same walk rules as getTreeStats: explicit stack of client paths, links
+     * and dot-entries skipped, unreadable subtrees skipped, and the same
+     * entry/time budgets - when one trips, `truncated: true` says the match
+     * list is partial instead of presenting it as complete.
+     *
+     * @param {string} clientPath - Directory to search under (must exist).
+     * @param {string} query - Lower-cased substring to match against names.
+     * @param {{maxEntries?: number, maxMs?: number}} [options]
+     * @returns {Promise<{matches: Array<{name:string, path:string}>, truncated:boolean}>}
+     */
+    static async searchTree(clientPath, query, options = {}) {
+        const maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
+        const deadline = Date.now() + (options.maxMs ?? DEFAULT_MAX_MS);
+
+        // The start directory itself failing is the caller's error (404/403/400).
+        await this.readDirectory(clientPath);
+
+        const matches = [];
+        const stack = [clientPath];
+        let scanned = 0;
+
+        while (stack.length > 0) {
+            const current = stack.pop();
+            let dirents;
+            try {
+                dirents = await fs.readdir(PathService.resolveSecurePath(current), { withFileTypes: true });
+            } catch {
+                continue; // unreadable subtree: skip, keep searching siblings
+            }
+
+            for (const dirent of dirents) {
+                if (dirent.name.startsWith('.') || dirent.isSymbolicLink()) continue;
+                if (scanned >= maxEntries || (scanned % TIME_CHECK_INTERVAL === 0 && Date.now() >= deadline)) {
+                    return { matches, truncated: true };
+                }
+                scanned += 1;
+
+                const childPath = current === '/' ? `/${dirent.name}` : `${current}/${dirent.name}`;
+                if (dirent.name.toLowerCase().includes(query)) matches.push({ name: dirent.name, path: childPath });
+                if (dirent.isDirectory()) stack.push(childPath);
+            }
+        }
+
+        return { matches, truncated: false };
+    }
+
+    /**
      * Pure capacity arithmetic. No I/O, so the formula can be tested exhaustively
      * without a syscall backdoor.
      *

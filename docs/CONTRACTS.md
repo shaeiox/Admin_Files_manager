@@ -494,7 +494,7 @@ at. Omitted or `/` behaves exactly as before.
 | `limit` | integer ≥ 1 | `20` | clamped to **`200`** (`LIST_MAX_LIMIT`) |
 | `sort` | `name` \| `size` \| `modified` \| `downloads` | `modified` | falls back to `modified` |
 | `dir` | `asc` \| `desc` | `desc` | anything but `asc` is `desc` |
-| `search` | substring of the **name**, case-insensitive | — | — |
+| `search` | substring of the **name**, case-insensitive; matches in **every subdirectory** of `path`, not just its direct children | — | — |
 | `type` | `all` \| `folder` \| `image` \| `video` \| `document` \| `audio` \| `archive` \| `code` \| `other` | `all` | matches nothing |
 | `starredOnly` | `true` | off | anything but `true` is off |
 
@@ -532,6 +532,10 @@ at. Omitted or `/` behaves exactly as before.
 - **`counts`** covers every entry that survived `search` and `starredOnly` (before the `type`
   filter and pagination). `counts.all` equals the sum of every other key, **including `other`** —
   the unclassified bucket is counted, never dropped.
+- **Search is recursive** (`FileSystemService.searchTree`): dot-entries and links are skipped, an
+  unreadable subtree is skipped, and the walk shares `getTreeStats`' budgets (100k entries / 2 s).
+  With `search` set the response adds `searchTruncated` (`true` when a budget stopped the walk, so
+  the matches are partial); without `search` the field is absent.
 - `total` is the full matching count after the `type` filter; a `page` past the end returns
   `items: []` with the true `total`.
 - An entry that vanishes between the directory read and its `stat` (or cannot be stat-ed) is
