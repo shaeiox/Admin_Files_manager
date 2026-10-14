@@ -41,6 +41,8 @@ const config = {
     port: process.env.PORT || 3000,
     env,
     storageRoot: process.env.STORAGE_ROOT,
+    // Shown as the sidebar version label. APP_VERSION when set, else package.json.
+    appVersion: (process.env.APP_VERSION || '').trim() || require('../../package.json').version,
     // Base directory of the metadata and settings stores. Outside production an
     // unset value keeps the historical <cwd>/data; in production it is required
     // (validateStartup) so the store can never follow a release's working

@@ -81,6 +81,7 @@ function me(req, res, next) {
             role: req.user.role,
             status: req.user.status,
             csrfToken: req.session.csrf_secret,
+            appVersion: config.appVersion,
         });
     } catch (error) {
         return next(error);

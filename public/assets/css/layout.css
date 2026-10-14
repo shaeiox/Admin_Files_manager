@@ -169,6 +169,21 @@
   line-height: 1.4;
 }
 
+.app-version {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border: 1px solid var(--border-primary);
+  border-radius: 999px;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-version[hidden] { display: none; }
+
 .sidebar.is-collapsed .brand-text {
   opacity: 0;
   max-width: 0;

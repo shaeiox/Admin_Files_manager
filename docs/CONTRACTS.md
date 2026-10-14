@@ -187,6 +187,10 @@ guard → `GET /health` → `/auth` router (self-gated) → `authenticate` → `
 | GET | `/api/admin/files/permissions` | admin | ✅ live | Per-user grants/denies on one path |
 | POST | `/api/admin/files/permissions` | admin | ✅ live | Grant or deny one user (`201`) |
 | DELETE | `/api/admin/files/permissions` | admin | ✅ live | Remove one user's grant/deny |
+| GET | `/api/admin/portal/config` | admin | ✅ live | File portal `.env` keys, or `available:false` |
+| PUT | `/api/admin/portal/config` | admin | ✅ live | Replace the six portal `.env` keys (applies on portal restart) |
+| GET | `/api/admin/logs/portal` | admin | ✅ live | File portal trace, newest first |
+| GET | `/api/admin/logs/audit` | admin | ✅ live | Admin audit log, newest first |
 
 ### GET /api/health
 
@@ -970,6 +974,22 @@ A governed path's `files.client_path` row is kept in step with `PUT /api/fs/rena
 (`FileAccessPolicyService.onPathRenamed`/`onPathDeleted`, called from `fs.controller.js` alongside
 the existing `MetadataService` fire-and-forget calls) — the filesystem operation's own success
 never depends on it.
+
+### File portal and logs (`system.controller.js`, `PortalService`)
+
+The File Portal (files-server-web) is linked by `PORTAL_ROOT` — the absolute path of its project
+directory on this host. Unset, not absolute, missing or not a directory (e.g. pointed at `data/portal.log`), every read below answers `available: false` plus a human-readable `reason` (never an empty config
+or an empty log passed off as real) and the write answers `503` with that reason.
+
+| Endpoint | Envelope | Notes |
+|---|---|---|
+| `GET /api/admin/portal/config` | bare `{available, values}` | `values` holds exactly `FILES_ROOT`, `RELEASE_PVM`, `AUTH_ENABLED`, `AUTH_SESSION_MINUTES`, `AUTH_MAX_FAILED_ATTEMPTS`, `AUTH_LOCKOUT_MINUTES` as strings (`""` when absent); `null` when unavailable. No other key of that `.env` (e.g. `AUTH_JWT_SECRET`) is ever returned. |
+| `PUT /api/admin/portal/config` | `{success, values, restartRequired: true}` | Full replace of the six keys, all strings. `400`: unknown key, missing key, multi-line value, empty `FILES_ROOT`, `AUTH_ENABLED` not `"true"`/`"false"`, minutes not 1–10080, attempts not 1–1000. Each key's line is rewritten in place (comments, order and other keys kept; a missing key is appended), temp-file-then-rename. Audited as `portal.config`. The portal reads its `.env` only at startup. |
+| `GET /api/admin/logs/portal?limit=` | bare `{available, entries}` | Parsed JSON lines from `<PORTAL_ROOT>/data/portal.log` (the portal's `LOG_FILE` default), newest first, `limit` 1–1000 (default 200), only the last 512 KiB read. Entry: `{t, level: "info"|"warn"|"error", msg, method?, status?, url?}`. A missing file is `entries: []`. |
+| `GET /api/admin/logs/audit?limit=` | bare array | `audit_logs` rows plus `actor_username` (`null` for a deleted or absent actor), newest first, `limit` 1–1000 (default 200). |
+
+`GET /api/auth/me` additionally carries `appVersion` (additive): `APP_VERSION` when set, else the
+`package.json` version. The sidebar renders it as the version label.
 
 ## Error Model
 

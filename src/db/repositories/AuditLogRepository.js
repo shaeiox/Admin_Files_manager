@@ -13,7 +13,11 @@ class AuditLogRepository {
     }
 
     list({ limit = 100 } = {}) {
-        return AdminDatabase.get().prepare('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT ?').all(limit);
+        return AdminDatabase.get().prepare(
+            `SELECT a.*, u.username AS actor_username FROM audit_logs a
+             LEFT JOIN users u ON u.id = a.actor_id
+             ORDER BY a.created_at DESC, a.id DESC LIMIT ?`
+        ).all(limit);
     }
 
     /** Deletes every row older than `olderThanMs` relative to now. */

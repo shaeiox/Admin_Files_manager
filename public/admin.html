@@ -47,7 +47,7 @@
           </div>
           <div class="brand-text">
             <span class="brand-name">Dimension</span>
-            <span class="brand-sub">Files Manager</span>
+            <span class="brand-sub">Files Manager <span class="app-version" hidden></span></span>
           </div>
         </a>
       </div>
@@ -176,7 +176,7 @@
               Administration
             </span>
             <h1 class="page-title">Admin</h1>
-            <p class="page-subtitle">Manage user accounts and file access policies. Only an administrator can
+            <p class="page-subtitle">Manage user accounts, file access policies, the file portal and logs. Only an administrator can
               reach this page.</p>
           </div>
         </div>
@@ -198,6 +198,15 @@
             <button class="settings-nav-item" data-pane="policies">
               <i data-icon="lock" data-icon-size="16"></i>
               File access policies
+            </button>
+            <div class="settings-nav-label">System</div>
+            <button class="settings-nav-item" data-pane="portal">
+              <i data-icon="globe" data-icon-size="16"></i>
+              File portal
+            </button>
+            <button class="settings-nav-item" data-pane="logs">
+              <i data-icon="activity" data-icon-size="16"></i>
+              Logs
             </button>
           </nav>
 
@@ -392,6 +401,130 @@
                     <tbody id="permissionsTableBody"></tbody>
                   </table>
                 </div>
+              </div>
+            </div>
+
+            <!-- ══════════════════════
+               PANE: FILE PORTAL (.env of files-server-web, via PORTAL_ROOT)
+               ══════════════════════ -->
+            <div class="settings-pane" data-pane-content="portal">
+
+              <div class="admin-notice" id="portalUnavailable" role="status" hidden>
+                <i data-icon="info" data-icon-size="16"></i>
+                <span>The file portal is not linked: <strong id="portalUnavailableReason"></strong> Set
+                  <code>PORTAL_ROOT</code> to the portal's project folder (e.g. <code>C:\PRO\files-server-web</code>)
+                  and restart this server.</span>
+              </div>
+
+              <form class="settings-group" id="portalForm" novalidate>
+                <div class="sg-head">
+                  <div class="sg-title">
+                    <i data-icon="folder" data-icon-size="18"></i>
+                    Content
+                  </div>
+                  <div class="sg-desc">Where the portal serves files from. Relative paths resolve from the portal's
+                    project directory.</div>
+                </div>
+                <div class="sg-body portal-grid">
+                  <div class="field">
+                    <label class="field-label" for="pFILES_ROOT">Files root</label>
+                    <input class="input input-mono" type="text" id="pFILES_ROOT" name="FILES_ROOT" required autocomplete="off" spellcheck="false">
+                    <span class="field-hint"><code>FILES_ROOT</code> · same directory as this server's storage root</span>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="pRELEASE_PVM">Release folder</label>
+                    <input class="input input-mono" type="text" id="pRELEASE_PVM" name="RELEASE_PVM" autocomplete="off" spellcheck="false" placeholder="optional">
+                    <span class="field-hint"><code>RELEASE_PVM</code> · empty scans the files root</span>
+                  </div>
+                </div>
+
+                <div class="sg-head sg-head-split">
+                  <div class="sg-title">
+                    <i data-icon="lock" data-icon-size="18"></i>
+                    Sign-in gate
+                  </div>
+                  <div class="sg-desc">Session length and brute-force lockout for portal sign-in.</div>
+                </div>
+                <div class="sg-body portal-grid">
+                  <div class="field portal-switch-row">
+                    <label class="admin-switch-label" for="pAUTH_ENABLED">
+                      <span class="switch">
+                        <input type="checkbox" id="pAUTH_ENABLED" name="AUTH_ENABLED">
+                        <span class="track" aria-hidden="true"></span>
+                      </span>
+                      <span>Require sign-in <code>AUTH_ENABLED</code></span>
+                    </label>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="pAUTH_SESSION_MINUTES">Session length</label>
+                    <div class="input-suffix">
+                      <input class="input" type="number" inputmode="numeric" min="1" max="10080" step="1" id="pAUTH_SESSION_MINUTES" name="AUTH_SESSION_MINUTES" required>
+                      <span>min</span>
+                    </div>
+                    <span class="field-hint"><code>AUTH_SESSION_MINUTES</code></span>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="pAUTH_MAX_FAILED_ATTEMPTS">Failed attempts before lockout</label>
+                    <input class="input" type="number" inputmode="numeric" min="1" max="1000" step="1" id="pAUTH_MAX_FAILED_ATTEMPTS" name="AUTH_MAX_FAILED_ATTEMPTS" required>
+                    <span class="field-hint"><code>AUTH_MAX_FAILED_ATTEMPTS</code></span>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="pAUTH_LOCKOUT_MINUTES">Lockout duration</label>
+                    <div class="input-suffix">
+                      <input class="input" type="number" inputmode="numeric" min="1" max="10080" step="1" id="pAUTH_LOCKOUT_MINUTES" name="AUTH_LOCKOUT_MINUTES" required>
+                      <span>min</span>
+                    </div>
+                    <span class="field-hint"><code>AUTH_LOCKOUT_MINUTES</code></span>
+                  </div>
+                </div>
+
+                <div class="portal-actions">
+                  <span class="portal-actions-note">
+                    <i data-icon="info" data-icon-size="14"></i>
+                    Written to the portal's <code>.env</code>. Takes effect when the portal restarts.
+                  </span>
+                  <button type="button" class="btn btn-ghost btn-sm" id="portalReset" disabled>Discard</button>
+                  <button type="submit" class="btn btn-primary btn-sm" id="portalSave" disabled>
+                    <i data-icon="save" data-icon-size="14"></i>
+                    Save changes
+                  </button>
+                </div>
+                <div class="admin-form-error" id="portalError" role="alert" hidden></div>
+              </form>
+            </div>
+
+            <!-- ══════════════════════
+               PANE: LOGS (portal trace + admin audit log)
+               ══════════════════════ -->
+            <div class="settings-pane" data-pane-content="logs">
+              <div class="settings-group log-panel">
+                <div class="log-toolbar">
+                  <div class="segmented" role="tablist" aria-label="Log source">
+                    <button type="button" class="is-active" role="tab" aria-selected="true" data-log-source="portal">File portal</button>
+                    <button type="button" role="tab" aria-selected="false" data-log-source="audit">Admin audit</button>
+                  </div>
+                  <div class="segmented" role="group" aria-label="Level filter" id="logLevels">
+                    <button type="button" class="is-active" data-log-level="all">All</button>
+                    <button type="button" data-log-level="warn">Warnings</button>
+                    <button type="button" data-log-level="error">Errors</button>
+                  </div>
+                  <label class="log-search">
+                    <i data-icon="search" data-icon-size="14"></i>
+                    <input type="search" id="logSearch" placeholder="Filter…" aria-label="Filter log lines" autocomplete="off">
+                  </label>
+                  <label class="admin-switch-label log-live">
+                    <span class="switch">
+                      <input type="checkbox" id="logLive">
+                      <span class="track" aria-hidden="true"></span>
+                    </span>
+                    <span>Live</span>
+                  </label>
+                  <button type="button" class="btn-icon btn-icon-sm" id="logRefresh" aria-label="Refresh logs" data-tip="Refresh" data-tip-pos="bottom">
+                    <i data-icon="refresh" data-icon-size="15"></i>
+                  </button>
+                </div>
+                <div class="log-meta" id="logMeta" aria-live="polite"></div>
+                <ol class="log-list" id="logList" aria-label="Log entries"></ol>
               </div>
             </div>
 

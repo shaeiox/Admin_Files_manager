@@ -5,6 +5,7 @@ const express = require('express');
 const requireAdmin = require('../middlewares/requireAdmin');
 const usersController = require('../controllers/users.controller');
 const filePolicyController = require('../controllers/filePolicy.controller');
+const systemController = require('../controllers/system.controller');
 
 /**
  * Admin-only endpoints (ADR-009 phase 2): user management and
@@ -31,5 +32,10 @@ router.delete('/files/policy', filePolicyController.deletePolicy);
 router.get('/files/permissions', filePolicyController.listPermissions);
 router.post('/files/permissions', filePolicyController.grantPermission);
 router.delete('/files/permissions', filePolicyController.revokePermission);
+
+router.get('/portal/config', systemController.getPortalConfig);
+router.put('/portal/config', systemController.setPortalConfig);
+router.get('/logs/portal', systemController.getPortalLog);
+router.get('/logs/audit', systemController.getAuditLog);
 
 module.exports = router;

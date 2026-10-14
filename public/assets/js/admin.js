@@ -403,6 +403,191 @@ const Admin = (() => {
     }
 
     /* ══════════════════════════════════════════
+       FILE PORTAL (.env of files-server-web)
+       ══════════════════════════════════════════ */
+
+    const PORTAL_KEYS = ['FILES_ROOT', 'RELEASE_PVM', 'AUTH_ENABLED', 'AUTH_SESSION_MINUTES', 'AUTH_MAX_FAILED_ATTEMPTS', 'AUTH_LOCKOUT_MINUTES'];
+    let portalSaved = null;
+
+    function readPortalForm() {
+        const values = {};
+        for (const key of PORTAL_KEYS) {
+            const el = document.getElementById(`p${key}`);
+            values[key] = el.type === 'checkbox' ? String(el.checked) : el.value.trim();
+        }
+        return values;
+    }
+
+    function fillPortalForm(values) {
+        for (const key of PORTAL_KEYS) {
+            const el = document.getElementById(`p${key}`);
+            if (el.type === 'checkbox') el.checked = ['true', '1', 'yes', 'on'].includes(String(values[key]).toLowerCase());
+            else el.value = values[key] || '';
+        }
+        portalSaved = readPortalForm();
+        updatePortalDirty();
+    }
+
+    function updatePortalDirty() {
+        const dirty = portalSaved && PORTAL_KEYS.some((k) => readPortalForm()[k] !== portalSaved[k]);
+        document.getElementById('portalSave').disabled = !dirty;
+        document.getElementById('portalReset').disabled = !dirty;
+    }
+
+    async function loadPortal() {
+        const form = document.getElementById('portalForm');
+        if (!form) return;
+        try {
+            const config = await window.API.get('/admin/portal/config', { silent: true });
+            const unavailable = !config || !config.available;
+            document.getElementById('portalUnavailable').hidden = !unavailable;
+            document.getElementById('portalUnavailableReason').textContent = (config && config.reason) || '';
+            form.querySelectorAll('input').forEach((el) => { el.disabled = unavailable; });
+            if (!unavailable) fillPortalForm(config.values);
+        } catch (error) {
+            const errorEl = document.getElementById('portalError');
+            errorEl.textContent = error.message || 'Could not read the portal configuration.';
+            errorEl.hidden = false;
+        }
+    }
+
+    async function handlePortalSave(event) {
+        event.preventDefault();
+        const errorEl = document.getElementById('portalError');
+        errorEl.hidden = true;
+        const saveBtn = document.getElementById('portalSave');
+        saveBtn.disabled = true;
+        try {
+            const res = await window.API.put('/admin/portal/config', readPortalForm(), { silent: true });
+            fillPortalForm(res.values);
+            Toast.success('Portal settings saved', 'Restart the file portal to apply them.');
+        } catch (error) {
+            errorEl.textContent = error.message || 'Could not save the portal configuration.';
+            errorEl.hidden = false;
+            updatePortalDirty();
+        }
+    }
+
+    /* ══════════════════════════════════════════
+       LOGS (portal trace + admin audit)
+       ══════════════════════════════════════════ */
+
+    const LOG_LIMIT = 500;
+    const LOG_POLL_MS = 5000;
+    let logState = { source: 'portal', level: 'all', query: '', entries: [], available: true };
+    let logTimer = null;
+
+    /** Both sources reduced to one row shape: {t, level, title, detail}. */
+    function normalizePortalEntry(e) {
+        const level = ['error', 'warn'].includes(e.level) ? e.level : 'info';
+        if (e.method) return { t: e.t, level, status: e.status, title: `${e.method} ${e.url || ''}`, detail: e.msg || '' };
+        return { t: e.t, level, title: e.msg || '', detail: '' };
+    }
+
+    function normalizeAuditEntry(e) {
+        const target = e.target_type ? `${e.target_type}${e.target_id != null ? ` #${e.target_id}` : ''}` : '';
+        return {
+            t: e.created_at,
+            level: e.outcome === 'failure' ? 'warn' : 'info',
+            status: e.outcome,
+            title: e.action,
+            detail: [e.actor_username || (e.actor_id ? `user #${e.actor_id}` : 'system'), target, e.ip].filter(Boolean).join(' · '),
+        };
+    }
+
+    function filterLogEntries(entries, level, query) {
+        const q = query.trim().toLowerCase();
+        return entries.filter((e) => {
+            if (level === 'error' && e.level !== 'error') return false;
+            if (level === 'warn' && e.level === 'info') return false;
+            return !q || `${e.title} ${e.detail} ${e.status ?? ''}`.toLowerCase().includes(q);
+        });
+    }
+
+    function renderLogs() {
+        const list = document.getElementById('logList');
+        const meta = document.getElementById('logMeta');
+        if (!list) return;
+        const shown = filterLogEntries(logState.entries, logState.level, logState.query);
+        meta.textContent = !logState.available
+            ? `File portal is not linked: ${logState.reason || 'PORTAL_ROOT is not usable.'}`
+            : `${shown.length} of ${logState.entries.length} most recent entries`;
+
+        if (shown.length === 0) {
+            list.innerHTML = `<li class="log-empty">${logState.entries.length ? 'No entries match the filter.' : 'No log entries yet.'}</li>`;
+            return;
+        }
+        list.innerHTML = shown.map((e) => {
+            const d = new Date(e.t);
+            const valid = !Number.isNaN(d.getTime());
+            const time = valid ? d.toLocaleTimeString([], { hour12: false }) : '—';
+            const day = valid ? d.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
+            const status = e.status != null ? `<span class="log-status">${escapeHtml(String(e.status))}</span>` : '';
+            return `
+                <li class="log-row" data-level="${escapeHtml(e.level)}">
+                    <time class="log-time" datetime="${valid ? escapeHtml(d.toISOString()) : ''}"><span>${escapeHtml(day)}</span>${escapeHtml(time)}</time>
+                    <span class="log-level">${escapeHtml(e.level)}</span>
+                    <span class="log-body">${status}<span class="log-title">${escapeHtml(e.title)}</span>${e.detail ? `<span class="log-detail">${escapeHtml(e.detail)}</span>` : ''}</span>
+                </li>`;
+        }).join('');
+    }
+
+    async function loadLogs() {
+        const source = logState.source;
+        try {
+            if (source === 'portal') {
+                const res = await window.API.get(`/admin/logs/portal?limit=${LOG_LIMIT}`, { silent: true });
+                if (source !== logState.source) return;
+                logState.available = Boolean(res && res.available);
+                logState.reason = res && res.reason;
+                logState.entries = (res && res.entries ? res.entries : []).map(normalizePortalEntry);
+            } else {
+                const rows = await window.API.get(`/admin/logs/audit?limit=${LOG_LIMIT}`, { silent: true });
+                if (source !== logState.source) return;
+                logState.available = true;
+                logState.entries = (rows || []).map(normalizeAuditEntry);
+            }
+            renderLogs();
+        } catch (error) {
+            const meta = document.getElementById('logMeta');
+            if (meta) meta.textContent = `Could not load logs: ${error.message || 'request failed'}`;
+        }
+    }
+
+    function setLogLive(on) {
+        clearInterval(logTimer);
+        logTimer = on ? setInterval(() => { if (!document.hidden) loadLogs(); }, LOG_POLL_MS) : null;
+    }
+
+    function bindLogs() {
+        const panel = document.querySelector('[data-pane-content="logs"]');
+        if (!panel) return;
+        panel.addEventListener('click', (e) => {
+            const src = e.target.closest('[data-log-source]');
+            if (src) {
+                logState.source = src.dataset.logSource;
+                logState.entries = [];
+                panel.querySelectorAll('[data-log-source]').forEach((b) => {
+                    b.classList.toggle('is-active', b === src);
+                    b.setAttribute('aria-selected', String(b === src));
+                });
+                renderLogs();
+                loadLogs();
+                return;
+            }
+            const lvl = e.target.closest('[data-log-level]');
+            if (lvl) {
+                logState.level = lvl.dataset.logLevel;
+                panel.querySelectorAll('[data-log-level]').forEach((b) => b.classList.toggle('is-active', b === lvl));
+                renderLogs();
+            }
+        });
+        document.getElementById('logSearch').addEventListener('input', (e) => { logState.query = e.target.value; renderLogs(); });
+        document.getElementById('logRefresh').addEventListener('click', loadLogs);
+        document.getElementById('logLive').addEventListener('change', (e) => setLogLive(e.target.checked));
+    }
+
+    /* ══════════════════════════════════════════
        PANE SWITCHING (settings.js's pattern)
        ══════════════════════════════════════════ */
 
@@ -414,6 +599,7 @@ const Admin = (() => {
                 $$('.settings-pane').forEach((p) => {
                     p.classList.toggle('is-active', p.getAttribute('data-pane-content') === target);
                 });
+                if (target === 'logs') loadLogs();
             });
         });
     }
@@ -480,8 +666,19 @@ const Admin = (() => {
         const grantForm = document.getElementById('grantPermissionForm');
         if (grantForm) grantForm.addEventListener('submit', handleGrantPermission);
 
+        const portalForm = document.getElementById('portalForm');
+        if (portalForm) {
+            portalForm.addEventListener('submit', handlePortalSave);
+            portalForm.addEventListener('input', updatePortalDirty);
+            portalForm.addEventListener('change', updatePortalDirty);
+            document.getElementById('portalReset').addEventListener('click', () => portalSaved && fillPortalForm(portalSaved));
+        }
+        logState = { source: 'portal', level: 'all', query: '', entries: [], available: true };
+        bindLogs();
+
         loadUsers();
         loadPolicies();
+        loadPortal();
 
         if (window.AFM && AFM.Notifications) AFM.Notifications.bindTopbarBell();
     }
@@ -490,12 +687,13 @@ const Admin = (() => {
     function destroy() {
         globalListeners.forEach(([target, type, handler]) => target.removeEventListener(type, handler));
         globalListeners = [];
+        setLogLive(false);
     }
 
     return {
         init, destroy,
         // Exposed for test/frontend/admin.test.js (pure-ish helpers, DOM-light).
-        _internal: { renderUsersTable, renderPoliciesTable },
+        _internal: { renderUsersTable, renderPoliciesTable, normalizePortalEntry, normalizeAuditEntry, filterLogEntries },
     };
 })();
 

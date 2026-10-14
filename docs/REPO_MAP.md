@@ -51,7 +51,8 @@ admin-files-manager/
 │   │   ├── settings.controller.js   # GET → bare document; PUT → { success, settings }; no hand-rolled checks
 │   │   ├── auth.controller.js    # login/logout/me — sets/clears the session cookie, returns the CSRF token
 │   │   ├── users.controller.js   # admin user CRUD — never returns password_hash (UserService strips it)
-│   │   └── filePolicy.controller.js  # admin file-access-policy CRUD + per-user permission grant/revoke
+│   │   ├── filePolicy.controller.js  # admin file-access-policy CRUD + per-user permission grant/revoke
+│   │   └── system.controller.js  # admin: file-portal .env keys (PORTAL_ROOT), portal trace log, audit log
 │   ├── services/                 # 🔒 All filesystem + metadata access (no Express here)
 │   │   ├── PathService.js        # Client path ⇄ secure OS path; traversal guard (THE boundary)
 │   │   ├── FileSystemService.js  # stat/readdir/mkdir/rename/move/copy/rm/unlink → AppError; tree/volume/health aggregation
@@ -62,6 +63,7 @@ admin-files-manager/
 │   │   ├── UploadService.js      # Multer engine + staging: placement decided after the body is parsed; overwrite; size cap
 │   │   ├── PreviewService.js     # Thumbnail capability + bounded transform (only if a transformer is installed)
 │   │   ├── UserService.js        # Admin user management — validates, hashes (node:crypto), strips secrets on the way out
+│   │   ├── PortalService.js      # File portal link (PORTAL_ROOT): whitelisted .env read/rewrite + portal.log tail
 │   │   ├── SessionService.js     # Login/validateSession/logout/revoke — flat 24h expiry, lockout after 10 failures
 │   │   └── FileAccessPolicyService.js  # Per-file policy CRUD + permission grants; onPathRenamed/onPathDeleted
 │   │                             #   best-effort hooks called from fs.controller.js; checkerFor() = the access decision

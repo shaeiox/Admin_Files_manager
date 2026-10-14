@@ -1043,6 +1043,13 @@ function updateUserUI(health) {
   if (avatarEl) avatarEl.textContent = view.avatar;
   if (nameEl) nameEl.textContent = view.name;
   if (roleEl) roleEl.textContent = view.role;
+
+  const versionEl = document.querySelector('.app-version');
+  const version = health && typeof health.appVersion === 'string' ? health.appVersion : '';
+  if (versionEl) {
+    versionEl.textContent = version ? `v${version.replace(/^v/i, '')}` : '';
+    versionEl.hidden = !version;
+  }
 }
 
 function updateStorageUI(storage) {
