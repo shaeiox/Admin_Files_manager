@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "public/assets/js/app.js": {
-    "mtime": 1792001810.162048,
-    "seen": 1792002386.0603392,
+    "mtime": 1792005446.9877467,
+    "seen": 1792006867.7652917,
     "ast_hash": "263f42a76bf18bb6c4ce63fdb210120b",
     "semantic_hash": ""
   },
@@ -42,9 +42,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/files.js": {
-    "mtime": 1792002318.07902,
-    "seen": 1792002386.0603437,
-    "ast_hash": "83dbf3090d3aadd3dad6d0331c12617b",
+    "mtime": 1792008930.4442484,
+    "seen": 1792009467.6754956,
+    "ast_hash": "05286159a2299c9826c7f2271bcd4804",
     "semantic_hash": ""
   },
   "public/assets/js/settings.js": {
@@ -90,9 +90,9 @@
     "semantic_hash": ""
   },
   "src/controllers/fs.controller.js": {
-    "mtime": 1792002257.323326,
-    "seen": 1792002386.0603883,
-    "ast_hash": "9056d4060f74d68a8eb4c2b332e2f991",
+    "mtime": 1792008794.0131962,
+    "seen": 1792009467.6755366,
+    "ast_hash": "bab615d87e39d0b38df6239e44d365e3",
     "semantic_hash": ""
   },
   "src/middlewares/errorHandler.js": {
@@ -108,8 +108,8 @@
     "semantic_hash": ""
   },
   "src/services/FileSystemService.js": {
-    "mtime": 1792002244.8818953,
-    "seen": 1792002386.0604537,
+    "mtime": 1792002971.4980278,
+    "seen": 1792006867.7653978,
     "ast_hash": "50cbd0d892bf95faad297b5f6194b925",
     "semantic_hash": ""
   },
@@ -396,9 +396,9 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1791991670.5719767,
-    "seen": 1792001002.724936,
-    "ast_hash": "35e610a08f2a0ad2f02bea68af5d89d5",
+    "mtime": 1792009319.807552,
+    "seen": 1792009467.675819,
+    "ast_hash": "4f026840bab8176777643d47059a9059",
     "semantic_hash": ""
   },
   "PROJECT_TREE.md": {
@@ -408,15 +408,15 @@
     "semantic_hash": "6f72ba4f8d01347aabdf0261fa963963"
   },
   "docs/CONTRACTS.md": {
-    "mtime": 1792002360.6512175,
-    "seen": 1792002386.0608087,
-    "ast_hash": "a03bbbafa1aa599deec36bc49f3153d7",
+    "mtime": 1792009319.8355517,
+    "seen": 1792009467.675903,
+    "ast_hash": "a99ce698ed4ef8d9028eb732d707097f",
     "semantic_hash": ""
   },
   "docs/REPO_MAP.md": {
-    "mtime": 1792001810.0773506,
-    "seen": 1792002386.060815,
-    "ast_hash": "4ce4d4d24535a447a1639c04da30f2de",
+    "mtime": 1792009319.8385541,
+    "seen": 1792009467.675908,
+    "ast_hash": "457dc759007cdb49aef7b3d3491e6451",
     "semantic_hash": ""
   },
   "docs/STRUCTURE.md": {
@@ -456,8 +456,8 @@
     "semantic_hash": ""
   },
   "public/files.html": {
-    "mtime": 1792001810.162048,
-    "seen": 1792002386.0611317,
+    "mtime": 1792005447.0033631,
+    "seen": 1792006867.7660084,
     "ast_hash": "1789a497f787ca8f73f3f581bd3de284",
     "semantic_hash": ""
   },
@@ -480,9 +480,9 @@
     "semantic_hash": ""
   },
   "src/controllers/dashboard.controller.js": {
-    "mtime": 1791991670.610661,
-    "seen": 1792001002.7245822,
-    "ast_hash": "28f5a2182a2fdd92c039056520590222",
+    "mtime": 1792008794.0091908,
+    "seen": 1792009467.6755333,
+    "ast_hash": "febd71c20c9f31543590cd05f14ba8a2",
     "semantic_hash": ""
   },
   "src/routes/dashboard.routes.js": {
@@ -492,8 +492,8 @@
     "semantic_hash": ""
   },
   "src/utils/fileTypes.js": {
-    "mtime": 1791060952.7551937,
-    "seen": 1791088819.505831,
+    "mtime": 1792005447.022523,
+    "seen": 1792006867.7654262,
     "ast_hash": "1f3336d752337ad7180165d2b399e9a3",
     "semantic_hash": ""
   },
@@ -570,9 +570,9 @@
     "semantic_hash": ""
   },
   "src/controllers/preview.controller.js": {
-    "mtime": 1791991670.6116667,
-    "seen": 1792001002.724589,
-    "ast_hash": "2487f9f49144441b706bfe7729b38fb3",
+    "mtime": 1792008794.0101902,
+    "seen": 1792009467.6755412,
+    "ast_hash": "fa4209b65931a62f9b6cdc74219443ef",
     "semantic_hash": ""
   },
   "src/services/PreviewService.js": {
@@ -594,8 +594,8 @@
     "semantic_hash": ""
   },
   "test/api/fs.contract.test.js": {
-    "mtime": 1792002324.7612178,
-    "seen": 1792002386.0605025,
+    "mtime": 1792002971.5136745,
+    "seen": 1792006867.7654424,
     "ast_hash": "ee92445eee6397e1bc10d99ebfec636e",
     "semantic_hash": ""
   },
@@ -996,8 +996,8 @@
     "semantic_hash": ""
   },
   "test/frontend/tooltips.test.js": {
-    "mtime": 1791904626.7347436,
-    "seen": 1791955531.9550354,
+    "mtime": 1792005447.022523,
+    "seen": 1792006867.7654977,
     "ast_hash": "65c1c2566992f17efd5b9ec9e31bf8c3",
     "semantic_hash": ""
   },
@@ -1548,9 +1548,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/admin.js": {
-    "mtime": 1792001810.1464045,
-    "seen": 1792002386.0603337,
-    "ast_hash": "393c3fb035b9c76dac3802eff238fb86",
+    "mtime": 1792009326.672892,
+    "seen": 1792009467.6754854,
+    "ast_hash": "3848082fc9b243b22c5487b5d164a242",
     "semantic_hash": ""
   },
   "public/assets/js/login.js": {
@@ -1566,9 +1566,9 @@
     "semantic_hash": ""
   },
   "src/controllers/filePolicy.controller.js": {
-    "mtime": 1791904626.7034724,
-    "seen": 1791955531.9548693,
-    "ast_hash": "8bbcce116c9db329c180e9a80fdfc60b",
+    "mtime": 1792008850.3455105,
+    "seen": 1792009467.6755352,
+    "ast_hash": "931662856115249b64a44c0ebc6c2a09",
     "semantic_hash": ""
   },
   "src/controllers/users.controller.js": {
@@ -1596,9 +1596,9 @@
     "semantic_hash": ""
   },
   "src/db/repositories/FileAccessPolicyRepository.js": {
-    "mtime": 1791991670.6116667,
-    "seen": 1792001002.724606,
-    "ast_hash": "17eb81a62cbeb68b71b538260615e183",
+    "mtime": 1792008850.3455105,
+    "seen": 1792009467.6755574,
+    "ast_hash": "1bfc66252d6b9fa6e4064ca0f1c25cbb",
     "semantic_hash": ""
   },
   "src/db/repositories/SessionRepository.js": {
@@ -1608,9 +1608,9 @@
     "semantic_hash": ""
   },
   "src/db/repositories/UserFilePermissionRepository.js": {
-    "mtime": 1791991670.6126618,
-    "seen": 1792001002.724611,
-    "ast_hash": "0c452edec1538d3b1cc0f56a0b0f020a",
+    "mtime": 1792008850.344496,
+    "seen": 1792009467.6755648,
+    "ast_hash": "36c58e8ee5e761a2fe67bdaa259868ff",
     "semantic_hash": ""
   },
   "src/db/repositories/UserRepository.js": {
@@ -1620,9 +1620,9 @@
     "semantic_hash": ""
   },
   "src/db/schema.js": {
-    "mtime": 1791904626.7104802,
-    "seen": 1791955531.9549017,
-    "ast_hash": "a9eee42de6711ce84b50f1c2298eb5fe",
+    "mtime": 1792008850.343979,
+    "seen": 1792009467.675569,
+    "ast_hash": "6e2a3750e7a365d163495422e584d6e1",
     "semantic_hash": ""
   },
   "src/middlewares/authenticate.js": {
@@ -1644,9 +1644,9 @@
     "semantic_hash": ""
   },
   "src/routes/admin.routes.js": {
-    "mtime": 1792001810.162048,
-    "seen": 1792002386.0604358,
-    "ast_hash": "577d6a1018e92d6afbee05e376a70933",
+    "mtime": 1792006012.1769822,
+    "seen": 1792006867.7653828,
+    "ast_hash": "bcbf3e813f5515a318dea557d1ce5a0b",
     "semantic_hash": ""
   },
   "src/routes/auth.routes.js": {
@@ -1656,9 +1656,9 @@
     "semantic_hash": ""
   },
   "src/services/FileAccessPolicyService.js": {
-    "mtime": 1791991670.6137662,
-    "seen": 1792001002.7246463,
-    "ast_hash": "5e12a35df64f38eda37a9b616bbd6178",
+    "mtime": 1792008850.3419752,
+    "seen": 1792009467.675596,
+    "ast_hash": "71298636334a2a29f5c598e82e2d82d1",
     "semantic_hash": ""
   },
   "src/services/SessionService.js": {
@@ -1680,9 +1680,9 @@
     "semantic_hash": ""
   },
   "test/api/admin.contract.test.js": {
-    "mtime": 1791991670.6137662,
-    "seen": 1792001002.7246835,
-    "ast_hash": "f75ba1d6c85b208c72bce239f47ad0bd",
+    "mtime": 1792009018.1640856,
+    "seen": 1792009467.6756337,
+    "ast_hash": "b7e61c06b2a9471f53071b47e36d17d8",
     "semantic_hash": ""
   },
   "test/api/auth.contract.test.js": {
@@ -1698,9 +1698,9 @@
     "semantic_hash": ""
   },
   "test/frontend/admin.test.js": {
-    "mtime": 1791991670.614777,
-    "seen": 1792001002.7247243,
-    "ast_hash": "98094bacf86e9b513cd268298362f476",
+    "mtime": 1792009088.9531982,
+    "seen": 1792009467.6756692,
+    "ast_hash": "9441956570d1a8537b0b62c62cd3691e",
     "semantic_hash": ""
   },
   "test/frontend/login.test.js": {
@@ -1716,9 +1716,9 @@
     "semantic_hash": ""
   },
   "test/services/FileAccessPolicyService.test.js": {
-    "mtime": 1791991670.615772,
-    "seen": 1792001002.7247653,
-    "ast_hash": "b7032c29adacd9e143a719f0ec11d86f",
+    "mtime": 1792009018.1650946,
+    "seen": 1792009467.6757073,
+    "ast_hash": "e7621f86e52779e97ccc3115787af382",
     "semantic_hash": ""
   },
   "test/services/FileSystemService.copy.test.js": {
@@ -1806,9 +1806,9 @@
     "semantic_hash": ""
   },
   "public/admin.html": {
-    "mtime": 1792001810.1464045,
-    "seen": 1792002386.06113,
-    "ast_hash": "303b8aebad82eb850560b540eff5803e",
+    "mtime": 1792008930.4122365,
+    "seen": 1792009467.6761873,
+    "ast_hash": "a1ee19d612662a1b64b94147626a3946",
     "semantic_hash": ""
   },
   "public/login.html": {
@@ -2064,15 +2064,15 @@
     "semantic_hash": ""
   },
   "docs/DATABASE.md": {
-    "mtime": 1791991670.5719767,
-    "seen": 1792001002.7250328,
-    "ast_hash": "0057e568f9614814d2f931b6cec9c827",
+    "mtime": 1792009319.8365507,
+    "seen": 1792009467.6759045,
+    "ast_hash": "ec63a6659b9c9f2313c460f81b05294d",
     "semantic_hash": ""
   },
   "src/controllers/system.controller.js": {
-    "mtime": 1792001810.162048,
-    "seen": 1792002386.0603957,
-    "ast_hash": "f60e2cb82fc2717bfb911647fa7c102e",
+    "mtime": 1792004989.4456239,
+    "seen": 1792006867.765347,
+    "ast_hash": "85ec4897686ef1d99564924ae42914d0",
     "semantic_hash": ""
   },
   "src/services/PortalService.js": {
@@ -2082,9 +2082,33 @@
     "semantic_hash": ""
   },
   "test/api/system.contract.test.js": {
-    "mtime": 1792001810.1750329,
-    "seen": 1792002386.060514,
-    "ast_hash": "2a5770fb739960847dcfdb488eb15bfb",
+    "mtime": 1792004989.4456239,
+    "seen": 1792006867.7654533,
+    "ast_hash": "d32fcb71a9bf43a9e77634a42044af6f",
+    "semantic_hash": ""
+  },
+  "src/controllers/groups.controller.js": {
+    "mtime": 1792005954.8262618,
+    "seen": 1792006867.7653403,
+    "ast_hash": "2c801be346450578c618f0146970612e",
+    "semantic_hash": ""
+  },
+  "src/db/repositories/GroupRepository.js": {
+    "mtime": 1792005810.9480963,
+    "seen": 1792006867.7653596,
+    "ast_hash": "b341aca50da5b3dde4f7e9192264b1b7",
+    "semantic_hash": ""
+  },
+  "src/services/GroupService.js": {
+    "mtime": 1792005954.7422855,
+    "seen": 1792006867.7653987,
+    "ast_hash": "8dc3c49c87d746ad42b809e6f6246909",
+    "semantic_hash": ""
+  },
+  "src/services/PortalNavService.js": {
+    "mtime": 1792004989.4456239,
+    "seen": 1792006867.7654045,
+    "ast_hash": "7933f644e24a526f625ca1f6f1c94962",
     "semantic_hash": ""
   }
 }
