@@ -239,13 +239,152 @@ describe('file-access-policy management', () => {
         assert.equal(newPolicy.json.access_mode, 'public');
     });
 
-    test('this change enforces nothing against a real download (design D5)', async () => {
-        fs.writeFileSync(path.join(ROOT, 'blocked-in-theory.txt'), 'STILL READABLE');
-        await sendJson('PUT', '/api/v1/admin/files/policy', { path: '/blocked-in-theory.txt', accessMode: 'restricted', isLocked: true }, adminHeaders);
-        // Any authenticated session - not just one with a granted permission -
-        // can still download it today, because nothing wires the policy into
-        // the download endpoint yet.
-        const res = await send('GET', '/api/v1/fs/download?path=%2Fblocked-in-theory.txt', { headers: adminHeaders });
-        assert.equal(res.status, 200);
+    test('a policy below a renamed folder moves with it instead of being stranded', async () => {
+        fs.mkdirSync(path.join(ROOT, 'old-dir'), { recursive: true });
+        fs.writeFileSync(path.join(ROOT, 'old-dir', 'inner.txt'), 'x');
+        await sendJson('PUT', '/api/v1/admin/files/policy', { path: '/old-dir/inner.txt', isLocked: true }, adminHeaders);
+        const renameRes = await sendJson('PUT', '/api/v1/fs/rename', { oldPath: '/old-dir', newName: 'new-dir' }, adminHeaders);
+        assert.equal(renameRes.status, 200);
+
+        const moved = await send('GET', '/api/v1/admin/files/policy?path=/new-dir/inner.txt', { headers: adminHeaders });
+        assert.ok(moved.json, 'the descendant policy was re-keyed under the new folder name');
+        assert.equal(moved.json.is_locked, 1);
+    });
+});
+
+describe('policy enforcement for a non-admin session', () => {
+    const q = (p) => encodeURIComponent(p);
+    let user;
+    let userHeaders;
+
+    async function policy(p, fields) {
+        const res = await sendJson('PUT', '/api/v1/admin/files/policy', { path: p, ...fields }, adminHeaders);
+        assert.equal(res.status, 200, JSON.stringify(res.json));
+    }
+    const download = (p, headers = userHeaders) => send('GET', `/api/v1/fs/download?path=${q(p)}`, { headers });
+    async function listNames(dir) {
+        const res = await send('GET', `/api/v1/fs/list?path=${q(dir)}&limit=200`, { headers: userHeaders });
+        assert.equal(res.status, 200, JSON.stringify(res.json));
+        return { names: res.json.items.map((i) => i.name).sort(), total: res.json.total };
+    }
+
+    before(async () => {
+        const dir = path.join(ROOT, 'enforce');
+        fs.mkdirSync(path.join(dir, 'vault', 'deep'), { recursive: true });
+        for (const name of ['open.txt', 'locked.txt', 'draft.txt', 'shared.txt', 'granted.txt', 'denied.txt', 'future.txt', 'expired.txt']) {
+            fs.writeFileSync(path.join(dir, name), name);
+        }
+        fs.writeFileSync(path.join(dir, 'vault', 'deep', 'secret.txt'), 'secret');
+
+        user = await createUser('enforce-user');
+        userHeaders = await loginAs('enforce-user');
+
+        const hour = 3600 * 1000;
+        await policy('/enforce/locked.txt', { accessMode: 'authenticated', isPublished: true, isLocked: true });
+        await policy('/enforce/draft.txt', { accessMode: 'authenticated', isPublished: false });
+        await policy('/enforce/shared.txt', { accessMode: 'authenticated', isPublished: true });
+        await policy('/enforce/granted.txt', { accessMode: 'restricted', isPublished: true });
+        await policy('/enforce/denied.txt', { accessMode: 'restricted', isPublished: true });
+        await policy('/enforce/future.txt', { accessMode: 'authenticated', isPublished: true, availableFrom: Date.now() + hour });
+        await policy('/enforce/expired.txt', { accessMode: 'authenticated', isPublished: true, availableUntil: Date.now() - hour });
+        await policy('/enforce/vault', { isDirectory: true, accessMode: 'authenticated', isPublished: true, isLocked: true });
+
+        await sendJson('POST', '/api/v1/admin/files/permissions', { path: '/enforce/granted.txt', userId: user.id, permission: 'grant' }, adminHeaders);
+        await sendJson('POST', '/api/v1/admin/files/permissions', { path: '/enforce/denied.txt', userId: user.id, permission: 'deny' }, adminHeaders);
+    });
+
+    test('download: allowed exactly where every policy on the path allows', async () => {
+        const expected = {
+            '/enforce/open.txt': 200, // no policy: open to every signed-in user
+            '/enforce/shared.txt': 200,
+            '/enforce/granted.txt': 200,
+            '/enforce/locked.txt': 404,
+            '/enforce/draft.txt': 404,
+            '/enforce/denied.txt': 404,
+            '/enforce/future.txt': 404,
+            '/enforce/expired.txt': 404,
+            '/enforce/vault/deep/secret.txt': 404, // locked ancestor folder
+        };
+        for (const [p, status] of Object.entries(expected)) {
+            assert.equal((await download(p)).status, status, p);
+        }
+    });
+
+    test('a hidden file answers exactly like a missing one', async () => {
+        const hidden = await download('/enforce/locked.txt');
+        const missing = await download('/enforce/no-such-file.txt');
+        assert.equal(hidden.status, missing.status);
+        assert.equal(hidden.json.error.replace('locked', 'X'), missing.json.error.replace('no-such-file', 'X'));
+    });
+
+    test('non-canonical spellings of a hidden path are not a way around it', async () => {
+        for (const p of ['/enforce//locked.txt', '/enforce/./locked.txt', '/enforce/vault/../locked.txt', '/enforce/locked.txt/', '/enforce/vault//deep/secret.txt']) {
+            assert.notEqual((await download(p)).status, 200, p);
+        }
+    });
+
+    test('list and tree omit hidden entries, and total/counts do not reveal them', async () => {
+        const { names, total } = await listNames('/enforce');
+        assert.deepEqual(names, ['granted.txt', 'open.txt', 'shared.txt']);
+        assert.equal(total, 3);
+
+        const tree = await send('GET', `/api/v1/fs/tree?path=${q('/enforce')}`, { headers: userHeaders });
+        assert.equal(tree.status, 200);
+        assert.deepEqual(tree.json[0].children.map((c) => c.name), [], 'the locked vault folder is not in the tree');
+
+        assert.equal((await send('GET', `/api/v1/fs/list?path=${q('/enforce/vault')}`, { headers: userHeaders })).status, 404);
+    });
+
+    test('ZIP refuses a hidden path and leaves hidden descendants out of a folder', async () => {
+        const zipHidden = await sendJson('POST', '/api/v1/fs/download-zip', { paths: ['/enforce/locked.txt'] }, userHeaders);
+        assert.equal(zipHidden.status, 404);
+
+        const raw = await new Promise((resolve, reject) => {
+            const body = JSON.stringify({ paths: ['/enforce'] });
+            const req = http.request({ host: '127.0.0.1', port, path: '/api/v1/fs/download-zip', method: 'POST', agent: false,
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), ...userHeaders } }, (res) => {
+                const chunks = [];
+                res.on('data', (c) => chunks.push(c));
+                res.on('end', () => resolve({ status: res.statusCode, buffer: Buffer.concat(chunks) }));
+            });
+            req.on('error', reject);
+            req.end(body);
+        });
+        assert.equal(raw.status, 200);
+        const listing = raw.buffer.toString('latin1'); // ZIP stores entry names uncompressed
+        assert.ok(listing.includes('enforce/open.txt'));
+        for (const hidden of ['locked.txt', 'draft.txt', 'denied.txt', 'secret.txt']) {
+            assert.ok(!listing.includes(hidden), `${hidden} must not be in the archive`);
+        }
+    });
+
+    test('mutations refuse hidden items and folders hiding something', async () => {
+        const del = await sendJson('DELETE', '/api/v1/fs/delete', { paths: ['/enforce/locked.txt'] }, userHeaders);
+        assert.equal(del.status, 404);
+        const delFolder = await sendJson('DELETE', '/api/v1/fs/delete', { paths: ['/enforce'] }, userHeaders);
+        assert.equal(delFolder.status, 403, 'deleting a folder would destroy what the user cannot see');
+        const copy = await sendJson('POST', '/api/v1/fs/copy', { paths: ['/enforce'], destination: '/' }, userHeaders);
+        assert.equal(copy.status, 403, 'copying would publish an unprotected duplicate');
+        const rename = await sendJson('PUT', '/api/v1/fs/rename', { oldPath: '/enforce/draft.txt', newName: 'x.txt' }, userHeaders);
+        assert.equal(rename.status, 404);
+        const move = await sendJson('PUT', '/api/v1/fs/move', { paths: ['/enforce/open.txt'], destination: '/enforce/vault' }, userHeaders);
+        assert.equal(move.status, 404, 'cannot move into a hidden folder');
+        const star = await sendJson('POST', '/api/v1/fs/star', { path: '/enforce/locked.txt' }, userHeaders);
+        assert.equal(star.status, 404);
+        const folder = await sendJson('POST', '/api/v1/fs/folder', { path: '/enforce/vault/new' }, userHeaders);
+        assert.equal(folder.status, 404);
+        assert.ok(fs.existsSync(path.join(ROOT, 'enforce', 'locked.txt')));
+    });
+
+    test('an administrator is never restricted by a policy', async () => {
+        assert.equal((await download('/enforce/locked.txt', adminHeaders)).status, 200);
+        assert.equal((await download('/enforce/vault/deep/secret.txt', adminHeaders)).status, 200);
+    });
+
+    test('changing the policy takes effect on the next request', async () => {
+        await policy('/enforce/draft.txt', { isPublished: true });
+        assert.equal((await download('/enforce/draft.txt')).status, 200);
+        await sendJson('DELETE', '/api/v1/admin/files/permissions', { path: '/enforce/granted.txt', userId: user.id }, adminHeaders);
+        assert.equal((await download('/enforce/granted.txt')).status, 404, 'a revoked grant closes a restricted file');
     });
 });

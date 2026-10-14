@@ -135,6 +135,15 @@ CASCADE` — that this data model needs).
 
 ### D5. No enforcement wiring in this change
 
+> **Amendment (2026-10-14): superseded — policies are now enforced.** The operator asked for the
+> backend to honour policies, so the "decided consumer" is this application itself.
+> `FileAccessPolicyService.checkerFor(req.user)` is consulted by every `/fs` endpoint, the
+> thumbnail and the dashboard summary. Admins bypass; an unpolicied path stays open; otherwise every
+> policy on the path (ancestors included) must allow — which also amends the "per-file, not
+> inherited" requirement, since a folder ZIP or listing would otherwise leak a locked child. Hidden
+> items answer `404` like missing ones. Rules: `docs/CONTRACTS.md` → "What a policy enforces".
+> The original decision is kept below for the record.
+
 **Decision.** `fs.routes.js`'s existing read endpoints (`GET /list`, `GET /tree`, `GET /download`,
 `GET /download-zip`, `GET /thumbnail`) are **not** modified to consult `file_access_policies` or
 `user_file_permissions`. This change adds the schema and the admin CRUD surface only.

@@ -2,6 +2,7 @@
 'use strict';
 
 const PreviewService = require('../services/PreviewService');
+const FileAccessPolicyService = require('../services/FileAccessPolicyService');
 const { validateClientPath } = require('../utils/validators');
 
 /**
@@ -24,6 +25,7 @@ async function getThumbnail(req, res, next) {
     try {
         const clientPath = req.query.path;
         validateClientPath(clientPath);
+        FileAccessPolicyService.checkerFor(req.user).assertCanAccess(clientPath);
         const size = PreviewService.parseSize(req.query.size);
 
         const { buffer, contentType } = await PreviewService.render(clientPath, size);

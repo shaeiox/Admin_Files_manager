@@ -64,7 +64,7 @@ admin-files-manager/
 │   │   ├── UserService.js        # Admin user management — validates, hashes (node:crypto), strips secrets on the way out
 │   │   ├── SessionService.js     # Login/validateSession/logout/revoke — flat 24h expiry, lockout after 10 failures
 │   │   └── FileAccessPolicyService.js  # Per-file policy CRUD + permission grants; onPathRenamed/onPathDeleted
-│   │                             #   best-effort hooks called from fs.controller.js (enforces nothing, design D5)
+│   │                             #   best-effort hooks called from fs.controller.js; checkerFor() = the access decision
 │   ├── db/                       # ADR-009 — a separate node:sqlite database, not a JSON-store replacement
 │   │   ├── connection.js         # Singleton; `dbPath` redirectable by tests like MetadataService.dbPath
 │   │   ├── schema.js             # Migrations array (1: users/sessions/audit_logs; 2: files/policies/permissions)
@@ -178,7 +178,7 @@ admin-files-manager/
 │   │   │                                    #   with no session, CSRF enforcement, cookie+bearer both work,
 │   │   │                                    #   logout revokes, /api/v1 ↔ /api parity (ADR-009)
 │   │   └── admin.contract.test.js           # live-server: requireAdmin (403 vs 401), full user-management
-│   │                                        #   and file-policy CRUD flows, D5's "enforces nothing yet"
+│   │                                        #   and file-policy CRUD flows, policy enforcement for a non-admin session
 │   ├── integration/
 │   │   ├── live-server.test.js              # traversal guard wired into the running app
 │   │   ├── error-disclosure.test.js         # no stack / no path in error bodies
@@ -201,7 +201,7 @@ admin-files-manager/
 │       ├── uploads.test.js                  # uploads.js in a vm with stub DOM/API/XHR: queue derivations, failure
 │       │                                    #   kinds, escaping, destination gate, honesty + a11y source guards
 │       ├── admin.test.js                    # admin.html/js source-level: escaping scoped to the HTML-building
-│       │                                    #   functions, API-boundary compliance, D5 disclosure copy pinned
+│       │                                    #   functions, API-boundary compliance, enforcement disclosure copy pinned
 │       └── login.test.js                    # login.html/js: standalone-page isolation, and a real functional
 │                                            #   test of the open-redirect guard on `?redirect=`
 │

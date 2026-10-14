@@ -196,10 +196,13 @@ describe('editing an existing policy does not silently reset Published/Locked to
     });
 });
 
-describe('the data model vs. enforcement distinction is disclosed truthfully (design D5)', () => {
-    test('the policies pane states plainly that nothing is enforced yet', () => {
-        assert.match(ADMIN_HTML, /does not yet change what this application serves/i);
-        assert.match(ADMIN_HTML, /nothing currently\s+checks it before a download/i);
+describe('the policies pane describes enforcement truthfully', () => {
+    test('it states who is restricted and what a missing policy means', () => {
+        assert.match(ADMIN_HTML, /Policies are enforced for every non-administrator account/i);
+        assert.match(ADMIN_HTML, /Paths with no policy stay open/i);
+        assert.match(ADMIN_HTML, /administrators are never restricted/i);
+        assert.ok(!/does not yet change what this application serves/i.test(ADMIN_HTML),
+            'the stale "nothing is enforced" notice must not come back');
     });
 });
 

@@ -2,6 +2,7 @@
 'use strict';
 
 const AppError = require('../utils/AppError');
+const PathService = require('./PathService');
 const { validateClientPath } = require('../utils/validators');
 const FileAccessPolicyRepository = require('../db/repositories/FileAccessPolicyRepository');
 const UserFilePermissionRepository = require('../db/repositories/UserFilePermissionRepository');
@@ -10,14 +11,125 @@ const UserRepository = require('../db/repositories/UserRepository');
 const ACCESS_MODES = new Set(['public', 'authenticated', 'restricted']);
 const PERMISSIONS = new Set(['grant', 'deny']);
 
+/** Windows and macOS volumes are case-insensitive: `/Secret.txt` opens `/secret.txt`. */
+const CASE_INSENSITIVE = process.platform === 'win32' || process.platform === 'darwin';
+
 /**
- * Admin file-access-policy management (ADR-009 phase 2,
- * authorization/file-access-policy spec). Per-file, not directory-inherited.
- * This service enforces NO policy against a real download - fs.routes.js's
- * read endpoints are untouched by this change (design D5). It only lets an
- * administrator create, read, and edit the data model.
+ * The form a path is compared in. `validateClientPath` does not normalise, and
+ * `/a//x`, `/x/../a`, `/a/` (and `\` on Windows) all reach the same file, so a
+ * raw string lookup would be bypassable. Both sides go through this.
+ * ponytail: lexical only - an in-root symlink to a governed file, or a Windows
+ * trailing-dot alias, is not mapped back; canonicalise via realpath if those matter.
+ */
+function canonical(clientPath) {
+    const key = PathService.toClientPath(PathService.resolveSecurePath(clientPath));
+    return CASE_INSENSITIVE ? key.toLowerCase() : key;
+}
+
+/** `/a/b` -> ['/', '/a', '/a/b']: every path whose policy governs `/a/b`. */
+function selfAndAncestors(key) {
+    const out = ['/'];
+    let at = 0;
+    while ((at = key.indexOf('/', at + 1)) !== -1) out.push(key.slice(0, at));
+    if (key !== '/') out.push(key);
+    return out;
+}
+
+const ALLOW_ALL = Object.freeze({
+    canAccess: () => true,
+    assertCanAccess: () => {},
+    assertCanAccessTree: () => {},
+    hidesAnythingBelow: () => false,
+});
+
+/** Same answer as a path that does not exist, so a hidden file's existence is not disclosed. */
+function notFound(clientPath) {
+    return new AppError(`Item not found: ${clientPath}`, 404);
+}
+
+/**
+ * File-access policies (ADR-009, authorization/file-access-policy spec):
+ * administrator management of the data model, and `checkerFor`, the one
+ * decision every fs/dashboard endpoint consults before serving or mutating
+ * a path.
  */
 class FileAccessPolicyService {
+    /**
+     * The access decision for one request's user, loaded once so a listing of N
+     * entries is N map lookups, not N queries.
+     *
+     * - Administrators manage policies and are never restricted by them.
+     * - A path with no policy on itself or any ancestor folder is open to every
+     *   signed-in user (the behaviour before policies existed).
+     * - Otherwise EVERY policy on the path (ancestors and self) must allow: so
+     *   locking a folder locks everything beneath it. A policy allows when it is
+     *   not locked, is published, `now` is inside [available_from, available_until),
+     *   and - for `restricted` - the user holds an explicit `grant` on that policy's
+     *   path. `public` and `authenticated` are equivalent: every route already
+     *   requires a session, so there is no anonymous caller to distinguish.
+     *
+     * ponytail: reads every policy row per request; index by prefix if policies reach thousands.
+     */
+    checkerFor(user, now = Date.now()) {
+        if (!user || user.role === 'admin') return ALLOW_ALL;
+
+        const policies = new Map();
+        for (const row of FileAccessPolicyRepository.listPolicies()) {
+            try {
+                policies.set(canonical(row.client_path), row);
+            } catch (error) {
+                // A stored path outside the root governs nothing reachable. Anything
+                // else is a bug and must not silently disable enforcement.
+                if (!(error instanceof AppError)) throw error;
+            }
+        }
+        if (policies.size === 0) return ALLOW_ALL;
+
+        const grants = new Map(UserFilePermissionRepository.listForUser(user.id)
+            .map((row) => [row.file_id, row.permission]));
+
+        const allows = (p) => p.is_locked !== 1
+            && p.is_published === 1
+            && (p.available_from === null || now >= p.available_from)
+            && (p.available_until === null || now < p.available_until)
+            && (p.access_mode !== 'restricted' || grants.get(p.file_id) === 'grant');
+
+        // A traversal attempt throws its usual 403 from canonical(), unchanged.
+        const canAccess = (clientPath) => {
+            const key = canonical(clientPath);
+            return selfAndAncestors(key).every((k) => !policies.has(k) || allows(policies.get(k)));
+        };
+
+        const hidesAnythingBelow = (clientPath) => {
+            const key = canonical(clientPath);
+            const base = key === '/' ? '/' : `${key}/`;
+            for (const [k, row] of policies) {
+                if (k !== key && k.startsWith(base) && !allows(row)) return true;
+            }
+            return false;
+        };
+
+        return {
+            canAccess,
+            hidesAnythingBelow,
+            assertCanAccess(clientPath) {
+                if (!canAccess(clientPath)) throw notFound(clientPath);
+            },
+            /**
+             * For operations that act on a whole subtree (delete, move, rename, copy):
+             * refusing is the only safe answer when it holds something this user
+             * cannot see - deleting it would destroy it unseen, copying it would
+             * publish an unprotected duplicate.
+             */
+            assertCanAccessTree(clientPath) {
+                if (!canAccess(clientPath)) throw notFound(clientPath);
+                if (hidesAnythingBelow(clientPath)) {
+                    throw new AppError('This folder contains items you do not have access to.', 403);
+                }
+            },
+        };
+    }
+
     list() {
         return FileAccessPolicyRepository.listPolicies();
     }

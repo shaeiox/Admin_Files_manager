@@ -31,6 +31,10 @@ class UserFilePermissionRepository {
     listForFile(fileId) {
         return AdminDatabase.get().prepare('SELECT * FROM user_file_permissions WHERE file_id = ?').all(fileId);
     }
+
+    listForUser(userId) {
+        return AdminDatabase.get().prepare('SELECT file_id, permission FROM user_file_permissions WHERE user_id = ?').all(userId);
+    }
 }
 
 module.exports = new UserFilePermissionRepository();

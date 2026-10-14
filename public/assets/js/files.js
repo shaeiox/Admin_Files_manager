@@ -1644,8 +1644,8 @@ const Files = (() => {
           <div class="modal-header">
             <div>
               <div class="modal-title" id="policyModalTitle">${title}</div>
-              <div class="modal-subtitle">Administrator only. This manages the data model only —
-                nothing currently checks it before a download.</div>
+              <div class="modal-subtitle">Administrator only. Enforced for every non-administrator
+                account; a folder's policy covers everything inside it.</div>
             </div>
             <button class="btn-icon btn-icon-sm" data-act="cancel" aria-label="Cancel">${icon('x', 15)}</button>
           </div>

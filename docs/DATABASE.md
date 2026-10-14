@@ -157,9 +157,12 @@ on a best-effort basis (see *Lifecycle*).
 | `created_at`, `updated_at` | INTEGER | NOT NULL | |
 
 > [!IMPORTANT]
-> **Policies are stored, not enforced.** No read endpoint (`/fs/list`, `/fs/download`, ZIP, preview)
-> consults this table (ADR-009 design D5). Any authenticated session can read any file regardless
-> of what is set here. Policies are also **per path, not inherited** by a directory's contents.
+> **Policies are enforced for non-admin sessions** by `FileAccessPolicyService.checkerFor`, which
+> reads every policy row (and the caller's `user_file_permissions`) once per request. A policy on a
+> directory path covers everything below it: every policy on a path, ancestors included, must allow.
+> The full rules and per-endpoint behaviour are in `docs/CONTRACTS.md` → "What a policy enforces".
+> `renamePath`/`deletePath` act on the path **and every row below it**, so a folder rename never
+> strands a descendant's policy on a path that no longer exists.
 
 #### `user_file_permissions` (migration 2)
 

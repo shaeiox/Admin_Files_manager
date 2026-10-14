@@ -82,15 +82,24 @@ class FileAccessPolicyRepository {
         return this.findPolicyByPath(clientPath);
     }
 
-    /** Best-effort rename of a governed file's path (design D2) - never throws on a missing row. */
+    /**
+     * Best-effort rename of a governed path (design D2) - never throws on a missing row.
+     * Rows BELOW a renamed folder move with it: re-keying only the exact path would
+     * strand their policies on a path that no longer exists, unprotecting the files.
+     */
     renamePath(oldClientPath, newClientPath) {
-        AdminDatabase.get().prepare('UPDATE files SET client_path = ?, updated_at = ? WHERE client_path = ?')
-            .run(newClientPath, Date.now(), oldClientPath);
+        const prefix = `${oldClientPath}/`;
+        AdminDatabase.get().prepare(
+            `UPDATE files SET client_path = ? || substr(client_path, ?), updated_at = ?
+             WHERE client_path = ? OR substr(client_path, 1, ?) = ?`
+        ).run(newClientPath, oldClientPath.length + 1, Date.now(), oldClientPath, prefix.length, prefix);
     }
 
-    /** Best-effort removal of a governed file's row and its policy/permissions (cascade). */
+    /** Best-effort removal of a governed path and everything below it, policies/permissions included (cascade). */
     deletePath(clientPath) {
-        AdminDatabase.get().prepare('DELETE FROM files WHERE client_path = ?').run(clientPath);
+        const prefix = `${clientPath}/`;
+        AdminDatabase.get().prepare('DELETE FROM files WHERE client_path = ? OR substr(client_path, 1, ?) = ?')
+            .run(clientPath, prefix.length, prefix);
     }
 
     deletePolicy(clientPath) {

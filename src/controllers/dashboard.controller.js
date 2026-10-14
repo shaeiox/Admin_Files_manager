@@ -3,6 +3,8 @@
 
 const FileSystemService = require('../services/FileSystemService');
 const MetadataService = require('../services/MetadataService');
+const FileAccessPolicyService = require('../services/FileAccessPolicyService');
+const path = require('path');
 const { CATEGORIES } = require('../utils/fileTypes');
 
 /**
@@ -141,7 +143,19 @@ async function getSummary(req, res, next) {
 
         // Drop metadata whose file no longer exists, then recompute the maximum
         // over what actually survives. Filesystem access belongs to a service.
-        const topFiles = await FileSystemService.retainExisting(rawTopFiles);
+        // The feed and leaderboard name files, so a hidden file is dropped from both.
+        // ponytail: the tree totals above still count hidden bytes; they are aggregates, not names.
+        const access = FileAccessPolicyService.checkerFor(req.user);
+        const visible = (clientPath) => {
+            try {
+                return access.canAccess(clientPath);
+            } catch {
+                return false; // a corrupt store entry outside the root is not shown, and not a 500
+            }
+        };
+        activities = activities.filter((a) => typeof a.folder !== 'string' || typeof a.target !== 'string'
+            || visible(path.posix.join(a.folder, a.target)));
+        const topFiles = await FileSystemService.retainExisting(rawTopFiles.filter((f) => visible(f.path)));
 
         return res.json({
             stats: buildStats(tree, volume),

@@ -277,9 +277,12 @@
 
               <div class="admin-notice" role="note">
                 <i data-icon="info" data-icon-size="16"></i>
-                <span>A policy set here does not yet change what this application serves — nothing currently
-                  checks it before a download. This manages the data model only; enforcement is a separate,
-                  not-yet-built change.</span>
+                <span>Policies are enforced for every non-administrator account: a file is listed, previewed,
+                  downloaded or changed only when every policy on its path allows it — not locked, published,
+                  inside its availability window, and, if restricted, granted to that user. A policy on a folder
+                  covers everything inside it. Paths with no policy stay open to all signed-in users, and
+                  administrators are never restricted. "Public" currently behaves like "Authenticated": every
+                  request needs a sign-in.</span>
               </div>
 
               <div class="settings-group">

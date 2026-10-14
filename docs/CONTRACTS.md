@@ -63,9 +63,10 @@
   requires a session (`afm_session` cookie or `Authorization: Bearer`). This closes ADR-003 §9's
   Critical, scoped to single-tenant authentication — see "Auth endpoints (ADR-009)" below.
 - **CSRF defence is in place.** Every non-GET request requires a session-bound `X-CSRF-Token`
-  header, checked before any mutation. **Still open:** a full permission catalogue, per-file access
-  policies enforced against a real download, and the Files-portal integration decision are explicit
-  follow-ups — see `openspec/changes/admin-identity-and-access-control/` and ADR-009.
+  header, checked before any mutation. **Per-file access policies are enforced** for non-admin
+  sessions (see "What a policy enforces" under the admin endpoints). **Still open:** a full
+  permission catalogue and the Files-portal integration decision are explicit follow-ups — see
+  `openspec/changes/admin-identity-and-access-control/` and ADR-009.
 
 **Closed by `api-security-hardening`:**
 
@@ -876,10 +877,30 @@ here requires a session (like everything except `/health` and `/auth/login`) **a
 is no per-route permission catalogue — one role check gates the whole router (identity/rbac-lite
 spec).
 
-**What this track does not do:** nothing here enforces a file-access policy against a real
-download. `GET /api/fs/list`, `GET /api/fs/download`, etc. are unmodified by this change and
-answer exactly as they did before — any authenticated session can still read any file regardless
-of what's set here. This section manages the data model and the admin UI over it only (design D5).
+**What a policy enforces.** `FileAccessPolicyService.checkerFor(req.user)` is the single decision,
+consulted by every `/fs` endpoint, the thumbnail, and the dashboard summary:
+
+- **Administrators are never restricted.** A path with **no policy** on itself or any ancestor is
+  open to every signed-in user (the behaviour before policies existed).
+- Otherwise **every** policy on the path — each ancestor folder's and the item's own — must allow, so
+  a folder's policy covers everything inside it and cannot be loosened by a child. A policy allows
+  when it is not locked, is published, `available_from <= now < available_until` (either bound may be
+  null), and, for `restricted`, the user holds a `grant` on that policy's path (a `deny` or no row
+  refuses). `public` and `authenticated` behave identically: every route already needs a session.
+- Paths are compared after canonicalisation (`//`, `.`, `..`, trailing `/`; `\` and letter case on
+  Windows/macOS), so a different spelling of a hidden path is not a way around it.
+
+| Endpoint | When the path is not allowed |
+|---|---|
+| `GET /fs/download`, `GET /fs/thumbnail`, `POST /fs/star`, `PUT /fs/rename`, `POST /fs/folder`, `POST /fs/upload` (target file) | `404`, same body as a missing path — a hidden item's existence is not disclosed |
+| `GET /fs/list`, `GET /fs/tree` | the requested folder itself → `404`; hidden children are omitted, and `total`/`counts` exclude them |
+| `POST /fs/download-zip` | a hidden requested path → `404`; hidden descendants of a requested folder are left out of the archive |
+| `DELETE /fs/delete`, `PUT /fs/move`, `POST /fs/copy`, `PUT /fs/rename` | per item: hidden → `404`; a folder **containing** something hidden → `403 "This folder contains items you do not have access to."` (deleting it would destroy what the user cannot see; copying it would publish an unprotected duplicate). A hidden `destination` → `404` for the whole request |
+| `GET /dashboard/summary` | hidden files are dropped from `activities` and `topFiles`. Aggregate totals (`stats`, `storage`, `storageBreakdown`) still count them |
+
+Known limits: a folder entry's recursive `size` in `/fs/list` still includes hidden descendants;
+an in-root symlink to a governed file is not mapped back to that file's policy. Renaming, moving or
+deleting a folder carries the policies **below** it too (they are re-keyed or removed with it).
 
 Data model, constraints and lifecycle: `docs/DATABASE.md`. Every mutating admin call — success
 **and** failure — writes one `audit_logs` row (action names in `docs/DATABASE.md` → *Action

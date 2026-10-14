@@ -13,6 +13,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+// checkerFor canonicalises paths against the storage root; any root works, nothing is read.
+process.env.STORAGE_ROOT = process.env.STORAGE_ROOT || os.tmpdir();
+
 const AdminDatabase = require('../../src/db/connection');
 const UserRepository = require('../../src/db/repositories/UserRepository');
 const FileAccessPolicyService = require('../../src/services/FileAccessPolicyService');
@@ -134,5 +137,92 @@ describe('FileAccessPolicyService.onPathRenamed / onPathDeleted (best-effort hoo
 
     test('onPathDeleted never throws for an ungoverned path', () => {
         assert.doesNotThrow(() => FileAccessPolicyService.onPathDeleted('/never-governed-2.txt'));
+    });
+});
+
+describe('FileAccessPolicyService.onPathRenamed / onPathDeleted carry descendants', () => {
+    test('renaming a folder re-keys the policies below it, not a name-prefix sibling', () => {
+        FileAccessPolicyService.setPolicy('/dir/inner.txt', { actorId });
+        FileAccessPolicyService.setPolicy('/dir-sibling.txt', { actorId });
+        FileAccessPolicyService.onPathRenamed('/dir', '/renamed');
+        assert.equal(FileAccessPolicyService.getByPath('/dir/inner.txt'), null);
+        assert.ok(FileAccessPolicyService.getByPath('/renamed/inner.txt'));
+        assert.ok(FileAccessPolicyService.getByPath('/dir-sibling.txt'), 'a sibling sharing the prefix is untouched');
+    });
+
+    test('deleting a folder removes the policies below it', () => {
+        FileAccessPolicyService.setPolicy('/gone/inner.txt', { actorId });
+        FileAccessPolicyService.onPathDeleted('/gone');
+        assert.equal(FileAccessPolicyService.getByPath('/gone/inner.txt'), null);
+    });
+});
+
+describe('FileAccessPolicyService.checkerFor (the access decision)', () => {
+    const NOW = 1_000_000;
+    let user;
+    let other;
+
+    before(() => {
+        user = UserRepository.create({ username: 'checker-user', passwordHash: hashPassword('x-password-1') });
+        other = UserRepository.create({ username: 'checker-other', passwordHash: hashPassword('x-password-1') });
+        const open = { accessMode: 'authenticated', isPublished: true, actorId };
+        FileAccessPolicyService.setPolicy('/k/open.txt', open);
+        FileAccessPolicyService.setPolicy('/k/public.txt', { ...open, accessMode: 'public' });
+        FileAccessPolicyService.setPolicy('/k/locked.txt', { ...open, isLocked: true });
+        FileAccessPolicyService.setPolicy('/k/unpublished.txt', { ...open, isPublished: false });
+        FileAccessPolicyService.setPolicy('/k/starts.txt', { ...open, availableFrom: NOW + 1 });
+        FileAccessPolicyService.setPolicy('/k/ends.txt', { ...open, availableUntil: NOW });
+        FileAccessPolicyService.setPolicy('/k/window.txt', { ...open, availableFrom: NOW, availableUntil: NOW + 1 });
+        FileAccessPolicyService.setPolicy('/k/restricted.txt', { ...open, accessMode: 'restricted' });
+        FileAccessPolicyService.grantPermission('/k/restricted.txt', user.id, 'grant', actorId);
+        FileAccessPolicyService.setPolicy('/k/denied.txt', { ...open, accessMode: 'restricted' });
+        FileAccessPolicyService.grantPermission('/k/denied.txt', user.id, 'deny', actorId);
+        FileAccessPolicyService.setPolicy('/k/sealed', { ...open, isDirectory: true, isLocked: true });
+        FileAccessPolicyService.setPolicy('/k/sealed/opened.txt', open);
+    });
+
+    test('each rule decides as documented', () => {
+        const access = FileAccessPolicyService.checkerFor({ id: user.id, role: 'user' }, NOW);
+        const expected = {
+            '/k/no-policy.txt': true,
+            '/k/open.txt': true,
+            '/k/public.txt': true,
+            '/k/locked.txt': false,
+            '/k/unpublished.txt': false,
+            '/k/starts.txt': false,
+            '/k/ends.txt': false, // available_until is exclusive
+            '/k/window.txt': true, // available_from is inclusive
+            '/k/restricted.txt': true,
+            '/k/denied.txt': false,
+            '/k/sealed': false,
+            '/k/sealed/opened.txt': false, // a locked ancestor wins over a permissive child
+        };
+        for (const [p, allowed] of Object.entries(expected)) assert.equal(access.canAccess(p), allowed, p);
+    });
+
+    test('a grant belongs to one user', () => {
+        const access = FileAccessPolicyService.checkerFor({ id: other.id, role: 'user' }, NOW);
+        assert.equal(access.canAccess('/k/restricted.txt'), false);
+    });
+
+    test('an administrator is never restricted', () => {
+        const access = FileAccessPolicyService.checkerFor({ id: actorId, role: 'admin' }, NOW);
+        assert.equal(access.canAccess('/k/locked.txt'), true);
+        assert.equal(access.hidesAnythingBelow('/k'), false);
+    });
+
+    test('non-canonical spellings resolve to the governed path', () => {
+        const access = FileAccessPolicyService.checkerFor({ id: user.id, role: 'user' }, NOW);
+        for (const p of ['/k//locked.txt', '/k/./locked.txt', '/k/x/../locked.txt', '/k/locked.txt/']) {
+            assert.equal(access.canAccess(p), false, p);
+        }
+    });
+
+    test('a subtree operation is refused when the folder hides something, with 404 for the hidden item itself', () => {
+        const access = FileAccessPolicyService.checkerFor({ id: user.id, role: 'user' }, NOW);
+        assert.equal(access.hidesAnythingBelow('/k'), true);
+        assert.throws(() => access.assertCanAccessTree('/k'), (err) => err.statusCode === 403);
+        assert.throws(() => access.assertCanAccess('/k/locked.txt'), (err) => err.statusCode === 404);
+        assert.doesNotThrow(() => access.assertCanAccessTree('/k/open.txt'));
     });
 });

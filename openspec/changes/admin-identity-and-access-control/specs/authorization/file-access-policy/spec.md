@@ -4,14 +4,15 @@
 
 Defines the per-file publication and access-policy data model an administrator manages: access
 mode, publish/lock state, availability window, and per-user permission grants — and states
-plainly that this change does not wire any of it into a real download decision.
+how it is enforced against every filesystem endpoint for non-administrator sessions.
 
 ## ADDED Requirements
 
-### Requirement: A File-Access Policy Is Per-File, Not Inherited From A Directory
+### Requirement: A Policy Is Stored Per Path, And A Folder's Policy Covers Its Contents
 
-An administrator SHALL be able to set an access policy on an individual file path. There is no
-directory-level policy and no inheritance from a parent path.
+An administrator SHALL be able to set an access policy on an individual file or folder path. Each
+policy is stored on its own path only; at enforcement time a folder's policy also governs everything
+below it (see "Policies Are Enforced For Every Non-Administrator Session").
 
 #### Scenario: Setting a policy on one file does not affect its siblings
 
@@ -41,9 +42,9 @@ database constraint.
 
 ### Requirement: Publication And Lock Are Independent Flags
 
-A file's `is_published` and `is_locked` flags SHALL be independently settable. A locked file's
-intended behavior is "no access regardless of publication," even though this change does not yet
-wire that intent into a real download path (see the enforcement note below).
+A file's `is_published` and `is_locked` flags SHALL be independently settable. A locked file is
+refused regardless of publication, so locking keeps the publication state and window intact for
+when the lock is lifted.
 
 #### Scenario: An unpublished file's policy can still be edited
 
@@ -117,21 +118,46 @@ without making the filesystem operation's success depend on it.
   removed on a best-effort basis
 - **AND** the delete response is unaffected by whether that removal succeeds
 
-### Requirement: This Change Enforces Nothing Against A Real Download
+### Requirement: Policies Are Enforced For Every Non-Administrator Session
 
-This change SHALL NOT modify any existing filesystem read endpoint (`GET /list`, `GET /tree`,
-`GET /download`, `GET /download-zip`, `GET /thumbnail`) to consult a file's access policy or
-permission before serving it. The admin UI SHALL disclose this plainly rather than implying a
-policy currently restricts real access.
+Every filesystem endpoint (`GET /list`, `GET /tree`, `GET /download`, `POST /download-zip`,
+`GET /thumbnail`, and the mutating `/fs` endpoints) and the dashboard summary SHALL consult the
+caller's effective access before serving or changing a path. An administrator SHALL never be
+restricted. A path with no policy on itself or any ancestor SHALL remain open to every signed-in
+user. Otherwise every policy on the path, ancestors included, SHALL allow: not locked, published,
+inside its availability window, and — for `restricted` — an explicit `grant` for that user.
 
-#### Scenario: An existing download endpoint ignores policy data
+#### Scenario: A locked file is refused like a missing one
 
-- **GIVEN** a file with a `restricted` policy and no granted users
-- **WHEN** that file is requested through the existing, unmodified download endpoint
-- **THEN** the request is served exactly as it would be with no policy at all
+- **GIVEN** a file with a locked policy
+- **WHEN** a non-administrator requests it through `GET /download`
+- **THEN** the response is `404` with the same body shape as a path that does not exist
 
-#### Scenario: The admin UI discloses that enforcement is not yet wired
+#### Scenario: A folder's policy covers its contents
 
-- **WHEN** an administrator views or sets a file's policy in the admin UI
-- **THEN** the UI states that the policy does not yet affect what this application serves
-- **AND** no control or success message implies real access is currently restricted
+- **GIVEN** a folder with a locked policy and a file inside it with a permissive policy
+- **WHEN** a non-administrator requests that file
+- **THEN** the request is refused
+
+#### Scenario: Hidden entries are omitted from a listing and its totals
+
+- **WHEN** a non-administrator lists a folder holding hidden and visible entries
+- **THEN** only the visible entries are returned, and `total`/`counts` count only them
+
+#### Scenario: A subtree operation never acts on what the caller cannot see
+
+- **GIVEN** a folder containing a hidden file
+- **WHEN** a non-administrator deletes, moves, renames or copies that folder
+- **THEN** the request is refused with `403` and nothing changes on disk
+
+#### Scenario: An administrator is never restricted
+
+- **GIVEN** a file with a locked policy
+- **WHEN** an administrator downloads it
+- **THEN** it is served
+
+#### Scenario: The admin UI describes enforcement truthfully
+
+- **WHEN** an administrator views the policies pane
+- **THEN** the UI states who is restricted, that a folder's policy covers its contents, and that
+  paths without a policy stay open

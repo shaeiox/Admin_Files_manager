@@ -32,6 +32,8 @@ async function getTree(req, res, next) {
     try {
         const rootPath = req.query.path === undefined ? '/' : req.query.path;
         if (rootPath !== '/') validateClientPath(rootPath);
+        const access = FileAccessPolicyService.checkerFor(req.user);
+        access.assertCanAccess(rootPath);
 
         async function scanChildren(clientPath, depth) {
             // Past this request's cap: not read here - the caller can ask for
@@ -59,6 +61,7 @@ async function getTree(req, res, next) {
                 if (!item.isDirectory()) continue;
 
                 const childPath = clientPath === '/' ? `/${item.name}` : `${clientPath}/${item.name}`;
+                if (!access.canAccess(childPath)) continue;
                 const sub = await scanChildren(childPath, depth + 1);
                 folders.push({
                     id: childPath,
@@ -155,10 +158,15 @@ async function getList(req, res, next) {
         // Library "Starred" view. Composes with search, sort and type like any filter.
         const starredOnly = req.query.starredOnly === 'true';
 
+        const access = FileAccessPolicyService.checkerFor(req.user);
+        access.assertCanAccess(targetPath);
+
         // Fails the whole request when the target itself is unreadable.
         const rawItems = await FileSystemService.readDirectory(targetPath);
+        // Hidden entries are dropped BEFORE counting, so total/counts never reveal them.
         const candidates = rawItems.filter((item) =>
-            !item.name.startsWith('.') && (!search || item.name.toLowerCase().includes(search)));
+            !item.name.startsWith('.') && (!search || item.name.toLowerCase().includes(search))
+            && access.canAccess(targetPath === '/' ? `/${item.name}` : `${targetPath}/${item.name}`));
 
         // One store read primes the metadata cache, so the concurrent per-entry
         // lookups below are cache hits rather than N racing cold reads.
@@ -246,6 +254,7 @@ async function createFolder(req, res, next) {
 
         const folderName = path.posix.basename(clientPath);
         validateFileName(folderName);
+        FileAccessPolicyService.checkerFor(req.user).assertCanAccess(clientPath);
 
         await FileSystemService.createDirectory(clientPath);
 
@@ -275,6 +284,7 @@ async function renameItem(req, res, next) {
         const { oldPath, newName } = req.body || {};
         validateClientPath(oldPath);
         const cleanNewName = validateFileName(newName);
+        FileAccessPolicyService.checkerFor(req.user).assertCanAccessTree(oldPath);
 
         const { oldPath: from, newPath: to } = await FileSystemService.rename(oldPath, cleanNewName);
 
@@ -319,12 +329,15 @@ async function moveItems(req, res, next) {
             throw new AppError('Too many items in a single request (max 500).', 400);
         }
         validateClientPath(destination);
+        const access = FileAccessPolicyService.checkerFor(req.user);
+        access.assertCanAccess(destination);
 
         const results = { moved: [], failed: [] };
 
         for (const clientPath of paths) {
             try {
                 validateClientPath(clientPath);
+                access.assertCanAccessTree(clientPath);
                 const { oldPath: from, newPath: to } = await FileSystemService.move(clientPath, destination);
 
                 if (from !== to) {
@@ -387,12 +400,15 @@ async function copyItems(req, res, next) {
             throw new AppError('Too many items in a single request (max 500).', 400);
         }
         validateClientPath(destination);
+        const access = FileAccessPolicyService.checkerFor(req.user);
+        access.assertCanAccess(destination);
 
         const results = { copied: [], failed: [] };
 
         for (const clientPath of paths) {
             try {
                 validateClientPath(clientPath);
+                access.assertCanAccessTree(clientPath);
                 const { sourcePath, newPath } = await FileSystemService.copy(clientPath, destination);
 
                 MetadataService.addActivity({
@@ -442,11 +458,13 @@ async function deleteItems(req, res, next) {
             throw new AppError('Too many items in a single request (max 500).', 400);
         }
 
+        const access = FileAccessPolicyService.checkerFor(req.user);
         const results = { deleted: [], failed: [] };
 
         for (const clientPath of paths) {
             try {
                 validateClientPath(clientPath);
+                access.assertCanAccessTree(clientPath);
                 await FileSystemService.remove(clientPath);
 
                 MetadataService.deletePath(clientPath).catch(() => { });
@@ -491,6 +509,7 @@ async function downloadFile(req, res, next) {
     try {
         const clientPath = req.query.path;
         validateClientPath(clientPath);
+        FileAccessPolicyService.checkerFor(req.user).assertCanAccess(clientPath);
 
         const stats = await FileSystemService.getStats(clientPath);
 
@@ -550,6 +569,9 @@ function uploadFile(req, res, next) {
 
             const destination = await UploadService.resolveDirectory(req.body.destination || '/');
             const overwrite = req.body.overwrite === 'true';
+            // Covers the destination folder and an existing hidden file the upload would replace.
+            FileAccessPolicyService.checkerFor(req.user)
+                .assertCanAccess(path.posix.join(destination.clientPath, req.file.targetName));
             const { clientPath, name } = await UploadService.commit(
                 req.file.path, destination, req.file.targetName, { overwrite });
 
@@ -591,6 +613,7 @@ async function setStar(req, res, next) {
         }
 
         // 404 for a path that does not exist: a star on nothing is not an outcome.
+        FileAccessPolicyService.checkerFor(req.user).assertCanAccess(clientPath);
         await FileSystemService.getStats(clientPath);
 
         const current = (await MetadataService.getFileMeta(clientPath)).starred;
@@ -632,9 +655,11 @@ async function downloadZip(req, res, next) {
             throw new AppError('Too many items for a single ZIP request (max 500).', 400);
         }
 
+        const access = FileAccessPolicyService.checkerFor(req.user);
         const entries = [];
         for (const clientPath of rawPaths) {
             validateClientPath(clientPath);
+            access.assertCanAccess(clientPath);
             const stats = await FileSystemService.getStats(clientPath);
             entries.push({
                 clientPath,
@@ -674,7 +699,12 @@ async function downloadZip(req, res, next) {
             const normalizedPath = entry.securePath.replace(/\\/g, '/');
 
             if (entry.isDirectory) {
-                archive.directory(normalizedPath, entry.name);
+                // A folder's hidden descendants are left out of the archive, not
+                // refused: the caller is entitled to everything else in it.
+                const filter = access.hidesAnythingBelow(entry.clientPath)
+                    ? (data) => (access.canAccess(path.posix.join(entry.clientPath, data.name.replace(/\\/g, '/'))) ? data : false)
+                    : undefined;
+                archive.directory(normalizedPath, entry.name, filter);
             } else {
                 archive.file(normalizedPath, { name: entry.name });
             }
