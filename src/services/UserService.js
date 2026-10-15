@@ -43,6 +43,7 @@ class UserService {
             throw new AppError('Status must be "active" or "disabled".', 400);
         }
         if (!UserRepository.findById(id)) throw new AppError('User not found.', 404);
+        if (status === 'disabled') this._assertNotLastActiveAdmin(id);
         return this._publicShape(UserRepository.setStatus(id, status));
     }
 
@@ -56,7 +57,21 @@ class UserService {
 
     delete(id) {
         if (!UserRepository.findById(id)) throw new AppError('User not found.', 404);
+        this._assertNotLastActiveAdmin(id);
         UserRepository.delete(id);
+    }
+
+    /**
+     * Bootstrap only recreates an admin when the user table is EMPTY, so losing
+     * the last active admin while other accounts exist locks the admin panel
+     * for good. ponytail: check-then-act, fine for a single-process app.
+     */
+    _assertNotLastActiveAdmin(id) {
+        const others = UserRepository.list().filter((u) => u.role === 'admin' && u.status === 'active' && u.id !== id);
+        const target = UserRepository.findById(id);
+        if (target.role === 'admin' && target.status === 'active' && others.length === 0) {
+            throw new AppError('The last active administrator cannot be disabled or deleted.', 409);
+        }
     }
 
     /** Strips password_hash and throttle bookkeeping before this ever reaches a response. */

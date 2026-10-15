@@ -89,7 +89,30 @@ class PathService {
             throw new AppError('Access denied. Path traversal detected.', 403);
         }
 
-        return realPath;
+        // Re-based onto the configured root so callers stay on ONE basis with
+        // resolveSecurePath/toClientPath. Returning realPath itself broke a linked
+        // STORAGE_ROOT (/srv/storage -> /mnt/disk): toClientPath mapped every path
+        // to '/', so an upload aimed at /media landed in the root.
+        return path.join(rootPath, path.relative(realRoot, realPath));
+    }
+
+    /**
+     * Write-side guard for an operand that may not exist yet (mkdir target) or that
+     * is acted on as an entry rather than followed (rename/move/copy source): its
+     * PARENT is canonicalised and must stay inside the root, the leaf is not
+     * followed. Without it, '/link-out/x' passed the lexical check and the write
+     * landed outside the root - or copied outside bytes in for download to serve.
+     *
+     * @param {string} clientPath
+     * @returns {Promise<string>} the lexical absolute path, its parent proven inside the root
+     */
+    static async resolveSecureParentPath(clientPath) {
+        const securePath = this.resolveSecurePath(clientPath);
+        const rootPath = path.resolve(config.storageRoot);
+        if (securePath === rootPath) return securePath;
+        const parent = path.posix.dirname(clientPath.replace(/\\/g, '/'));
+        await this.resolveSecureRealPath(parent === '.' ? '/' : parent);
+        return securePath;
     }
 
     /**

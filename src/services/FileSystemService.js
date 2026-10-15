@@ -69,6 +69,21 @@ class FileSystemService {
     }
 
     /**
+     * A move/copy destination is FOLLOWED (things land inside it), so it is
+     * canonicalised: a link to outside the root is refused, not written through.
+     */
+    static async _resolveDestination(clientPath) {
+        try {
+            return await PathService.resolveSecureRealPath(clientPath);
+        } catch (error) {
+            if (error instanceof AppError && error.statusCode === 404) {
+                throw new AppError('Destination folder not found.', 404);
+            }
+            throw error;
+        }
+    }
+
+    /**
      * Check if a path exists on the disk (no throw).
      * @param {string} securePath 
      */
@@ -90,7 +105,7 @@ class FileSystemService {
      * @returns {Promise<{securePath: string}>}
      */
     static async createDirectory(clientPath) {
-        const securePath = PathService.resolveSecurePath(clientPath);
+        const securePath = await PathService.resolveSecureParentPath(clientPath);
 
         // Check for existing entry to return a clean 409 Conflict
         if (await this.exists(securePath)) {
@@ -122,7 +137,7 @@ class FileSystemService {
      * @returns {Promise<{oldPath: string, newPath: string}>}
      */
     static async rename(oldClientPath, newName) {
-        const oldSecurePath = PathService.resolveSecurePath(oldClientPath);
+        const oldSecurePath = await PathService.resolveSecureParentPath(oldClientPath);
 
         // Ensure source exists before proceeding
         if (!(await this.exists(oldSecurePath))) {
@@ -184,7 +199,7 @@ class FileSystemService {
      */
     static async move(oldClientPath, destinationClientPath) {
         const path = require('path');
-        const oldSecurePath = PathService.resolveSecurePath(oldClientPath);
+        const oldSecurePath = await PathService.resolveSecureParentPath(oldClientPath);
 
         const rootPath = PathService.resolveSecurePath('/');
         if (oldSecurePath === rootPath) {
@@ -194,7 +209,7 @@ class FileSystemService {
             throw new AppError('Source item not found.', 404);
         }
 
-        const destSecurePath = PathService.resolveSecurePath(destinationClientPath);
+        const destSecurePath = await this._resolveDestination(destinationClientPath);
         let destStat;
         try {
             destStat = await fs.stat(destSecurePath);
@@ -256,13 +271,13 @@ class FileSystemService {
      */
     static async copy(oldClientPath, destinationClientPath) {
         const path = require('path');
-        const oldSecurePath = PathService.resolveSecurePath(oldClientPath);
+        const oldSecurePath = await PathService.resolveSecureParentPath(oldClientPath);
 
         if (!(await this.exists(oldSecurePath))) {
             throw new AppError('Source item not found.', 404);
         }
 
-        const destSecurePath = PathService.resolveSecurePath(destinationClientPath);
+        const destSecurePath = await this._resolveDestination(destinationClientPath);
         let destStat;
         try {
             destStat = await fs.stat(destSecurePath);

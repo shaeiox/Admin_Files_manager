@@ -200,6 +200,18 @@ function directoryProblems(name, dir) {
     return [];
 }
 
+/**
+ * Interface the server binds. Production defaults to loopback: nginx is the only
+ * intended client (it proxies to 127.0.0.1), and an all-interfaces bind exposed
+ * port 3000 around nginx's TLS and basic-auth gate - where `trust proxy` also let
+ * a direct caller forge X-Forwarded-For. HOST overrides; undefined = all interfaces.
+ */
+function listenHost(source = process.env) {
+    if (source.HOST) return source.HOST;
+    return (source.NODE_ENV || 'development') === 'production' ? '127.0.0.1' : undefined;
+}
+
 config.validateStartup = validateStartup;
+config.listenHost = listenHost;
 
 module.exports = config;

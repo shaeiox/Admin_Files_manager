@@ -100,3 +100,19 @@ describe('validateStartup: bootstrap-admin credentials (ADR-009)', () => {
         assert.ok(p.some((m) => m.includes('AFM_BOOTSTRAP_ADMIN_PASSWORD must be at least 8 characters')), p.join('\n'));
     });
 });
+
+describe('listen address', () => {
+    // Regression: the server bound every interface, so on the Linux host port
+    // 3000 answered directly - around nginx's TLS and basic-auth gate, and with
+    // `trust proxy` a direct caller could forge X-Forwarded-For past the login
+    // rate limit. nginx proxies to 127.0.0.1, so production binds loopback.
+    test('production binds loopback unless HOST says otherwise', () => {
+        assert.equal(config.listenHost({ NODE_ENV: 'production' }), '127.0.0.1');
+        assert.equal(config.listenHost({ NODE_ENV: 'production', HOST: '0.0.0.0' }), '0.0.0.0');
+    });
+
+    test('development keeps the historical all-interfaces bind', () => {
+        assert.equal(config.listenHost({ NODE_ENV: 'development' }), undefined);
+        assert.equal(config.listenHost({}), undefined);
+    });
+});

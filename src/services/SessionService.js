@@ -3,7 +3,10 @@
 
 const UserRepository = require('../db/repositories/UserRepository');
 const SessionRepository = require('../db/repositories/SessionRepository');
-const { verifyPassword, randomToken, hashToken } = require('../utils/crypto');
+const { hashPassword, verifyPassword, randomToken, hashToken } = require('../utils/crypto');
+
+/** Verified against when the username is unknown, so both paths cost one scrypt. */
+const DUMMY_HASH = hashPassword(randomToken());
 
 /** Flat session expiry (design D3) - no tiered absolute/sliding/step-up policy. */
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -23,11 +26,17 @@ const LOCKOUT_MS = 15 * 60 * 1000;
 class SessionService {
     login({ username, password, ip, userAgent }) {
         const user = UserRepository.findByUsername(String(username || '').trim());
+        // The password is hashed for EVERY attempt: answering an unknown username
+        // without the scrypt cost let response time tell which accounts exist.
+        const passwordOk = verifyPassword(password, user ? user.password_hash : DUMMY_HASH);
         if (!user || user.status !== 'active') return { ok: false };
         if (user.locked_until && user.locked_until > Date.now()) return { ok: false };
 
-        if (!verifyPassword(password, user.password_hash)) {
-            const failedCount = user.failed_login_count + 1;
+        if (!passwordOk) {
+            // An expired lock starts a fresh count; otherwise one failure after
+            // the lock re-locked at once (one request per period kept it locked).
+            if (user.locked_until) UserRepository.resetLoginFailures(user.id);
+            const failedCount = (user.locked_until ? 0 : user.failed_login_count) + 1;
             UserRepository.recordLoginFailure(user.id);
             if (failedCount >= MAX_FAILED_LOGINS) {
                 UserRepository.lockUntil(user.id, Date.now() + LOCKOUT_MS);

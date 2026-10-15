@@ -72,6 +72,19 @@ describe('FileAccessPolicyService.setPolicy / getByPath', () => {
         );
     });
 
+    test('rejects a non-boolean flag instead of storing its truthiness', () => {
+        // Regression: the string "false" is truthy, so it was stored as 1 -
+        // isPublished: "false" PUBLISHED the file on the portal.
+        for (const flags of [{ isPublished: 'false' }, { isLocked: 'false' }, { isDirectory: 0 }]) {
+            assert.throws(
+                () => FileAccessPolicyService.setPolicy('/flags.txt', { ...flags, actorId }),
+                (err) => err instanceof AppError && err.statusCode === 400,
+                JSON.stringify(flags)
+            );
+        }
+        assert.equal(FileAccessPolicyService.getByPath('/flags.txt'), null, 'nothing was stored');
+    });
+
     test('rejects a malformed client path', () => {
         assert.throws(
             () => FileAccessPolicyService.setPolicy('not-rooted.txt', { actorId }),

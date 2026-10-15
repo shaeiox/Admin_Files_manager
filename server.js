@@ -145,7 +145,7 @@ require('./src/db/bootstrap').ensureBootstrapAdmin();
 // The handle is exported so integration tests can read the bound port and close
 // the listener. Without it every require() leaks a live server that keeps the
 // event loop alive forever. HTTP behaviour is unchanged for normal startup.
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, config.listenHost(), () => {
     console.log(`=========================================`);
     console.log(`🚀 Dimension Server running on port ${config.port}`);
     console.log(`📁 Target Storage Root: ${config.storageRoot}`);

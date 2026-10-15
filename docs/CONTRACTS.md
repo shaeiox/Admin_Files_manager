@@ -940,10 +940,10 @@ token, `429` from the general limiter.
 |---|---|---|
 | `GET /api/admin/users` | bare array | User objects ordered by `created_at` ascending. |
 | `POST /api/admin/users` → `201` | `{success, user}` | Body: `{username, password, email?, role?}`. `username` trimmed, required (`400`); `password` ≥ 8 characters (`400`); `role` `"admin"`\|`"user"`, default `"user"` (`400` otherwise); `409` on a duplicate username (case-insensitive). `email` is optional and blank becomes `null`; a duplicate email violates the `UNIQUE` constraint and surfaces as a masked `500` (no pre-check). |
-| `POST /api/admin/users/:id/status` | `{success, user}` | Body: `{status: "active"\|"disabled"}` (`400` otherwise, `404` unknown id). Disabling revokes every active session for that user immediately (`SessionService.revokeAllForUser`). |
+| `POST /api/admin/users/:id/status` | `{success, user}` | Body: `{status: "active"\|"disabled"}` (`400` otherwise, `404` unknown id, `409` when it would disable the last active admin). Disabling revokes every active session for that user immediately (`SessionService.revokeAllForUser`). |
 | `POST /api/admin/users/:id/reset-password` | `{success, user}` | Body: `{password}` (≥ 8, `400`). Also revokes every active session for that user — a reset password must not leave an old session usable. Does **not** clear an active lockout. |
 | `POST /api/admin/users/:id/revoke-sessions` | `{success: true}` | Ends every active session for that user without touching `status`. Succeeds (no-op) for an unknown id. |
-| `DELETE /api/admin/users/:id` | `{success: true}` | `404` unknown id. Its own sessions and permission rows go via `ON DELETE CASCADE`. **Known defect:** a user referenced by `audit_logs.actor_id` or by a policy's `created_by`/`updated_by`/`granted_by` cannot be deleted — the foreign key has no `ON DELETE` action, so the request fails with a masked `500` (see `docs/DATABASE.md`). |
+| `DELETE /api/admin/users/:id` | `{success: true}` | `404` unknown id; `409` for the last active admin. Its own sessions and permission rows go via `ON DELETE CASCADE`; the author columns that name it (`audit_logs.actor_id`, policy `created_by`/`updated_by`, `granted_by`) are set to `NULL` in the same transaction, so the audit rows survive unattributed. |
 
 > [!WARNING]
 > There is no last-admin guard: an admin can disable or delete themselves, or the last active

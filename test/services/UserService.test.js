@@ -114,3 +114,48 @@ describe('UserService.list / setStatus / resetPassword / delete', () => {
         );
     });
 });
+
+describe('the last active admin cannot be removed', () => {
+    function freshDb(name) {
+        AdminDatabase.reset();
+        AdminDatabase.dbPath = path.join(tmp, `${name}.sqlite`);
+    }
+
+    // Regression: disabling or deleting the only active admin locked the admin
+    // panel for good - bootstrap only runs when the user table is EMPTY.
+    test('disable and delete of the last active admin are refused with 409', () => {
+        freshDb('last-admin-1');
+        const admin = UserService.create({ username: 'only-admin', password: 'only-admin-pw', role: 'admin' });
+        UserService.create({ username: 'plain-user', password: 'plain-user-pw' });
+        assert.throws(() => UserService.setStatus(admin.id, 'disabled'), (e) => e instanceof AppError && e.statusCode === 409);
+        assert.throws(() => UserService.delete(admin.id), (e) => e instanceof AppError && e.statusCode === 409);
+    });
+
+    test('another admin may still be disabled or deleted while one stays active', () => {
+        freshDb('last-admin-2');
+        UserService.create({ username: 'admin-a', password: 'admin-a-password', role: 'admin' });
+        const b = UserService.create({ username: 'admin-b', password: 'admin-b-password', role: 'admin' });
+        assert.equal(UserService.setStatus(b.id, 'disabled').status, 'disabled');
+        UserService.delete(b.id);
+    });
+});
+
+describe('deleting a user who left an audit trail', () => {
+    // Regression: audit_logs.actor_id (and the policy/grant author columns)
+    // reference users(id) with no ON DELETE action, so deleting anyone who had
+    // ever acted failed with a constraint error -> raw 500.
+    test('succeeds and keeps the audit row with its actor cleared', () => {
+        AdminDatabase.reset();
+        AdminDatabase.dbPath = path.join(tmp, 'audit-delete.sqlite');
+        const AuditLogRepository = require('../../src/db/repositories/AuditLogRepository');
+        UserService.create({ username: 'keeper', password: 'keeper-password', role: 'admin' });
+        const gone = UserService.create({ username: 'leaver', password: 'leaver-password', role: 'admin' });
+        AuditLogRepository.record({ actorId: gone.id, action: 'user.create', outcome: 'success' });
+
+        UserService.delete(gone.id);
+
+        const row = AuditLogRepository.list().find((r) => r.action === 'user.create');
+        assert.ok(row, 'the audit row survives');
+        assert.equal(row.actor_id, null);
+    });
+});

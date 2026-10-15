@@ -5,7 +5,7 @@ nginx host — a static portal and a proxied application.
 
 | Domain | Served by | Gate | Security headers from |
 |---|---|---|---|
-| `files.cloudavid.com` | static shell (`index/browse/404.html` + `/assets/`) from `/var/www/html/files-server-web`; `/api/` and `/release{8,9}/latest` proxied to the portal Node process on `127.0.0.1:4000` | portal sign-in + admin policies (in Node) | nginx (pages), Node (API) |
+| `files.cloudavid.com` | static shell (`index/browse/404.html` + `/assets/`) from `/var/www/html/files-server-web/public`; `/api/` and `/release{8,9}/latest` proxied to the portal Node process on `127.0.0.1:4000` | portal sign-in + admin policies (in Node) | nginx (pages), Node (API) |
 | `adminfiles.cloudavid.com` | reverse proxy → `127.0.0.1:3000`, the Dimension app running from `/var/www/html/Admin-Files` | **HTTP Basic Auth** | the app (helmet), through the proxy |
 
 > ⚠ **The admin API is unauthenticated** (ADR-003): no login in the application
@@ -27,7 +27,7 @@ Everything below runs **on the server, as root** (shown via `sudo`).
 #      adminfiles.cloudavid.com-> A/AAAA <server IP>
 # 2. Firewall: 80 and 443 open
 # 3. Content, where the config expects it:
-ls -d /var/www/html/files-server-web
+ls -d /var/www/html/files-server-web/public
 # 4. Both applications running and answering LOCALLY (bypasses nginx and auth):
 curl -s http://127.0.0.1:3000/api/v1/health     # admin  -> "success":true ... "apiVersion":1
 curl -s http://127.0.0.1:4000/api/health        # portal -> {"status":"ok",...}
@@ -197,14 +197,15 @@ admin site prompts once for user/password.
 | `/api/...`, `/release{8,9}/latest` | set by the portal (`no-store` on JSON) | proxied, never cached by nginx |
 | anything else | rewritten to `/index.html` | the SPA shell; **no other file under the root is ever served** |
 
-The root is the portal checkout itself (`server.js`, `lib/`, `package.json`,
-`data/`, `docs/`, `node_modules/` …). The locations are an **allowlist** on
-purpose: matching by extension alone (`\.js$`, `try_files $uri`) published the
-server source, `package.json` and `data/users.json`. Add a public file outside
+The root is the checkout's `public/` directory; `server.js`, `lib/`,
+`package.json`, `data/` and `docs/` sit one level up and cannot be served. The
+locations are also an **allowlist**: matching by extension alone (`\.js$`,
+`try_files $uri`) over the old root (the checkout itself) published the server
+source, `package.json` and `data/users.json`. Add a public file outside
 `/assets/` → add it to the allowlist explicitly.
 
-Deploying portal changes = replace files under
-`/var/www/html/files-server-web`. Nothing to reload; HTML is never cached, and
+Deploying portal changes = update the checkout at
+`/var/www/html/files-server-web` (nginx serves its `public/`). Nothing to reload; HTML is never cached, and
 JS/CSS revalidate by ETag. If you ever see stale HTML anyway, the response
 itself will show the old headers — check you edited the vhost that is actually
 loaded (`nginx -T | grep cloudavid`).
@@ -229,11 +230,11 @@ file tree, curl against both):
 | — | admin vhost: proxy + `auth_basic` | the app cannot be served as static files; publishing it ungated would expose an unauthenticated destructive API |
 | `listen 443 ssl http2` | unchanged (deliberately) | works on every nginx version; the ≥ 1.25.1 deprecation warning is documented above. `http2 on;` would *fail* on < 1.25.1 |
 
-| extension regexes + `try_files $uri $uri/ @spa` over the portal checkout | allowlist: three HTML shells + `/assets/`, everything else → `/index.html` | the extension rules served `/server.js`, `/lib/*.js`, `/package.json`, `/data/users.json` straight from disk |
+| `root /var/www/html/files-server-web` + extension regexes + `try_files $uri $uri/ @spa` | `root …/files-server-web/public` + allowlist: three HTML shells + `/assets/`, everything else → `/index.html` | the extension rules served `/server.js`, `/lib/*.js`, `/package.json`, `/data/users.json` straight from disk |
 | `/download/`, `/files/`, `/__list/` served from disk | removed; all content goes through the portal API | serving `FILES_ROOT` from disk bypasses every admin policy (locked/unpublished/deny) |
 | `X-Forwarded-For $proxy_add_x_forwarded_for` (portal) | `$remote_addr` | the appended form keeps the client-supplied value in the header |
 
-Unchanged on purpose: cert paths, `root /var/www/html/files-server-web`, 6 GB
+Unchanged on purpose: cert paths, 6 GB
 body ceiling, 600 s timeouts.
 
 ---
@@ -281,7 +282,7 @@ body ceiling, 600 s timeouts.
 
 | Want to change | Edit |
 |---|---|
-| portal document root | `root /var/www/html/files-server-web;` (portal server block) |
+| portal document root | `root /var/www/html/files-server-web/public;` (portal server block) |
 | portal port | `proxy_pass http://127.0.0.1:4000;` (portal server block) |
 | admin app port | `proxy_pass http://127.0.0.1:3000;` (admin server block) |
 | htpasswd path | `auth_basic_user_file` (admin server block) |

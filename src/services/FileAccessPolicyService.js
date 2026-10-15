@@ -147,6 +147,10 @@ class FileAccessPolicyService {
             throw new AppError('access_mode must be "public", "authenticated", or "restricted".', 400);
         }
         if (defaultLevel !== undefined) assertLevel(defaultLevel, 'default_level');
+        // Strict: the repository stores truthiness, and the string "false" is truthy.
+        for (const [name, value] of [['is_directory', isDirectory], ['is_published', isPublished], ['is_locked', isLocked]]) {
+            if (value !== undefined && typeof value !== 'boolean') throw new AppError(`${name} must be true or false.`, 400);
+        }
         if (availableFrom !== undefined && availableFrom !== null && !Number.isSafeInteger(availableFrom)) {
             throw new AppError('available_from must be an epoch-ms integer or null.', 400);
         }

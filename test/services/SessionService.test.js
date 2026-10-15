@@ -53,6 +53,22 @@ describe('SessionService.login', () => {
         assert.deepEqual(noSuchUser, { ok: false });
     });
 
+    test('an unknown username costs the same password hash as a known one (no timing oracle)', () => {
+        // Regression: an unknown name returned before scrypt ran, so response
+        // time told an attacker which usernames exist.
+        createUser('ned', 'ned-password-1');
+        const nodeCrypto = require('node:crypto');
+        const real = nodeCrypto.scryptSync;
+        const count = (username) => {
+            let calls = 0;
+            nodeCrypto.scryptSync = (...args) => { calls += 1; return real(...args); };
+            try { SessionService.login({ username, password: 'wrong-password' }); } finally { nodeCrypto.scryptSync = real; }
+            return calls;
+        };
+        assert.equal(count('nobody-at-all'), count('ned'));
+        assert.equal(count('nobody-at-all'), 1);
+    });
+
     test('a disabled account cannot log in even with the correct password', () => {
         const user = createUser('mona', 'mona-password-1');
         UserRepository.setStatus(user.id, 'disabled');
@@ -67,6 +83,19 @@ describe('SessionService.login', () => {
         }
         const result = SessionService.login({ username: 'noah', password: 'noah-password-1' });
         assert.deepEqual(result, { ok: false });
+    });
+
+    test('an expired lock starts a fresh count: one failure does not re-lock', () => {
+        // Regression: failed_login_count survived the lock, so after it expired a
+        // single wrong guess re-locked for 15 minutes - an attacker could keep
+        // the account locked with one request per lock period.
+        const user = createUser('opal', 'opal-password-1');
+        for (let i = 0; i < 10; i++) SessionService.login({ username: 'opal', password: 'wrong' });
+        UserRepository.lockUntil(user.id, Date.now() - 1); // the lock has expired
+
+        SessionService.login({ username: 'opal', password: 'wrong' });
+
+        assert.equal(SessionService.login({ username: 'opal', password: 'opal-password-1' }).ok, true);
     });
 });
 

@@ -55,8 +55,27 @@ class UserRepository {
         AdminDatabase.get().prepare('UPDATE users SET locked_until = ?, updated_at = ? WHERE id = ?').run(until, Date.now(), id);
     }
 
+    /**
+     * The author columns below reference users(id) with no ON DELETE action, so
+     * a plain DELETE of anyone who ever acted failed the foreign key (500). They
+     * are cleared first - what ON DELETE SET NULL would do, without a
+     * table-rebuild migration.
+     */
     delete(id) {
-        AdminDatabase.get().prepare('DELETE FROM users WHERE id = ?').run(id);
+        const db = AdminDatabase.get();
+        db.exec('BEGIN');
+        try {
+            db.prepare('UPDATE audit_logs SET actor_id = NULL WHERE actor_id = ?').run(id);
+            db.prepare('UPDATE file_access_policies SET created_by = NULL WHERE created_by = ?').run(id);
+            db.prepare('UPDATE file_access_policies SET updated_by = NULL WHERE updated_by = ?').run(id);
+            db.prepare('UPDATE user_file_permissions SET granted_by = NULL WHERE granted_by = ?').run(id);
+            db.prepare('UPDATE group_file_permissions SET granted_by = NULL WHERE granted_by = ?').run(id);
+            db.prepare('DELETE FROM users WHERE id = ?').run(id);
+            db.exec('COMMIT');
+        } catch (error) {
+            db.exec('ROLLBACK');
+            throw error;
+        }
     }
 
     count() {

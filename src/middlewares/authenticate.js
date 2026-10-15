@@ -13,7 +13,12 @@ function readCookie(req, name) {
     for (const part of header.split(';')) {
         const eq = part.indexOf('=');
         if (eq === -1) continue;
-        if (part.slice(0, eq).trim() === name) return decodeURIComponent(part.slice(eq + 1).trim());
+        if (part.slice(0, eq).trim() !== name) continue;
+        try {
+            return decodeURIComponent(part.slice(eq + 1).trim());
+        } catch {
+            return null; // a malformed value is "no credential" (401), not a URIError (500)
+        }
     }
     return null;
 }

@@ -280,11 +280,11 @@ bound.
 
 | Defect | Effect |
 |---|---|
-| `audit_logs.actor_id`, `file_access_policies.created_by/updated_by` and `user_file_permissions.granted_by` reference `users(id)` with **no ON DELETE action**, while `foreign_keys = ON`. | Deleting a user who has ever performed an audited admin action, or set a policy/grant, fails the `DELETE` with a constraint error → raw `500`. Fix: `ON DELETE SET NULL` (needs a table-rebuild migration). |
-| No last-admin guard. | An admin can disable or delete the last active admin, after which nobody can reach the admin panel until a manual database edit. |
-| `failed_login_count` is not reset when a lock expires. | After one lockout, a single further failure re-locks the account for another 15 minutes. |
-| `renamePath` / `deletePath` match the exact `client_path` only. | Renaming or deleting a **folder** leaves policies on its descendants pointing at paths that no longer exist. A rename onto a path that already has a row hits the `UNIQUE` constraint, which the best-effort hook swallows. |
-| Policy booleans are coerced by truthiness in the repository. | The string `"false"` sent by a client is stored as `1`. |
+| ~~`audit_logs.actor_id`, `file_access_policies.created_by/updated_by`, `*.granted_by` have no ON DELETE action~~ **Fixed:** `UserRepository.delete` sets them to `NULL` in the same transaction as the `DELETE` (what `ON DELETE SET NULL` would do, without a table rebuild). | Deleting a user who had acted used to fail with a raw `500`. |
+| ~~No last-admin guard.~~ **Fixed:** `UserService` refuses (409) to disable or delete the last active admin. | — |
+| ~~`failed_login_count` is not reset when a lock expires.~~ **Fixed:** the first failure after an expired lock starts a fresh count. | — |
+| ~~`renamePath` / `deletePath` match the exact `client_path` only.~~ **Fixed:** both carry or drop every row below a folder too. | — |
+| ~~Policy booleans are coerced by truthiness in the repository.~~ **Fixed:** `FileAccessPolicyService.setPolicy` refuses a non-boolean flag with `400`. | — |
 
 ### Operations
 

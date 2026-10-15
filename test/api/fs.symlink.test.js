@@ -160,6 +160,71 @@ describe('a link escaping the root is refused on every read path', () => {
         assert.equal(res.status, 403);
         assert.ok(!res.body.toString().includes(SECRET), 'the outside target is not in the archive');
     });
+
+    test('a ZIP of a real folder does not follow a link nested inside it', async (t) => {
+        if (!linksAvailable) return noLinks(t);
+        const zipDir = path.join(ROOT, 'zipdir');
+        fs.mkdirSync(zipDir, { recursive: true });
+        fs.writeFileSync(path.join(zipDir, 'plain.txt'), 'PLAIN');
+        try {
+            fs.symlinkSync(OUTSIDE_DIR, path.join(zipDir, 'nested-out'), process.platform === 'win32' ? 'junction' : 'dir');
+        } catch { return noLinks(t); }
+        const body = JSON.stringify({ paths: ['/zipdir'] });
+        const res = await request('/api/v1/fs/download-zip', {
+            method: 'POST',
+            body,
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        });
+        // STORE or DEFLATE: neither the plain secret nor its file name may appear.
+        assert.ok(!res.body.includes(Buffer.from(SECRET)), 'outside bytes are not archived');
+        assert.ok(!res.body.includes(Buffer.from('nested-out/secret.txt')), 'outside entry is not archived');
+    });
+});
+
+describe('a link escaping the root is refused on every write path', () => {
+    // The read side canonicalised, the write side judged only the path STRING:
+    // copy/move of '/link-outside/secret.txt' pulled the outside file into the
+    // root (where download then served it), and folder/rename/move-into acted
+    // on the outside directory.
+    function json(method, pathname, payload) {
+        const body = JSON.stringify(payload);
+        return request(pathname, {
+            method,
+            body,
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        });
+    }
+    const outsideEntries = () => fs.readdirSync(OUTSIDE_DIR).sort();
+
+    test('copy of a file reached through the link copies nothing into the root', async (t) => {
+        if (!linksAvailable) return noLinks(t);
+        await json('POST', '/api/v1/fs/copy', { paths: ['/link-outside/secret.txt'], destination: '/' });
+        assert.equal(fs.existsSync(path.join(ROOT, 'secret.txt')), false, 'outside bytes were not copied in');
+    });
+
+    test('move of a file reached through the link leaves it where it is', async (t) => {
+        if (!linksAvailable) return noLinks(t);
+        await json('PUT', '/api/v1/fs/move', { paths: ['/link-outside/secret.txt'], destination: '/' });
+        assert.equal(fs.existsSync(path.join(ROOT, 'secret.txt')), false);
+        assert.deepEqual(outsideEntries(), ['secret.txt']);
+    });
+
+    test('copy and move INTO the link write nothing outside the root', async (t) => {
+        if (!linksAvailable) return noLinks(t);
+        await json('POST', '/api/v1/fs/copy', { paths: ['/inside-dir/ok.txt'], destination: '/link-outside' });
+        await json('PUT', '/api/v1/fs/move', { paths: ['/inside-dir/ok.txt'], destination: '/link-outside' });
+        assert.deepEqual(outsideEntries(), ['secret.txt']);
+        assert.equal(fs.existsSync(path.join(INSIDE_DIR, 'ok.txt')), true, 'the source was not moved out');
+    });
+
+    test('creating a folder or renaming through the link is refused', async (t) => {
+        if (!linksAvailable) return noLinks(t);
+        const folder = await json('POST', '/api/v1/fs/folder', { path: '/link-outside/planted' });
+        const rename = await json('PUT', '/api/v1/fs/rename', { oldPath: '/link-outside/secret.txt', newName: 'renamed.txt' });
+        assert.equal(folder.status, 403);
+        assert.equal(rename.status, 403);
+        assert.deepEqual(outsideEntries(), ['secret.txt']);
+    });
 });
 
 describe('links that stay inside the root, and broken links', () => {

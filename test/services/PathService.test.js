@@ -380,3 +380,24 @@ test('10. client path -> resolve -> toClientPath returns the original', () => {
         assert.equal(PathService.toClientPath(securePath), clientPath, `round-trip failed for ${clientPath}`);
     }
 });
+
+// ---------------------------------------------------------------------------
+// STORAGE_ROOT that is itself a link (Linux: /srv/dimension/storage -> a mount)
+// ---------------------------------------------------------------------------
+
+test('a linked STORAGE_ROOT keeps canonical paths on the root\'s own basis', async (t) => {
+    // Regression: resolveSecureRealPath returned the canonical path, but
+    // toClientPath judged it against the UNcanonicalised root, so every path
+    // mapped to '/' - an upload aimed at /media landed in the root.
+    const linkedRoot = path.join(fixtureDir, 'linked-root');
+    try {
+        await fs.symlink(realRoot, linkedRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+        return t.skip('this platform refused to create a directory link');
+    }
+    const PathService = loadPathService(linkedRoot);
+
+    const media = await PathService.resolveSecureRealPath('/media');
+    assert.equal(PathService.toClientPath(media), '/media');
+    assert.equal(PathService.toClientPath(await PathService.resolveSecureRealPath('/media/a.txt')), '/media/a.txt');
+});

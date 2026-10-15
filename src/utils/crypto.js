@@ -18,6 +18,8 @@ function hashPassword(password) {
 
 /** Verifies a password against a "salt:hash" string with a timing-safe comparison. */
 function verifyPassword(password, stored) {
+    // A JSON body can carry any type; scrypt throws on a non-string (was a 500).
+    if (typeof password !== 'string') return false;
     const [salt, hashHex] = String(stored || '').split(':');
     if (!salt || !hashHex) return false;
     const candidate = crypto.scryptSync(password, salt, SCRYPT_KEYLEN);

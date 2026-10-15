@@ -138,6 +138,20 @@ describe('POST /api/v1/auth/login', () => {
         assert.match(setCookie, /SameSite=Lax/);
     });
 
+    test('a non-string password is a 401, not a 500', async () => {
+        // scryptSync threw a TypeError on a number/object/missing password.
+        for (const password of [12345678, { a: 1 }, null, undefined]) {
+            const res = await sendJson('POST', '/api/v1/auth/login', { username: BOOTSTRAP_USERNAME, password });
+            assert.equal(res.status, 401, `password ${JSON.stringify(password)}`);
+        }
+    });
+
+    test('a malformed session cookie is a 401, not a 500', async () => {
+        // decodeURIComponent threw URIError on a stray '%'.
+        const res = await send('GET', '/api/v1/fs/list?path=/', { headers: { Cookie: 'afm_session=%E0%A4%A' } });
+        assert.equal(res.status, 401);
+    });
+
     test('the cookie is Secure exactly when the request arrived over https (X-Forwarded-Proto from nginx)', async () => {
         // Secure used to follow NODE_ENV, which the systemd unit pins to
         // production: behind the plain-HTTP nginx config the browser dropped the
