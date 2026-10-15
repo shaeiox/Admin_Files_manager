@@ -5,8 +5,8 @@ nginx host — a static portal and a proxied application.
 
 | Domain | Served by | Gate | Security headers from |
 |---|---|---|---|
-| `files.cloudavid.com` | static: `/var/www/html/files-server-web` (+ content dirs `/var/www/html/download`, `/var/www/html/files`) | none (public) | nginx |
-| `admin.files.cloudavid.com` | reverse proxy → `127.0.0.1:3000`, the Dimension app running from `/var/www/html/Admin-Files` | **HTTP Basic Auth** | the app (helmet), through the proxy |
+| `files.cloudavid.com` | static shell (`index/browse/404.html` + `/assets/`) from `/var/www/html/files-server-web`; `/api/` and `/release{8,9}/latest` proxied to the portal Node process on `127.0.0.1:4000` | portal sign-in + admin policies (in Node) | nginx (pages), Node (API) |
+| `adminfiles.cloudavid.com` | reverse proxy → `127.0.0.1:3000`, the Dimension app running from `/var/www/html/Admin-Files` | **HTTP Basic Auth** | the app (helmet), through the proxy |
 
 > ⚠ **The admin API is unauthenticated** (ADR-003): no login in the application
 > itself. `auth_basic` in the config is the only thing between the internet and
@@ -24,12 +24,15 @@ Everything below runs **on the server, as root** (shown via `sudo`).
 ```bash
 # 1. DNS: both names point at this host
 #      files.cloudavid.com      -> A/AAAA <server IP>
-#      admin.files.cloudavid.com-> A/AAAA <server IP>
+#      adminfiles.cloudavid.com-> A/AAAA <server IP>
 # 2. Firewall: 80 and 443 open
 # 3. Content, where the config expects it:
-ls -d /var/www/html/files-server-web /var/www/html/download /var/www/html/files
-# 4. The application running and answering LOCALLY (bypasses nginx and auth):
-curl -s http://127.0.0.1:3000/api/v1/health     # -> "success":true ... "apiVersion":1
+ls -d /var/www/html/files-server-web
+# 4. Both applications running and answering LOCALLY (bypasses nginx and auth):
+curl -s http://127.0.0.1:3000/api/v1/health     # admin  -> "success":true ... "apiVersion":1
+curl -s http://127.0.0.1:4000/api/health        # portal -> {"status":"ok",...}
+# 5. Ports 3000 and 4000 NOT reachable from outside (both apps bind 0.0.0.0):
+#      firewall them, only nginx on this host may connect.
 ```
 
 If the app is **not** running, start it first (the config proxies to a process,
@@ -69,13 +72,13 @@ handshake with a name mismatch. Check what you have:
 sudo openssl x509 -in /etc/ssl/certs-web/fullchain-new.pem -noout -ext subjectAltName
 ```
 
-You need `DNS:files.cloudavid.com, DNS:admin.files.cloudavid.com` (a wildcard
-`*.cloudavid.com` does **not** cover `admin.files.cloudavid.com` — wildcards
-match one label only). If it doesn't, issue one cert for both names and repoint
+You need `DNS:files.cloudavid.com, DNS:adminfiles.cloudavid.com` (or a wildcard
+`*.cloudavid.com`, which covers both: each is a single label under
+`cloudavid.com`). If it doesn't, issue one cert for both names and repoint
 the two `ssl_certificate` lines:
 
 ```bash
-sudo certbot certonly --nginx -d files.cloudavid.com -d admin.files.cloudavid.com
+sudo certbot certonly --nginx -d files.cloudavid.com -d adminfiles.cloudavid.com
 # cert -> /etc/letsencrypt/live/files.cloudavid.com/{fullchain.pem,privkey.pem}
 ```
 
@@ -147,7 +150,7 @@ failure is deterministic, not a platform quirk. (Verified: the config fails
 ```bash
 # HTTP -> HTTPS, both names
 curl -sI http://files.cloudavid.com/       | head -1     # HTTP/1.1 301
-curl -sI http://admin.files.cloudavid.com/ | head -1     # HTTP/1.1 301
+curl -sI http://adminfiles.cloudavid.com/ | head -1     # HTTP/1.1 301
 
 # Portal: HTML is never cached, and the full security set is present
 curl -sI https://files.cloudavid.com/ | grep -iE 'cache-control|strict-transport|x-frame'
@@ -156,24 +159,26 @@ curl -sI https://files.cloudavid.com/ | grep -iE 'cache-control|strict-transport
 #   x-frame-options: SAMEORIGIN
 # EXACTLY ONE cache-control line — two means expires and add_header are both firing.
 
+# Portal pages carry the CSP (nginx serves them, so Node cannot add it)
+curl -sI https://files.cloudavid.com/ | grep -ci content-security-policy  # 1
+
 # Portal: JS/CSS revalidate (304 on repeat), images cache 7d
-curl -sI https://files.cloudavid.com/<any>.js  | grep -i cache-control   # no-cache, must-revalidate
-curl -sI https://files.cloudavid.com/<any>.png | grep -i cache-control   # public, max-age=604800, no-transform
+curl -sI https://files.cloudavid.com/assets/js/router.js | grep -i cache-control   # no-cache, must-revalidate
+curl -sI https://files.cloudavid.com/assets/icon/logo.webp | grep -i cache-control # public, max-age=604800, no-transform
 
-# Content dirs (note: /download/notes.html must be YOUR file, not the SPA)
-curl -sI https://files.cloudavid.com/download/<some-real-file>           # 200
+# Portal API and CLI shortcut reach Node
+curl -s  https://files.cloudavid.com/api/health                          # {"status":"ok",...}
+curl -sI https://files.cloudavid.com/release9/latest | head -1           # 200, or 401 if releases are locked
 
-# JSON listing: application/json EXACTLY once
-curl -sI https://files.cloudavid.com/__list/download/ | grep -ci '^content-type'   # 1
-curl -s  https://files.cloudavid.com/__list/download/ | head -c 200                # JSON array
-
-# Deny rules
-curl -sI https://files.cloudavid.com/.env | head -1                      # 404
+# The checkout is NOT published: none of these may return a file
+for p in /server.js /lib/auth-service.js /package.json /data/users.json /graphify-out/graph.html /.env; do
+  printf '%s ' "$p"; curl -s https://files.cloudavid.com$p | head -c 15; echo
+done   # every line must start with <!DOCTYPE (the SPA shell) or be empty (404)
 
 # Admin: closed without credentials, open with them
-curl -sI https://admin.files.cloudavid.com/ | head -1                    # 401
-curl -s  https://admin.files.cloudavid.com/ | grep -i www-authenticate   # Basic realm="CloudAvid Admin"
-curl -s -u '<user>:<pass>' https://admin.files.cloudavid.com/api/v1/health
+curl -sI https://adminfiles.cloudavid.com/ | head -1                    # 401
+curl -s  https://adminfiles.cloudavid.com/ | grep -i www-authenticate   # Basic realm="CloudAvid Admin"
+curl -s -u '<user>:<pass>' https://adminfiles.cloudavid.com/api/v1/health
 #   {"success":true,...,"apiVersion":1}   (proxied from the app)
 ```
 
@@ -186,11 +191,17 @@ admin site prompts once for user/password.
 
 | Class | Rule | Effect |
 |---|---|---|
-| `*.html` | `no-store, no-cache, ... max-age=0` | every navigation revalidates — a deploy is visible on the next reload |
-| `*.css`, `*.js` | `no-cache, must-revalidate` + `etag on` | 304 while unchanged, 200 + new bytes when the file changes |
-| images, fonts, media | `public, max-age=604800, no-transform` | 7 days in the browser/CDN |
-| `/__list/...` | `no-store` | listings are never stale |
-| `/download/`, `/files/` | no explicit cache header | heuristic + ETag/Last-Modified revalidation |
+| `/index.html`, `/browse.html`, `/404.html` | `no-store, no-cache, ... max-age=0` + CSP | every navigation revalidates — a deploy is visible on the next reload |
+| `/assets/**.css`, `/assets/**.js` | `no-cache, must-revalidate` + `etag on` | 304 while unchanged, 200 + new bytes when the file changes |
+| `/assets/**` images, fonts, media | `public, max-age=604800, no-transform` | 7 days in the browser/CDN |
+| `/api/...`, `/release{8,9}/latest` | set by the portal (`no-store` on JSON) | proxied, never cached by nginx |
+| anything else | rewritten to `/index.html` | the SPA shell; **no other file under the root is ever served** |
+
+The root is the portal checkout itself (`server.js`, `lib/`, `package.json`,
+`data/`, `docs/`, `node_modules/` …). The locations are an **allowlist** on
+purpose: matching by extension alone (`\.js$`, `try_files $uri`) published the
+server source, `package.json` and `data/users.json`. Add a public file outside
+`/assets/` → add it to the allowlist explicitly.
 
 Deploying portal changes = replace files under
 `/var/www/html/files-server-web`. Nothing to reload; HTML is never cached, and
@@ -218,10 +229,12 @@ file tree, curl against both):
 | — | admin vhost: proxy + `auth_basic` | the app cannot be served as static files; publishing it ungated would expose an unauthenticated destructive API |
 | `listen 443 ssl http2` | unchanged (deliberately) | works on every nginx version; the ≥ 1.25.1 deprecation warning is documented above. `http2 on;` would *fail* on < 1.25.1 |
 
-Unchanged on purpose: cert paths, `root /var/www/html/files-server-web`,
-`/__list/` rewrite trick (including the bogus index name that prevents an
-`index.html` from hijacking the JSON listing), `try_files … @spa`, 6 GB body
-ceiling, 600 s timeouts.
+| extension regexes + `try_files $uri $uri/ @spa` over the portal checkout | allowlist: three HTML shells + `/assets/`, everything else → `/index.html` | the extension rules served `/server.js`, `/lib/*.js`, `/package.json`, `/data/users.json` straight from disk |
+| `/download/`, `/files/`, `/__list/` served from disk | removed; all content goes through the portal API | serving `FILES_ROOT` from disk bypasses every admin policy (locked/unpublished/deny) |
+| `X-Forwarded-For $proxy_add_x_forwarded_for` (portal) | `$remote_addr` | the appended form keeps the client-supplied value in the header |
+
+Unchanged on purpose: cert paths, `root /var/www/html/files-server-web`, 6 GB
+body ceiling, 600 s timeouts.
 
 ---
 
@@ -256,9 +269,9 @@ ceiling, 600 s timeouts.
 | admin answers **401** with correct password | wrong htpasswd entry; regenerate. The browser cached old credentials — it re-prompts per protection space |
 | admin answers **502/504** | app not running or wrong port — `curl http://127.0.0.1:3000/api/v1/health`, fix `proxy_pass` |
 | **413** on upload | `client_max_body_size` < app `UPLOAD_MAX_BYTES` — raise both together |
-| portal file 404 although it exists | `root` mismatch: the two content locations read `/var/www/html/download` and `/var/www/html/files` (siblings of `files-server-web`). If your files live *inside* `files-server-web`, change those two `root` lines to `/var/www/html/files-server-web` |
-| bare `/download/` returns **403** | expected: listings are off in that location by design — use `/__list/download/` |
-| portal JS/CSS 404 for a file you just added | location precedence is working as designed: files under `/download/` and `/files/` are content (served from the content dirs); portal assets live under `files-server-web` |
+| portal **502/504** on `/api/` | portal not running or wrong port — `curl http://127.0.0.1:4000/api/health`, match `PORT` in its `.env` with `proxy_pass` |
+| a downloadable file is missing from the portal | content is never served from disk: check `FILES_ROOT` in the portal `.env` and the item's policy in Admin Files Manager |
+| portal JS/CSS/image you just added returns the SPA shell | it is outside `/assets/` — only `/assets/` and the three HTML shells are public (§5) |
 | `nginx: [crit] ... Permission denied` on cert/key | cert must be readable by the nginx worker — `chmod 644` the pem, or group-read the key |
 | scripts show `\r: command not found` over SSH | the file arrived with CRLF — this repo pins `*.conf`/`*.sh` to LF via `.gitattributes`; re-copy from the repository, don't paste through editors that rewrap |
 
@@ -269,8 +282,8 @@ ceiling, 600 s timeouts.
 | Want to change | Edit |
 |---|---|
 | portal document root | `root /var/www/html/files-server-web;` (portal server block) |
-| content dirs | the two `location ^~` blocks (`root /var/www/html;`) |
-| app port | the single `proxy_pass http://127.0.0.1:3000;` |
+| portal port | `proxy_pass http://127.0.0.1:4000;` (portal server block) |
+| admin app port | `proxy_pass http://127.0.0.1:3000;` (admin server block) |
 | htpasswd path | `auth_basic_user_file` (admin server block) |
 | certificate | the two `ssl_certificate*` lines in **each** 443 block |
 | image cache TTL | `max-age=604800` (7 days) in the media location |
