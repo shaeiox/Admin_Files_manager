@@ -86,5 +86,6 @@ class PortalNavService {
 }
 
 PortalNavService.MAX_FOLDERS = MAX_FOLDERS;
+PortalNavService.normalizePath = normalizePath;
 
 module.exports = PortalNavService;

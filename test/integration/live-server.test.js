@@ -265,7 +265,9 @@ describe('dashboard read endpoints on the live server', () => {
         let expectedBytes = 0;
         const walk = (dir) => {
             for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-                if (entry.isSymbolicLink()) continue;
+                // Same exclusions as the service walk: links and dot entries (e.g. the
+                // .dimension-volume marker stamped at startup).
+                if (entry.isSymbolicLink() || entry.name.startsWith('.')) continue;
                 const full = path.join(dir, entry.name);
                 if (entry.isDirectory()) walk(full);
                 else if (entry.isFile()) expectedBytes += fs.statSync(full).size;

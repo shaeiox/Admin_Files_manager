@@ -231,3 +231,25 @@ describe('tables degrade to an honest empty state, never a silent blank', () => 
         assert.match(ADMIN_JS, /showAdminNotice/);
     });
 });
+
+describe('File portal pane shares logical settings only (decouple-storage-and-release-paths)', () => {
+    test('host paths and the .env editor are gone', () => {
+        for (const removed of ['pFILES_ROOT', 'pRELEASE_PVM', 'pAUTH_ENABLED', 'PORTAL_ROOT', '/admin/portal/config', 'Restart the file portal']) {
+            assert.ok(!ADMIN_HTML.includes(removed) && !ADMIN_JS.includes(removed), removed);
+        }
+    });
+
+    test('it reads and writes /admin/portal/settings through window.API', () => {
+        assert.match(ADMIN_JS, /window\.API\.get\('\/admin\/portal\/settings'/);
+        assert.match(ADMIN_JS, /window\.API\.put\('\/admin\/portal\/settings'/);
+        for (const id of ['pPortalRoot', 'pReleaseClientPath', 'pSessionMinutes', 'pMaxFailedAttempts', 'pLockoutMinutes', 'portalVolume', 'portalVolumeText']) {
+            assert.match(ADMIN_HTML, new RegExp(`id="${id}"`), id);
+        }
+    });
+
+    test('the volume and portal-root status are rendered as text, never markup', () => {
+        assert.match(ADMIN_JS, /getElementById\('portalVolumeText'\)\.textContent = /);
+        for (const status of ['missing', 'mismatch', 'unwritable']) assert.match(ADMIN_JS, new RegExp(`${status}: '`), status);
+        assert.match(ADMIN_JS, /ROOT_STATUS_TEXT\[portalRoot\.status\]/);
+    });
+});

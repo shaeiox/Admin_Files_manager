@@ -6,6 +6,7 @@ const fs = require('fs');
 const FileSystemService = require('../services/FileSystemService');
 const MetadataService = require('../services/MetadataService');
 const FileAccessPolicyService = require('../services/FileAccessPolicyService');
+const IntegrationSettingsService = require('../services/IntegrationSettingsService');
 const UploadService = require('../services/UploadService');
 const AppError = require('../utils/AppError');
 const { validateFileName, validateClientPath } = require('../utils/validators');
@@ -292,6 +293,7 @@ async function renameItem(req, res, next) {
             console.error('[Metadata] Failed to migrate on rename:', metaErr.message);
         }
         FileAccessPolicyService.onPathRenamed(from, to);
+        IntegrationSettingsService.onPathRenamed(from, to);
 
         MetadataService.addActivity({
             type: 'edit',
@@ -342,6 +344,7 @@ async function moveItems(req, res, next) {
                         console.error('[Metadata] Failed to migrate on move:', metaErr.message);
                     }
                     FileAccessPolicyService.onPathRenamed(from, to);
+                    IntegrationSettingsService.onPathRenamed(from, to);
 
                     MetadataService.addActivity({
                         type: 'edit',

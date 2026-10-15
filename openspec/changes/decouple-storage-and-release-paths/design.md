@@ -68,12 +68,53 @@ running. The portal then refuses integration, which fails closed.
 - Compare device + inode: not portable to Windows/SMB and differs across mounts.
 - Store a root path in the database: that is the bug in a different place.
 
-### D2. Mapping stays `"/" + rel`, but it is now verified
+### D2. The portal locates itself in the storage; no shared path, no matching setting
 
-The marker only exists at the storage root, so a matching marker proves `FILES_ROOT` is the admin
-root. The existing mapping is then correct by construction. A configurable client-path prefix
-(serving a subtree) is a non-goal: the portal could not see the marker from a subtree mount. Add it
-with a per-subtree marker if a deployment ever needs it.
+*(Revised twice. v1 kept `"/" + rel`, which required the same directory. v2 let the admin choose a
+portal root and required the portal's marker to match it, so the two still had to agree on a path.
+The goal is the opposite: admin `STORAGE_ROOT=C:\Users\eleven`, portal
+`FILES_ROOT=C:\Users\eleven\Downloads` (or any other folder of that storage), with no
+admin-side setting, and policies working. That is also the shape one-portal-per-tenant SaaS
+needs.)*
+
+**Choice.** The portal works out which admin folder its `FILES_ROOT` is, from markers alone:
+
+1. Canonicalise `FILES_ROOT` (`realpath`, so a link or junction cannot fake the location), then
+   climb from it towards the filesystem root.
+2. The first `.dimension-volume` met that belongs to this volume (`volumeId` = `volume_id`) **and**
+   is trusted fixes the position: `portalRoot = join(marker.clientPath, the folders climbed)`.
+   Trusted markers are:
+   - **the storage-root marker** (`clientPath "/"`), which the admin stamps once and never moves;
+   - **a published folder marker**, whose `clientPath` equals `portal_root_client_path`. This is
+     the one subfolder marker the admin writes, for portal hosts that cannot see the storage root
+     (a container or share that mounts only a folder).
+
+   Any other marker of this volume (for example a folder copied with its old marker) is skipped.
+   A marker of another volume is skipped too.
+3. None found: the portal refuses to start, and answers `503` at runtime (fail closed, as before).
+
+The position is re-derived at every snapshot refresh, which reads a handful of small files, so a
+moved mount is noticed within `ADMIN_SYNC_TTL_MS`.
+
+- **No equality with any admin setting.** On a host that can see the storage root, every folder of
+  the storage works as `FILES_ROOT` with nothing configured in the admin. The admin's
+  **portal folder** setting (`portal_root_client_path`, optional) only publishes a marker into one
+  folder for hosts that cannot see the root. A portal may sit at or below it.
+- **Policies keep their meaning**, because the portal decides full admin client paths: a policy on
+  `/`, on any ancestor of `FILES_ROOT`, or inside it governs exactly as it would in the admin's
+  view. Moving `FILES_ROOT` cannot widen access: the same files get the same paths.
+- **Release folder and navbar folders** are full admin client paths. The portal uses those strictly
+  inside its own position and ignores the rest (logged once for the release folder). The admin no
+  longer checks them against a portal root it cannot know, and "Check access" no longer claims to
+  know which paths a portal serves.
+- **Admin portal-folder marker.** It is written before the setting is stored (`409` if the storage
+  is not verified or the folder holds another volume's marker), and removed from the previous
+  folder afterwards. It is restored when missing, follows API renames and moves, and is unreachable
+  through the API at any depth (the `PathService` guard).
+
+**SaaS path.** Every tenant portal is just a `FILES_ROOT` somewhere in the storage. Visible-root
+hosts need nothing. Isolated hosts need one published marker per tenant folder, which becomes a
+`portal_roots` table (`tenant_id, client_path`) in `saas-identity-and-tenancy`.
 
 ### D3. The release folder is a client path in the database
 

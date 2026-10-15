@@ -40,6 +40,14 @@ physical paths in its own host configuration.
   integration mode the portal reads that marker from its `FILES_ROOT`. If the marker is missing or
   differs from the database, the portal **refuses integration mode**. This replaces string
   equality between paths with a content check that holds on any mount point or host.
+- **The portal may serve any folder of the storage, with nothing to match (new).** Example: the
+  admin `STORAGE_ROOT` is `C:\Users\eleven` and the portal `FILES_ROOT` is
+  `C:\Users\eleven\Downloads`. The portal climbs from `FILES_ROOT` to the storage-root marker,
+  works out that it is the admin folder `/Downloads`, and maps its paths to `"/Downloads/" + rel`.
+  Policies on that folder and every ancestor apply. No admin setting is needed. For a portal host
+  that cannot see the storage root (a container mounting one folder), the admin can publish a
+  marker into that folder (optional "Portal folder"). A copied, stale marker is not trusted
+  (design D2).
 - **Release folder becomes a client path (new).** The release folder is stored in `admin.sqlite`
   as a client path (for example `/release/pvm`), next to the lock policy that protects it. It is
   set in Admin → File portal. In integration mode the portal resolves it under its own root and
@@ -66,8 +74,8 @@ physical paths in its own host configuration.
   `STORAGE_ROOT` (a Linux bind mount; no link resolution involved). A real multi-volume namespace
   (a `volumes` table and mount-aware `PathService`) is deferred until a deployment needs it. See
   design D3.
-- **A portal that serves only a subtree of the admin storage.** The marker lives at the storage
-  root, so `FILES_ROOT` must be that root.
+- **Several portal roots / tenants at once.** One portal root now. The table-per-tenant step is
+  designed (D2) but belongs to `saas-identity-and-tenancy`.
 - **Moving policies off path keys.** Renames inside a governed folder still orphan child policies
   (known limitation in the portal's integration doc). This change does not address it.
 - Any change to how policies are decided.

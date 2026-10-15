@@ -38,9 +38,55 @@ database holds no volume UUID, and SHALL NOT overwrite an existing marker.
 
 #### Scenario: Clients cannot see or touch the marker
 
-- **WHEN** a client lists, searches, renames, deletes or uploads to `/.dimension-volume`
+- **WHEN** a client lists, searches, downloads, renames, moves, copies, deletes or creates `/.dimension-volume`,
+  in any spelling Windows folds onto it (case, trailing dots or spaces, a `:$DATA` suffix)
 - **THEN** the marker is absent from every listing and walk
-- **AND** every mutation naming it is refused by `validateFileName`
+- **AND** `PathService.resolveSecurePath` answers `404` for it, so every endpoint refuses it
+  (`validateFileName` alone covers only the endpoints that take a bare name)
+
+### Requirement: The Admin Can Publish A Portal Folder Marker
+
+The admin SHALL let an administrator optionally name one folder
+(`integration_settings.portal_root_client_path`, null for none) and SHALL keep a marker
+`{volumeId, clientPath}` in it, for portal hosts that cannot see the storage root. The admin SHALL
+NOT require any portal to use that folder, and SHALL NOT check other settings against it.
+
+#### Scenario: Publishing a folder marker
+
+- **WHEN** `PUT /api/v1/admin/portal/settings` carries `portalRootClientPath: "/Downloads"`, the folder exists and the volume status is `ok`
+- **THEN** `STORAGE_ROOT/Downloads/.dimension-volume` holds `{"volumeId":"<id>","clientPath":"/Downloads"}`
+- **AND** `GET` reports `portalRoot: { clientPath: "/Downloads", status: "ok" }`
+
+#### Scenario: Changing or clearing it removes the old marker
+
+- **WHEN** the folder changes from `/Downloads` to `/Shared`, or to null
+- **THEN** the marker is written to the new folder (if any) and removed from `/Downloads`
+- **AND** the storage-root marker is never removed
+
+#### Scenario: A folder holding another volume's marker is refused
+
+- **WHEN** the chosen folder already holds a marker with a different `volumeId`
+- **THEN** the request is refused with `409` and nothing is written or stored
+
+#### Scenario: The storage identity must be verified first
+
+- **WHEN** `volume.status` is not `ok`
+- **THEN** a new portal folder is refused with `409`
+
+#### Scenario: The release folder is not tied to it
+
+- **WHEN** the release folder is outside the published portal folder
+- **THEN** it is stored (each portal uses the release folder only if it lies inside its own position)
+
+#### Scenario: Rename keeps the marker valid
+
+- **WHEN** the published folder, the release folder, or one of their ancestors is renamed or moved through the API
+- **THEN** the stored client paths follow it and the marker's `clientPath` is rewritten
+
+#### Scenario: A lost folder marker is restored
+
+- **WHEN** the published folder's marker is missing, the folder exists and `volume.status` is `ok`
+- **THEN** the admin rewrites it at startup or on the next settings read
 
 ### Requirement: The Release Folder Is A Client Path
 

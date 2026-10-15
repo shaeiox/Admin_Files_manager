@@ -736,50 +736,74 @@ const Admin = (() => {
     }
 
     /* ══════════════════════════════════════════
-       FILE PORTAL (.env of files-server-web)
+       FILE PORTAL (integration_settings in admin.sqlite; ADR-010)
        ══════════════════════════════════════════ */
 
-    const PORTAL_KEYS = ['FILES_ROOT', 'RELEASE_PVM', 'AUTH_ENABLED', 'AUTH_SESSION_MINUTES', 'AUTH_MAX_FAILED_ATTEMPTS', 'AUTH_LOCKOUT_MINUTES'];
+    const PORTAL_AUTH_FIELDS = ['sessionMinutes', 'maxFailedAttempts', 'lockoutMinutes'];
     let portalSaved = null;
 
+    /** What the portal's storage check sees, per volume.status from the server. */
+    const VOLUME_TEXT = {
+        missing: 'The storage marker .dimension-volume is missing from this server\'s storage root, so the file portal refuses to serve. If the storage root moved, point STORAGE_ROOT back at it; otherwise restore the marker with the volume id below (docs/DEPLOYMENT.md).',
+        mismatch: 'The storage root holds a .dimension-volume marker for a different volume, so the file portal refuses to serve. STORAGE_ROOT probably points at the wrong directory (docs/DEPLOYMENT.md).',
+        unwritable: 'The storage marker .dimension-volume could not be written to this server\'s storage root, so the file portal refuses to serve. Make STORAGE_ROOT writable and restart this server.',
+    };
+
+    /** The published portal folder's state, per portalRoot.status (unverified is covered by VOLUME_TEXT). */
+    const ROOT_STATUS_TEXT = {
+        missing: 'The portal folder no longer exists, so a portal host that sees only that folder cannot place itself. Choose the folder that host mounts now, or clear the field.',
+        mismatch: 'The portal folder holds the marker of another storage volume. Choose another folder.',
+    };
+
+    /** `{ portalRootClientPath, releaseClientPath, auth }` from the form; empty fields are null. */
     function readPortalForm() {
-        const values = {};
-        for (const key of PORTAL_KEYS) {
-            const el = document.getElementById(`p${key}`);
-            values[key] = el.type === 'checkbox' ? String(el.checked) : el.value.trim();
+        const root = document.getElementById('pPortalRoot').value.trim();
+        const release = document.getElementById('pReleaseClientPath').value.trim();
+        const auth = {};
+        for (const field of PORTAL_AUTH_FIELDS) {
+            const raw = document.getElementById(`p${field[0].toUpperCase()}${field.slice(1)}`).value.trim();
+            auth[field] = raw === '' ? null : Number(raw);
         }
-        return values;
+        return { portalRootClientPath: root && root !== '/' ? root : null, releaseClientPath: release || null, auth };
     }
 
-    function fillPortalForm(values) {
-        for (const key of PORTAL_KEYS) {
-            const el = document.getElementById(`p${key}`);
-            if (el.type === 'checkbox') el.checked = ['true', '1', 'yes', 'on'].includes(String(values[key]).toLowerCase());
-            else el.value = values[key] || '';
+    function fillPortalForm(settings) {
+        document.getElementById('pPortalRoot').value = (settings.portalRoot && settings.portalRoot.clientPath) || '';
+        document.getElementById('pReleaseClientPath').value = settings.releaseClientPath || '';
+        for (const field of PORTAL_AUTH_FIELDS) {
+            const value = settings.auth[field];
+            document.getElementById(`p${field[0].toUpperCase()}${field.slice(1)}`).value = value == null ? '' : String(value);
         }
         portalSaved = readPortalForm();
         updatePortalDirty();
     }
 
     function updatePortalDirty() {
-        const dirty = portalSaved && PORTAL_KEYS.some((k) => readPortalForm()[k] !== portalSaved[k]);
+        const dirty = portalSaved && JSON.stringify(readPortalForm()) !== JSON.stringify(portalSaved);
         document.getElementById('portalSave').disabled = !dirty;
         document.getElementById('portalReset').disabled = !dirty;
+    }
+
+    function renderVolume(volume, portalRoot) {
+        const notice = document.getElementById('portalVolume');
+        const volumeText = VOLUME_TEXT[volume && volume.status];
+        const rootText = !volumeText && portalRoot ? ROOT_STATUS_TEXT[portalRoot.status] : '';
+        notice.hidden = !volumeText && !rootText;
+        document.getElementById('portalVolumeText').textContent = volumeText
+            ? `${volumeText}${volume.id ? ` Volume id: ${volume.id}` : ''}`
+            : rootText ? `${rootText} Portal folder: ${portalRoot.clientPath}` : '';
     }
 
     async function loadPortal() {
         const form = document.getElementById('portalForm');
         if (!form) return;
         try {
-            const config = await window.API.get('/admin/portal/config', { silent: true });
-            const unavailable = !config || !config.available;
-            document.getElementById('portalUnavailable').hidden = !unavailable;
-            document.getElementById('portalUnavailableReason').textContent = (config && config.reason) || '';
-            form.querySelectorAll('input').forEach((el) => { el.disabled = unavailable; });
-            if (!unavailable) fillPortalForm(config.values);
+            const settings = await window.API.get('/admin/portal/settings', { silent: true });
+            renderVolume(settings.volume, settings.portalRoot);
+            fillPortalForm(settings);
         } catch (error) {
             const errorEl = document.getElementById('portalError');
-            errorEl.textContent = error.message || 'Could not read the portal configuration.';
+            errorEl.textContent = error.message || 'Could not read the portal settings.';
             errorEl.hidden = false;
         }
     }
@@ -791,11 +815,12 @@ const Admin = (() => {
         const saveBtn = document.getElementById('portalSave');
         saveBtn.disabled = true;
         try {
-            const res = await window.API.put('/admin/portal/config', readPortalForm(), { silent: true });
-            fillPortalForm(res.values);
-            Toast.success('Portal settings saved', 'Restart the file portal to apply them.');
+            const res = await window.API.put('/admin/portal/settings', readPortalForm(), { silent: true });
+            renderVolume(res.volume, res.portalRoot);
+            fillPortalForm(res);
+            Toast.success('Portal settings saved', 'The file portal applies them within seconds.');
         } catch (error) {
-            errorEl.textContent = error.message || 'Could not save the portal configuration.';
+            errorEl.textContent = error.message || 'Could not save the portal settings.';
             errorEl.hidden = false;
             updatePortalDirty();
         }
@@ -932,7 +957,7 @@ const Admin = (() => {
         if (!list) return;
         const shown = filterLogEntries(logState.entries, logState.level, logState.query);
         meta.textContent = !logState.available
-            ? `File portal is not linked: ${logState.reason || 'PORTAL_ROOT is not usable.'}`
+            ? `File portal log is not linked: ${logState.reason || 'PORTAL_LOG_FILE is not usable.'}`
             : `${shown.length} of ${logState.entries.length} most recent entries`;
 
         if (shown.length === 0) {

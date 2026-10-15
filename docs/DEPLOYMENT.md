@@ -81,6 +81,39 @@ Identity controls added by ADR-009 / `admin-identity-and-access-control` (phase 
 | `AFM_LOGIN_RATE_LIMIT_PER_MINUTE` | no | `10` | Per-IP login attempts per minute, independent of the write/read buckets above. |
 | `AFM_BOOTSTRAP_ADMIN_USERNAME` | **together with the password below, only if no admin account exists yet** | *(unset)* | Creates the first admin account on boot. An unset pair is not an error — the admin panel is simply unreachable until one is set and the service restarted. Setting only one of the pair **refuses startup**. |
 | `AFM_BOOTSTRAP_ADMIN_PASSWORD` | see above | *(unset)* | At least 8 characters, or startup is refused. Never printed to stdout, never logged. The admin database file lives in `AFM_DATA_DIR`, alongside `metadata.json`/`settings.json` — back it up the same way. |
+| `PORTAL_LOG_FILE` | no | *(unset)* | Absolute path of the File Portal's trace log (the portal's `LOG_FILE`). Enables Admin → Logs → File portal. `PORTAL_ROOT` is retired and ignored (ADR-010). |
+
+### File portal link (ADR-010)
+
+The File Portal reads `admin.sqlite` read-only. The two services share **logical** values only, so
+the storage, the release folder and either service's releases may live anywhere:
+
+- **Storage identity.** On first start this service writes `STORAGE_ROOT/.dimension-volume` (a
+  UUID, also stored in `admin.sqlite`). The marker is hidden and unreachable through the API.
+  **Back it up with the storage**, and never copy it into another storage root.
+- **Any folder as portal root, nothing to configure.** The portal's `FILES_ROOT` may be the storage
+  or any folder in it, mounted anywhere. Example: this service's `STORAGE_ROOT=C:\Users\eleven`, the
+  portal's `FILES_ROOT=C:\Users\eleven\Downloads`. The portal climbs to the storage marker, finds it
+  is the admin folder `/Downloads` (it logs `FILES_ROOT is the admin folder /Downloads`), and
+  decides every path as `/Downloads/…`. Policies on `/Downloads` and on `/` apply there too, and a
+  policy on `/docs` does not. Several portals may serve different folders of one storage at once.
+- **Portal folder (optional).** Only for a portal host that cannot see the storage root, such as a
+  container or share that mounts just `Downloads`. Set **Portal folder** to `/Downloads` in Admin →
+  File portal; this service writes a marker into that folder naming it, which such a host trusts.
+  Rename the folder only through the API (the stored path follows it).
+- **Recovery** when Admin → File portal reports the marker `missing`: first make sure `STORAGE_ROOT`
+  points at the real storage. Then recreate it with the id shown there:
+  `printf '{"volumeId":"<id>","clientPath":"/"}\n' > "$STORAGE_ROOT/.dimension-volume"` (owner
+  `dimension`, mode `0640`). The portal-root marker is restored automatically once this one is. `mismatch` means `STORAGE_ROOT` holds another volume's marker: fix the path, do not edit
+  the marker. `unwritable` means the root is read-only: make it writable and restart.
+- **Release folder and portal sign-in limits** are set in Admin → File portal. The portal applies
+  them within its sync interval, with no restart.
+- **A release disk elsewhere:** bind-mount it inside the storage
+  (`mount --bind /mnt/releases /srv/dimension/storage/release`) and select that folder. A symlink
+  or a Windows junction is refused by both services' containment checks.
+- **Upgrade order:** portal first (it accepts admin schema v4 and v5), then this service (migration
+  5, writes the marker), then set and lock the release folder, then remove `RELEASE_PVM` (portal)
+  and `PORTAL_ROOT` (here).
 
 - **Precedence:** a variable already in the process environment always wins. `dotenv` only fills
   unset variables, so a stray `.env` in a working directory can never override the `EnvironmentFile`.
