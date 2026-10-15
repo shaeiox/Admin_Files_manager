@@ -164,12 +164,13 @@ describe('getTreeStats - directory sizes are never accumulated', () => {
 });
 
 describe('getTreeStats - symbolic links and junctions', () => {
-    const isWindows = process.platform === 'win32';
     // On Windows symlink('file') needs elevation (EPERM) but symlink('junction')
-    // succeeds unelevated, so junction is what actually runs here.
+    // succeeds unelevated, so junction is what actually runs here. Elsewhere Node
+    // ignores the type and makes a plain directory symlink - these used to be
+    // Windows-only, which left the Linux deployment target uncovered.
     const link = (target, at) => fs.symlinkSync(target, at, 'junction');
 
-    test('a junction to an outside directory is not traversed', { skip: !isWindows }, async () => {
+    test('a junction to an outside directory is not traversed', async () => {
         const outside = path.join(TMP, `outside-${seq++}`);
         fs.mkdirSync(path.join(outside, 'deep'), { recursive: true });
         fs.writeFileSync(path.join(outside, 'secret.txt'), 'S'.repeat(5000));
@@ -185,7 +186,7 @@ describe('getTreeStats - symbolic links and junctions', () => {
         assert.ok(s.skippedLinks >= 1, 'link detected and skipped');
     });
 
-    test('readdir reports the junction as a link while stat follows it', { skip: !isWindows }, () => {
+    test('readdir reports the junction as a link while stat follows it', () => {
         const outside = path.join(TMP, `outside-stat-${seq++}`);
         fs.mkdirSync(outside, { recursive: true });
         const root = freshRoot();
@@ -198,7 +199,7 @@ describe('getTreeStats - symbolic links and junctions', () => {
             'stat follows it - this is why classification must not use stat');
     });
 
-    test('a link cycle to an ancestor terminates and is skipped', { skip: !isWindows }, async () => {
+    test('a link cycle to an ancestor terminates and is skipped', async () => {
         const root = freshRoot();
         const inner = path.join(root, 'inner');
         fs.mkdirSync(inner, { recursive: true });
@@ -211,7 +212,7 @@ describe('getTreeStats - symbolic links and junctions', () => {
         assert.ok(s.skippedLinks >= 1, 'cycle link skipped, never descended');
     });
 
-    test('a broken link is skipped without error', { skip: !isWindows }, async () => {
+    test('a broken link is skipped without error', async () => {
         const root = freshRoot();
         writeFile(root, 'ok.txt', 'ab');
         link(path.join(root, 'does-not-exist'), path.join(root, 'broken'));
@@ -222,7 +223,7 @@ describe('getTreeStats - symbolic links and junctions', () => {
         assert.deepEqual(s.errors, [], 'a broken link is not an error');
     });
 
-    test('a link name never appears in the results', { skip: !isWindows }, async () => {
+    test('a link name never appears in the results', async () => {
         const outside = path.join(TMP, `outside-name-${seq++}`);
         fs.mkdirSync(outside, { recursive: true });
         const root = freshRoot();
