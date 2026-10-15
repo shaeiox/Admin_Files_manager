@@ -114,9 +114,9 @@
     "semantic_hash": ""
   },
   "src/services/MetadataService.js": {
-    "mtime": 1792091259.8069243,
-    "seen": 1792095697.8935597,
-    "ast_hash": "87c0546db51353e6843eb617e09f1b35",
+    "mtime": 1792096572.028131,
+    "seen": 1792096701.0839329,
+    "ast_hash": "c682340c97a47a926cae52a4446ea347",
     "semantic_hash": ""
   },
   "src/services/PathService.js": {
@@ -408,9 +408,9 @@
     "semantic_hash": "6f72ba4f8d01347aabdf0261fa963963"
   },
   "docs/CONTRACTS.md": {
-    "mtime": 1792087124.2132468,
-    "seen": 1792095697.8940327,
-    "ast_hash": "a99ce698ed4ef8d9028eb732d707097f",
+    "mtime": 1792096650.1093848,
+    "seen": 1792096701.0843282,
+    "ast_hash": "02a9d8e42456c90f1bb64e8986bc943f",
     "semantic_hash": ""
   },
   "docs/REPO_MAP.md": {
@@ -540,9 +540,9 @@
     "semantic_hash": ""
   },
   "test/services/MetadataService.test.js": {
-    "mtime": 1792091136.4301524,
-    "seen": 1792095697.893746,
-    "ast_hash": "c65130efe089ddb18463e98ef39035be",
+    "mtime": 1792096568.4110167,
+    "seen": 1792096701.0840943,
+    "ast_hash": "37b13db9a33088ed2de8d3640ad6e3a8",
     "semantic_hash": ""
   },
   "test/services/PathService.test.js": {
@@ -1236,9 +1236,9 @@
     "semantic_hash": ""
   },
   "docs/DEPLOYMENT.md": {
-    "mtime": 1792091654.5578287,
-    "seen": 1792095697.8940384,
-    "ast_hash": "7f576268dde837c3711a414c091c6fed",
+    "mtime": 1792096661.4062922,
+    "seen": 1792096701.0843334,
+    "ast_hash": "08b3906696e75e1d77d2933a27d9f116",
     "semantic_hash": ""
   },
   "docs/decisions/ADR-008-production-deployment.md": {
@@ -1560,9 +1560,9 @@
     "semantic_hash": ""
   },
   "src/controllers/auth.controller.js": {
-    "mtime": 1792001810.162048,
-    "seen": 1792002386.060381,
-    "ast_hash": "840f2605e412a73a6d3c75fe7f674ad3",
+    "mtime": 1792096640.1890812,
+    "seen": 1792096701.08383,
+    "ast_hash": "e102a98ec10657ac6f26fc88ce619757",
     "semantic_hash": ""
   },
   "src/controllers/filePolicy.controller.js": {
@@ -1686,9 +1686,9 @@
     "semantic_hash": ""
   },
   "test/api/auth.contract.test.js": {
-    "mtime": 1791904626.7204728,
-    "seen": 1791955531.9549692,
-    "ast_hash": "73d90cc6d277e4d54a12f85b01ca07f3",
+    "mtime": 1792096639.8078513,
+    "seen": 1792096701.0839732,
+    "ast_hash": "d0f5d24a984e2cc090072020a107f206",
     "semantic_hash": ""
   },
   "test/db/schema.test.js": {
@@ -2076,15 +2076,15 @@
     "semantic_hash": ""
   },
   "src/services/PortalService.js": {
-    "mtime": 1792087124.2969873,
-    "seen": 1792095697.8935692,
-    "ast_hash": "54aa23329d6e3dd56de8ae5e029ba319",
+    "mtime": 1792096549.1221402,
+    "seen": 1792096701.083941,
+    "ast_hash": "b59444f9d8600bcb97133c6addf01257",
     "semantic_hash": ""
   },
   "test/api/system.contract.test.js": {
-    "mtime": 1792087124.2969873,
-    "seen": 1792095697.8936422,
-    "ast_hash": "d32fcb71a9bf43a9e77634a42044af6f",
+    "mtime": 1792096539.173766,
+    "seen": 1792096701.0839972,
+    "ast_hash": "26f746e29add00a644c6d2dee53cceca",
     "semantic_hash": ""
   },
   "src/controllers/groups.controller.js": {

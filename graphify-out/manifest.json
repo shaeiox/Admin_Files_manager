@@ -72,9 +72,9 @@
     "semantic_hash": ""
   },
   "server.js": {
-    "mtime": 1792091751.8253167,
-    "seen": 1792095697.89343,
-    "ast_hash": "3a97d0d788d9b88bfaed22326088f5ac",
+    "mtime": 1792097473.609118,
+    "seen": 1792097601.692398,
+    "ast_hash": "462de1b3a884d05b95aeaa0314bb7185",
     "semantic_hash": ""
   },
   "skills-lock.json": {
@@ -84,9 +84,9 @@
     "semantic_hash": ""
   },
   "src/config/env.js": {
-    "mtime": 1792001810.162048,
-    "seen": 1792002386.0603788,
-    "ast_hash": "a1a41ce8ff8f2aa1d2ec76560e11ab4b",
+    "mtime": 1792097473.592451,
+    "seen": 1792097601.6924093,
+    "ast_hash": "a083ffc2233249db5f92bbd953e8e2b0",
     "semantic_hash": ""
   },
   "src/controllers/fs.controller.js": {
@@ -108,9 +108,9 @@
     "semantic_hash": ""
   },
   "src/services/FileSystemService.js": {
-    "mtime": 1792002971.4980278,
-    "seen": 1792006867.7653978,
-    "ast_hash": "50cbd0d892bf95faad297b5f6194b925",
+    "mtime": 1792097034.3929064,
+    "seen": 1792097601.692522,
+    "ast_hash": "efa2863927d8e5c789f7d724a171f5d5",
     "semantic_hash": ""
   },
   "src/services/MetadataService.js": {
@@ -120,9 +120,9 @@
     "semantic_hash": ""
   },
   "src/services/PathService.js": {
-    "mtime": 1792087124.2783382,
-    "seen": 1792095697.893563,
-    "ast_hash": "7ec35d8c2ca18f1557a0b62d7acb5433",
+    "mtime": 1792097004.6415548,
+    "seen": 1792097601.6925302,
+    "ast_hash": "1d6a009efc6a8cd0eddc634e2ad92fe7",
     "semantic_hash": ""
   },
   "src/utils/AppError.js": {
@@ -408,9 +408,9 @@
     "semantic_hash": "6f72ba4f8d01347aabdf0261fa963963"
   },
   "docs/CONTRACTS.md": {
-    "mtime": 1792096650.1093848,
-    "seen": 1792096701.0843282,
-    "ast_hash": "02a9d8e42456c90f1bb64e8986bc943f",
+    "mtime": 1792097289.7029452,
+    "seen": 1792097601.6930494,
+    "ast_hash": "c8f8dff75131cb9e1e2336e69439933b",
     "semantic_hash": ""
   },
   "docs/REPO_MAP.md": {
@@ -546,9 +546,9 @@
     "semantic_hash": ""
   },
   "test/services/PathService.test.js": {
-    "mtime": 1792095314.9962454,
-    "seen": 1792095697.8937485,
-    "ast_hash": "7e372341229c2451cf3c627b4ff44702",
+    "mtime": 1792096989.407825,
+    "seen": 1792097601.6927185,
+    "ast_hash": "06951808bf2412f03e743a9be891cfcd",
     "semantic_hash": ""
   },
   "docs/decisions/ADR-002-dashboard-data-architecture.md": {
@@ -1344,9 +1344,9 @@
     "semantic_hash": ""
   },
   "test/api/fs.symlink.test.js": {
-    "mtime": 1791904626.7234726,
-    "seen": 1791955531.9549832,
-    "ast_hash": "d464d79af2e44ad164d422f757ba49a4",
+    "mtime": 1792097056.0588353,
+    "seen": 1792097601.69259,
+    "ast_hash": "f995ac0728610e6f9c3b13960de1a2af",
     "semantic_hash": ""
   },
   "test/api/header-hygiene.test.js": {
@@ -1374,9 +1374,9 @@
     "semantic_hash": ""
   },
   "test/config/env.test.js": {
-    "mtime": 1791904626.7292223,
-    "seen": 1791955531.9550054,
-    "ast_hash": "edeb9b599ec799e44d929016b652abec",
+    "mtime": 1792097458.3035576,
+    "seen": 1792097601.6926203,
+    "ast_hash": "ab9c8a5079f4df38f595a6456dee8606",
     "semantic_hash": ""
   },
   "test/integration/csp.test.js": {
@@ -1542,9 +1542,9 @@
     "semantic_hash": ""
   },
   "scripts/nginx/README.md": {
-    "mtime": 1792091724.2310627,
-    "seen": 1792095697.8945727,
-    "ast_hash": "e547c8fc633bca0b1cd179cfdcbf3d4e",
+    "mtime": 1792096884.2395642,
+    "seen": 1792097601.6935887,
+    "ast_hash": "3e5f5efad70b7d671f84091a7d1c845a",
     "semantic_hash": ""
   },
   "public/assets/js/admin.js": {
@@ -1614,9 +1614,9 @@
     "semantic_hash": ""
   },
   "src/db/repositories/UserRepository.js": {
-    "mtime": 1791904626.7094786,
-    "seen": 1791955531.9548995,
-    "ast_hash": "6e734240d0071fdddd97eedccb72bcc9",
+    "mtime": 1792097271.6454322,
+    "seen": 1792097601.6924658,
+    "ast_hash": "12e68c8a86e83af74e6c7cd3ac734ff5",
     "semantic_hash": ""
   },
   "src/db/schema.js": {
@@ -1626,9 +1626,9 @@
     "semantic_hash": ""
   },
   "src/middlewares/authenticate.js": {
-    "mtime": 1791904626.7114842,
-    "seen": 1791955531.9549038,
-    "ast_hash": "bd0f33f8ff196c37d04078ee6060ddc9",
+    "mtime": 1792097098.5707664,
+    "seen": 1792097601.6924722,
+    "ast_hash": "7bf61ead75d938359fdd4e02b8b467df",
     "semantic_hash": ""
   },
   "src/middlewares/csrf.js": {
@@ -1656,27 +1656,27 @@
     "semantic_hash": ""
   },
   "src/services/FileAccessPolicyService.js": {
-    "mtime": 1792084540.7070253,
-    "seen": 1792095697.89355,
-    "ast_hash": "71298636334a2a29f5c598e82e2d82d1",
+    "mtime": 1792097404.0659106,
+    "seen": 1792097601.692519,
+    "ast_hash": "3a31299d84d80059ba060cbc4fff29be",
     "semantic_hash": ""
   },
   "src/services/SessionService.js": {
-    "mtime": 1791904626.7174819,
-    "seen": 1791955531.9549448,
-    "ast_hash": "c394f86690862078eb52b4385a46507c",
+    "mtime": 1792097337.9703965,
+    "seen": 1792097601.6925433,
+    "ast_hash": "f8541fd608a59f6732b980fd1e18fedf",
     "semantic_hash": ""
   },
   "src/services/UserService.js": {
-    "mtime": 1791904626.718477,
-    "seen": 1791955531.9549522,
-    "ast_hash": "8a91f2770e62205d6da67eed0973d065",
+    "mtime": 1792097205.6217968,
+    "seen": 1792097601.692552,
+    "ast_hash": "f0186690071e993c7487de199940dcd4",
     "semantic_hash": ""
   },
   "src/utils/crypto.js": {
-    "mtime": 1791904626.718477,
-    "seen": 1791955531.9549596,
-    "ast_hash": "2e99874db4210a29d0b3ed17aaf273ff",
+    "mtime": 1792097098.5707664,
+    "seen": 1792097601.6925611,
+    "ast_hash": "4ea4752b83a61a0b1fb3bb9d4c1194c0",
     "semantic_hash": ""
   },
   "test/api/admin.contract.test.js": {
@@ -1686,9 +1686,9 @@
     "semantic_hash": ""
   },
   "test/api/auth.contract.test.js": {
-    "mtime": 1792096639.8078513,
-    "seen": 1792096701.0839732,
-    "ast_hash": "d0f5d24a984e2cc090072020a107f206",
+    "mtime": 1792097073.2705517,
+    "seen": 1792097601.6925745,
+    "ast_hash": "b3c8aac349ba399773884e675e4e8a27",
     "semantic_hash": ""
   },
   "test/db/schema.test.js": {
@@ -1716,9 +1716,9 @@
     "semantic_hash": ""
   },
   "test/services/FileAccessPolicyService.test.js": {
-    "mtime": 1792010011.7609358,
-    "seen": 1792095697.8937225,
-    "ast_hash": "e7621f86e52779e97ccc3115787af382",
+    "mtime": 1792097384.1683002,
+    "seen": 1792097601.692687,
+    "ast_hash": "b4037300983cd074364dcb76aef1f069",
     "semantic_hash": ""
   },
   "test/services/FileSystemService.copy.test.js": {
@@ -1734,15 +1734,15 @@
     "semantic_hash": ""
   },
   "test/services/SessionService.test.js": {
-    "mtime": 1791904626.7427945,
-    "seen": 1791955531.9550884,
-    "ast_hash": "e7250ca73c71dbf25b0cf1d7ab76bd37",
+    "mtime": 1792097323.1437924,
+    "seen": 1792097601.6927216,
+    "ast_hash": "7ad9ce343eb3bd1bbf5d3f6bd49ba71b",
     "semantic_hash": ""
   },
   "test/services/UserService.test.js": {
-    "mtime": 1791904626.7427945,
-    "seen": 1791955531.9550903,
-    "ast_hash": "d4b9a61557247ded25b60206a82b6f58",
+    "mtime": 1792097248.601204,
+    "seen": 1792097601.6927247,
+    "ast_hash": "61408d88f890884e1e4edf1e8b96c964",
     "semantic_hash": ""
   },
   "docs/decisions/ADR-009-admin-identity-and-file-access-policies.md": {
@@ -2064,9 +2064,9 @@
     "semantic_hash": ""
   },
   "docs/DATABASE.md": {
-    "mtime": 1792091751.8659675,
-    "seen": 1792095697.894035,
-    "ast_hash": "f4aa3148748bcf41c5aa84726ff5177a",
+    "mtime": 1792097420.8359747,
+    "seen": 1792097601.6930528,
+    "ast_hash": "735bf83ee1a780845e1de5ef92e7f269",
     "semantic_hash": ""
   },
   "src/controllers/system.controller.js": {
