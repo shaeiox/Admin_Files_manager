@@ -3,6 +3,7 @@
 
 const fs = require('fs/promises');
 const path = require('path');
+const { randomUUID } = require('node:crypto');
 const AppError = require('../utils/AppError');
 const { resolveDataDir } = require('../config/dataDir');
 
@@ -54,6 +55,9 @@ class MetadataService {
         // Under AFM_DATA_DIR (default <cwd>/data) - outside every release in production.
         this.dbPath = path.join(resolveDataDir(), 'metadata.json');
         this.cache = null; // In-memory cache to avoid excessive disk reads
+        // Write queue: overlapping _write calls are chained through here so only
+        // one staged write touches the store directory at a time.
+        this._writeQueue = Promise.resolve();
     }
 
     /**
@@ -88,7 +92,15 @@ class MetadataService {
      */
     async _read() {
         if (this.cache) return this.cache;
+        // Concurrent cold reads share one load: separate loads would each install
+        // their own object, and a mutation made on the losing copy is silently lost.
+        if (!this._loading) {
+            this._loading = this._load().finally(() => { this._loading = null; });
+        }
+        return this._loading;
+    }
 
+    async _load() {
         try {
             const data = await fs.readFile(this.dbPath, 'utf8');
             // Normalised, never stored raw: the file on disk may be hand-edited
@@ -111,16 +123,39 @@ class MetadataService {
     /**
      * Writes data to the JSON file atomically to prevent corruption.
      * Uses a temporary file and renames it (atomic operation on most OS).
+     *
+     * Concurrency: mutators are unlocked read-modify-write and most call sites
+     * are fire-and-forget, so writes routinely overlap. Two writers sharing one
+     * fixed temp name could truncate each other's staged bytes (leaving an
+     * invalid document for the next cold read) or race the rename - the second
+     * rename then fails ENOENT, which was observed live as a 500 on
+     * POST /api/fs/star. Every write is therefore chained through a per-store
+     * promise queue (file-level mutual exclusion) and stages to a unique temp
+     * name (no shared file another writer or a crashed predecessor can claim).
+     * A failed write rejects its own caller but never wedges the queue.
      */
     async _write(data) {
-        const tempPath = `${this.dbPath}.tmp`;
+        const run = this._writeQueue.then(() => this._writeOnce(data));
+        this._writeQueue = run.then(() => { }, () => { });
+        return run;
+    }
+
+    /** One staged write: unique temp name, atomic rename, cache updated last. */
+    async _writeOnce(data) {
+        const tempPath = `${this.dbPath}.${randomUUID()}.tmp`;
         const jsonString = JSON.stringify(data, null, 2);
 
-        // Write to temp file first
-        await fs.writeFile(tempPath, jsonString, 'utf8');
+        try {
+            // Write to temp file first
+            await fs.writeFile(tempPath, jsonString, 'utf8');
 
-        // Rename temp file to actual DB file (Atomic swap)
-        await fs.rename(tempPath, this.dbPath);
+            // Rename temp file to actual DB file (Atomic swap)
+            await fs.rename(tempPath, this.dbPath);
+        } catch (error) {
+            // A failed write must not leave a staging file behind.
+            await fs.rm(tempPath, { force: true }).catch(() => { });
+            throw error;
+        }
 
         // Update cache
         this.cache = data;

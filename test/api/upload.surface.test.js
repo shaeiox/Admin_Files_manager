@@ -296,6 +296,12 @@ describe('an unset environment selector discloses nothing', () => {
         const childPort = await freePort();
         const env = { ...process.env, STORAGE_ROOT: ROOT, PORT: String(childPort), DOTENV_CONFIG_QUIET: 'true' };
         delete env.NODE_ENV;
+        // The parent's dotenv loaded the repository .env into process.env, so
+        // AFM_DATA_DIR would otherwise be inherited and point the child at the
+        // REAL admin.sqlite (where a store migrated by a newer schema refuses
+        // this release's boot). Unset it: the child must resolve its own data
+        // dir under cwd like the rest of this test's isolation.
+        delete env.AFM_DATA_DIR;
         // cwd is the temp dir: no .env is found there (so nothing sets NODE_ENV),
         // and the metadata store resolves under it, not under the repository.
         const child = spawn(process.execPath, [path.join(REPO_DIR, 'server.js')], {

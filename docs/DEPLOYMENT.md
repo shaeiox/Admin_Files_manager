@@ -116,6 +116,10 @@ Run these as root. Replace `files.example.internal`, the certificate paths and t
    PORT=3000
    ```
    Then check that `find /etc/dimension -perm -o+r` prints nothing.
+   Optional file-portal link: add `PORTAL_ROOT=/var/www/html/files-server-web` and let this
+   service write that one file (it is rewritten in place, so owner and mode are kept):
+   `chgrp dimension /var/www/html/files-server-web/.env && chmod 0660 /var/www/html/files-server-web/.env`.
+   The unit's `ReadWritePaths` names that path; edit both if the portal lives elsewhere.
 5. **Deploy script and restart right.**
    ```bash
    install -m 0755 scripts/deploy.sh /opt/dimension/bin/deploy.sh
@@ -125,8 +129,9 @@ Run these as root. Replace `files.example.internal`, the certificate paths and t
 6. **systemd.** `install -m 0644 scripts/systemd/dimension.service /etc/systemd/system/`, then
    `systemd-analyze verify /etc/systemd/system/dimension.service`, then `systemctl daemon-reload` and
    `systemctl enable dimension`. Don't start it yet; `current` doesn't exist.
-7. **nginx.** Install `scripts/nginx/dimension.conf` into `sites-available`, link it into
-   `sites-enabled`, and set `server_name` and the certificate. **Always run `nginx -t` before
+7. **nginx.** Install `scripts/nginx/cloudavid.conf` into `sites-available`, link it into
+   `sites-enabled`, and set `server_name` and the certificate (full procedure, including the
+   two-domain layout and htpasswd gate: `scripts/nginx/README.md`). **Always run `nginx -t` before
    `systemctl reload nginx`.**
 8. **Firewall: deny by default.** Add the SSH rule **before** enabling enforcement:
    ```bash

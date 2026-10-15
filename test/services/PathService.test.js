@@ -267,7 +267,12 @@ test('6. nested escape to a sibling prefix is rejected', () => {
 // 7. Verdicts are invariant across Windows root spellings
 // ---------------------------------------------------------------------------
 
-test('7. containment verdicts are identical across five Windows root spellings', () => {
+// Node's `path` module is platform-specific: the Windows spellings below only
+// have Windows semantics on Windows. On POSIX, 'D:\download' is a relative
+// name, so this case verifies nothing there - the POSIX equivalent is case 8.
+test('7. containment verdicts are identical across five Windows root spellings',
+    { skip: process.platform === 'win32' ? false : 'Windows path semantics; the POSIX case is test 8' },
+    () => {
     const base = WINDOWS_ROOT_SPELLINGS[0];
     const cases = [
         { clientPath: '/', expected: 'allow' },

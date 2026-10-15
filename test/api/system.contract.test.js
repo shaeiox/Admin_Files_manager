@@ -113,6 +113,19 @@ test('PUT /admin/portal/config rewrites lines in place and keeps everything else
     assert.equal(text.match(/AUTH_SESSION_MINUTES=/g).length, 1);
 });
 
+test('PUT /admin/portal/config keeps the .env file itself (owner and mode guard AUTH_JWT_SECRET)', async () => {
+    // A temp-then-rename swapped in a new inode at umask mode: the secret-bearing
+    // file lost its 0640 and became world-readable on Linux.
+    const file = path.join(PORTAL, '.env');
+    if (process.platform !== 'win32') fs.chmodSync(file, 0o640);
+    const before = fs.statSync(file);
+    assert.equal((await send('PUT', '/api/v1/admin/portal/config', VALID)).status, 200);
+    const after = fs.statSync(file);
+    assert.equal(after.ino, before.ino, 'rewritten in place, not replaced');
+    if (process.platform !== 'win32') assert.equal(after.mode & 0o777, 0o640);
+    assert.deepEqual(fs.readdirSync(PORTAL).sort(), ['.env', 'data'], 'no staging file left beside it');
+});
+
 test('PUT /admin/portal/config refuses invalid, unknown and multi-line values with 400', async () => {
     for (const bad of [
         { ...VALID, AUTH_ENABLED: 'yes' },

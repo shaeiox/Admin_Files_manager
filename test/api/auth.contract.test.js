@@ -138,6 +138,17 @@ describe('POST /api/v1/auth/login', () => {
         assert.match(setCookie, /SameSite=Lax/);
     });
 
+    test('the cookie is Secure exactly when the request arrived over https (X-Forwarded-Proto from nginx)', async () => {
+        // Secure used to follow NODE_ENV, which the systemd unit pins to
+        // production: behind the plain-HTTP nginx config the browser dropped the
+        // cookie and login looped.
+        const creds = { username: BOOTSTRAP_USERNAME, password: BOOTSTRAP_PASSWORD };
+        const https = await sendJson('POST', '/api/v1/auth/login', creds, { 'X-Forwarded-Proto': 'https' });
+        const http = await sendJson('POST', '/api/v1/auth/login', creds, { 'X-Forwarded-Proto': 'http' });
+        assert.match((https.headers['set-cookie'] || []).join(';'), /;\s*Secure/);
+        assert.doesNotMatch((http.headers['set-cookie'] || []).join(';'), /Secure/);
+    });
+
     test('the session cookie authenticates a subsequent request', async () => {
         const auth = await authLogin(port);
         const res = await send('GET', '/api/v1/fs/list?path=/', { headers: { Cookie: auth.headers.Cookie } });

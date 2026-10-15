@@ -316,14 +316,17 @@ Shape: `docs/CONTRACTS.md` → *Data Schemas* → `data/metadata.json`. In short
 - **Owner:** `MetadataService` (instance singleton; `dbPath`, in-memory `cache`).
 - **Read:** first access loads and caches the whole document; a missing file is created with empty
   defaults; a corrupt or unreadable one throws `AppError(500)` and is not repaired.
-- **Write:** every mutation rewrites the whole document to `metadata.json.tmp` and renames it over
-  the original (atomic replace on one volume). No `fsync`.
+- **Write:** every mutation rewrites the whole document to a uniquely named staging file
+  (`metadata.json.<uuid>.tmp`) and renames it over the original (atomic replace on one volume).
+  Writes are serialized through a per-instance promise queue, so overlapping mutations never
+  interleave on disk (each stages to its own temp name; one write at a time). No `fsync`.
 - **Consistency:** eventually consistent and best-effort (AGENTS.md rule 7). Callers fire and
   forget (`.catch(() => {})`); a failed metadata write never fails the file operation.
 - **Path hooks:** `renamePath` / `deletePath` migrate or drop entries for the exact path.
-- **Known defects:** concurrent writers share one fixed `.tmp` name; the cache is mutated before
-  the write, so a failed write leaves memory ahead of disk; folder rename/delete orphans entries
-  for descendants; `downloads` keys are never pruned.
+- **Known defects:** the cache is mutated before the write, so a failed write leaves memory ahead
+  of disk; folder rename/delete orphans entries for descendants; `downloads` keys are never
+  pruned. (The former concurrent-writer `.tmp` collision is fixed: writes serialize through a
+  promise queue with unique staging names; pinned by `test/services/MetadataService.test.js`.)
 
 ## Settings store — `settings.json`
 

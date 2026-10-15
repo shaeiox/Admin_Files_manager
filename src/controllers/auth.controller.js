@@ -8,7 +8,7 @@ const { SESSION_COOKIE } = require('../middlewares/authenticate');
 
 const SESSION_TTL_SECONDS = 24 * 60 * 60;
 
-function setSessionCookie(res, token) {
+function setSessionCookie(req, res, token) {
     const parts = [
         `${SESSION_COOKIE}=${encodeURIComponent(token)}`,
         'Path=/',
@@ -16,7 +16,11 @@ function setSessionCookie(res, token) {
         'SameSite=Lax',
         `Max-Age=${SESSION_TTL_SECONDS}`,
     ];
-    if (config.env === 'production') parts.push('Secure');
+    // Follows the real scheme (X-Forwarded-Proto via `trust proxy`), not NODE_ENV:
+    // systemd pins production, and a Secure cookie on a plain-HTTP origin is
+    // dropped by the browser - login then loops. Both shipped nginx configs set
+    // X-Forwarded-Proto, so TLS deployments still get Secure.
+    if (req.secure) parts.push('Secure');
     res.setHeader('Set-Cookie', parts.join('; '));
 }
 
@@ -41,7 +45,7 @@ function login(req, res, next) {
         });
         if (!result.ok) throw new AppError('Invalid username or password.', 401);
 
-        setSessionCookie(res, result.token);
+        setSessionCookie(req, res, result.token);
         return res.json({
             success: true,
             user: { id: result.user.id, username: result.user.username, role: result.user.role },

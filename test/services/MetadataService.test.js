@@ -312,3 +312,118 @@ describe('Fire-and-forget contract (AGENTS.md rule 7)', () => {
         svc.dbPath = goodPath;
     });
 });
+
+describe('Concurrent writes are serialized (the _write race)', () => {
+    // Regression: _write used one fixed `${dbPath}.tmp` for every staged write.
+    // Overlapping writes (a fire-and-forget incrementDownload racing an awaited
+    // toggleStar, as in POST /fs/download-zip followed by POST /fs/star) shared
+    // that file: one rename consumed it and the other failed ENOENT - observed
+    // live as a 500 on the star request under parallel test load. Writes are
+    // now chained through a per-store promise queue and stage to a unique temp
+    // name. These tests pin both properties deterministically.
+
+    let tmp;
+
+    before(() => {
+        tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'afm-metadata-conc-'));
+    });
+
+    after(async () => {
+        await fsp.rm(tmp, { recursive: true, force: true });
+    });
+
+    test('overlapping _write calls never touch the store directory at the same time, and each stages to its own temp name', async () => {
+        const dir = fs.mkdtempSync(path.join(tmp, 'conc-'));
+        const svc = freshInstance(path.join(dir, 'data'));
+        await svc._read();
+
+        const realWriteFile = fsp.writeFile;
+        const realRename = fsp.rename;
+        const stagedPaths = [];
+        let inFlight = 0;
+        let maxInFlight = 0;
+        const observe = async (op, args, record) => {
+            inFlight += 1;
+            maxInFlight = Math.max(maxInFlight, inFlight);
+            if (record) stagedPaths.push(args[0]);
+            try {
+                // A delay widens any overlap window to the whole timer tick.
+                await new Promise((r) => setTimeout(r, 5));
+                return await op(...args);
+            } finally {
+                inFlight -= 1;
+            }
+        };
+        fsp.writeFile = (...args) => observe(realWriteFile, args, true);
+        fsp.rename = (...args) => observe(realRename, args, false);
+        try {
+            await Promise.all([
+                svc.incrementDownload('/a.txt'),
+                svc.toggleStar('/b.png'),
+                svc.addActivity({ type: 'upload', action: 'U', target: 'b.png' }),
+                svc.incrementDownload('/c.txt'),
+                svc.toggleStar('/d.png'),
+            ]);
+        } finally {
+            fsp.writeFile = realWriteFile;
+            fsp.rename = realRename;
+        }
+
+        assert.equal(maxInFlight, 1, 'store writes are serialized, never interleaved');
+        assert.ok(stagedPaths.length >= 5, 'each write staged to its own temp file');
+        assert.equal(new Set(stagedPaths).size, stagedPaths.length, 'every temp name is unique');
+    });
+
+    test('a storm of concurrent mutations lands every mutation in the store', async () => {
+        const dir = fs.mkdtempSync(path.join(tmp, 'conc-'));
+        const svc = freshInstance(path.join(dir, 'data'));
+        await svc._read();
+
+        await Promise.all([
+            ...Array.from({ length: 10 }, (_, i) => svc.incrementDownload(`/d${i}.txt`)),
+            ...Array.from({ length: 10 }, (_, i) => svc.toggleStar(`/s${i}.txt`)),
+            ...Array.from({ length: 5 }, (_, i) => svc.addActivity({ type: 'upload', action: 'A', target: `a${i}` })),
+        ]);
+
+        const raw = JSON.parse(await fsp.readFile(svc.dbPath, 'utf8'));
+        assert.equal(Object.keys(raw.downloads).length, 10, 'every download persisted');
+        assert.equal(raw.starred.length, 10, 'every star persisted');
+        assert.equal(raw.activities.length, 5, 'every activity persisted');
+
+        const litter = (await fsp.readdir(path.dirname(svc.dbPath))).filter((f) => f !== 'metadata.json');
+        assert.deepEqual(litter, [], 'no staging file left behind');
+    });
+
+    test('a rejected write does not wedge the queue for later writes', async () => {
+        const dir = fs.mkdtempSync(path.join(tmp, 'conc-'));
+        const svc = freshInstance(path.join(dir, 'data'));
+        await svc._read();
+        const goodPath = svc.dbPath;
+
+        // A missing parent directory makes the staged write fail.
+        const blocker = path.join(dir, 'blocked');
+        await fsp.writeFile(blocker, 'not a directory', 'utf8');
+        svc.dbPath = path.join(blocker, 'meta', 'metadata.json');
+        await assert.rejects(() => svc._write({ downloads: {}, starred: [], activities: [] }));
+
+        svc.dbPath = goodPath;
+        await svc.incrementDownload('/ok.txt');
+        const raw = JSON.parse(await fsp.readFile(goodPath, 'utf8'));
+        assert.equal(raw.downloads['/ok.txt'], 1, 'the queue processed the next write after a failure');
+    });
+
+    test('concurrent COLD mutations (empty cache, existing store) all land', async () => {
+        // Regression: each cold _read parsed its own copy and installed it as the
+        // cache, so a mutation made on the copy that lost the race was dropped.
+        const dir = fs.mkdtempSync(path.join(tmp, 'conc-'));
+        const seed = freshInstance(path.join(dir, 'data'));
+        await seed._read();
+        const svc = freshInstance(path.join(dir, 'data'));
+
+        await Promise.all([svc.incrementDownload('/a.txt'), svc.toggleStar('/b.txt')]);
+
+        const raw = JSON.parse(await fsp.readFile(svc.dbPath, 'utf8'));
+        assert.equal(raw.downloads['/a.txt'], 1);
+        assert.deepEqual(raw.starred, ['/b.txt']);
+    });
+});

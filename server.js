@@ -13,7 +13,7 @@ const apiRoutes = require('./src/routes/api');
 const app = express();
 
 /* ─── Proxy trust ─── */
-// The app runs behind a single nginx hop (scripts/nginx/dimension.conf sends
+// The app runs behind a single nginx hop (scripts/nginx/cloudavid.conf sends
 // X-Forwarded-For and terminates TLS). Trust exactly one hop so rate-limit
 // keying can use the forwarded client address without letting a caller spoof
 // extra hops. Keep this in step with the proxy deployment (ADR-008).
@@ -162,7 +162,7 @@ const server = app.listen(config.port, () => {
 // Timeouts are ORDERED (production-cicd-readiness D5) - keep them that way:
 //   application grace period   30 s   (here)            exits first
 //   systemd TimeoutStopSec     45 s   (scripts/systemd/dimension.service) > app, or systemd SIGKILLs a draining process
-//   nginx proxy_read_timeout  600 s   (scripts/nginx/dimension.conf)       > app, or the proxy severs a live request
+//   nginx proxy_read_timeout  600 s   (scripts/nginx/cloudavid.conf)       > app, or the proxy severs a live request
 const SHUTDOWN_GRACE_MS = 30000;
 
 function shutdown(signal) {

@@ -11,8 +11,9 @@ nginx host — a static portal and a proxied application.
 > ⚠ **The admin API is unauthenticated** (ADR-003): no login in the application
 > itself. `auth_basic` in the config is the only thing between the internet and
 > list/download/upload/delete of `STORAGE_ROOT`. Do not remove it until real
-> authentication lands in the app. `scripts/nginx/dimension.conf` is the generic
-> template with the same warning; this file is the concrete deployment.
+> authentication lands in the app. This file (`cloudavid.conf`) is the concrete
+> deployment; keep the warning in step with the app's posture (see
+> `docs/DEPLOYMENT.md`).
 
 Everything below runs **on the server, as root** (shown via `sudo`).
 

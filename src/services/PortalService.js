@@ -121,12 +121,16 @@ class PortalService {
         } catch (error) {
             if (error.code !== 'ENOENT') throw new AppError('The portal .env file could not be read.', 500);
         }
-        const tmp = `${file}.tmp`;
+        // Written IN PLACE, not temp-then-rename: a rename swaps in a new inode owned
+        // by this service at umask mode, so the portal's .env (which holds
+        // AUTH_JWT_SECRET) lost its owner/0640 and became world-readable. In place
+        // also needs write access to this one file only - the systemd unit grants
+        // exactly that, not the portal directory (ProtectSystem=strict).
+        // ponytail: a crash mid-write can truncate this small file; the operator
+        // re-saves from the admin page.
         try {
-            await fs.writeFile(tmp, PortalService.applyEnv(text, values), 'utf8');
-            await fs.rename(tmp, file);
+            await fs.writeFile(file, PortalService.applyEnv(text, values), { encoding: 'utf8', mode: 0o600 });
         } catch {
-            await fs.rm(tmp, { force: true });
             throw new AppError('The portal .env file could not be written.', 500);
         }
         return values;

@@ -249,7 +249,7 @@ Set-Cookie: afm_session=<token>; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400[;
 { "success": true, "user": { "id": 1, "username": "admin", "role": "admin" }, "csrfToken": "..." }
 ```
 
-- `Secure` is added only when `NODE_ENV=production`. The raw token is **only** in the cookie — the
+- `Secure` is added when the request arrived over https (`req.secure`, i.e. `X-Forwarded-Proto: https` from the one trusted nginx hop) — not by `NODE_ENV`, which systemd pins to production even behind the plain-HTTP test config. The raw token is **only** in the cookie — the
   body carries no token, so a Bearer client must read the cookie value.
 - Username matching is case-insensitive and trimmed.
 - `401 { "error": "Invalid username or password." }` for every failure: unknown user, wrong
