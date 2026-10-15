@@ -1,0 +1,143 @@
+{"t":"2026-10-15T17:06:29.692Z","level":"info","msg":"Portal started on port 4000 (auth true, admin gate on)"}
+{"t":"2026-10-15T17:06:31.365Z","level":"warn","msg":"\nShutting down file portal…"}
+{"t":"2026-10-15T17:17:55.383Z","level":"info","msg":"[admin-integration] FILES_ROOT is the admin folder /Downloads."}
+{"t":"2026-10-15T17:17:55.555Z","level":"info","msg":"Portal started on port 4000 (auth true, admin gate on)"}
+{"t":"2026-10-15T17:18:26.296Z","level":"warn","msg":"\nShutting down file portal…"}
+{"t":"2026-10-15T17:21:14.268Z","level":"info","msg":"[admin-integration] FILES_ROOT is the admin folder /Downloads."}
+{"t":"2026-10-15T17:21:14.464Z","level":"info","msg":"Portal started on port 4000 (auth true, admin gate on)"}
+{"t":"2026-10-15T17:21:38.787Z","level":"info","method":"GET","status":200,"url":"/","msg":"SPA"}
+{"t":"2026-10-15T17:21:38.980Z","level":"warn","method":"GET","status":403,"url":"/lib/idle-timer.js","msg":""}
+{"t":"2026-10-15T17:21:39.058Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 1ms"}
+{"t":"2026-10-15T17:21:39.333Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 111ms"}
+{"t":"2026-10-15T17:22:45.054Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 18ms"}
+{"t":"2026-10-15T17:22:45.195Z","level":"info","method":"GET","status":200,"url":"/api/releases","msg":"3 items · 82ms"}
+{"t":"2026-10-15T17:23:03.703Z","level":"warn","method":"GET","status":401,"url":"/api/files/release","msg":"policy locked · self"}
+{"t":"2026-10-15T17:23:05.357Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 0ms"}
+{"t":"2026-10-15T17:23:05.889Z","level":"info","method":"GET","status":200,"url":"/api/releases","msg":"0 items · 428ms"}
+{"t":"2026-10-15T17:23:08.390Z","level":"info","method":"GET","status":200,"url":"/download/release","msg":"SPA"}
+{"t":"2026-10-15T17:23:08.486Z","level":"warn","method":"GET","status":403,"url":"/lib/idle-timer.js","msg":""}
+{"t":"2026-10-15T17:23:08.566Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 0ms"}
+{"t":"2026-10-15T17:23:08.729Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 0ms"}
+{"t":"2026-10-15T17:23:08.768Z","level":"info","method":"GET","status":200,"url":"/api/releases","msg":"0 items · 28ms"}
+{"t":"2026-10-15T17:23:14.185Z","level":"warn","method":"GET","status":401,"url":"/api/files/release","msg":"policy locked · self"}
+{"t":"2026-10-15T17:23:15.594Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 0ms"}
+{"t":"2026-10-15T17:23:15.641Z","level":"info","method":"GET","status":200,"url":"/api/releases","msg":"0 items · 29ms"}
+{"t":"2026-10-15T17:23:53.333Z","level":"warn","method":"GET","status":401,"url":"/api/files/release","msg":"policy locked · self"}
+{"t":"2026-10-15T17:23:57.984Z","level":"warn","method":"POST","status":401,"url":"/api/auth/login","msg":"fail:test"}
+{"t":"2026-10-15T17:24:01.465Z","level":"info","method":"POST","status":200,"url":"/api/auth/login","msg":"login:admin"}
+{"t":"2026-10-15T17:24:01.474Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 3ms"}
+{"t":"2026-10-15T17:24:01.653Z","level":"info","method":"GET","status":200,"url":"/api/files/release","msg":"2 items"}
+{"t":"2026-10-15T17:24:01.666Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 1ms"}
+{"t":"2026-10-15T17:24:03.469Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 6ms"}
+{"t":"2026-10-15T17:24:03.551Z","level":"info","method":"GET","status":200,"url":"/api/releases","msg":"3 items · 74ms"}
+{"t":"2026-10-15T17:24:06.930Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 45ms"}
+{"t":"2026-10-15T17:24:08.526Z","level":"info","method":"GET","status":200,"url":"/api/files/release","msg":"2 items"}
+{"t":"2026-10-15T17:24:08.563Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 0ms"}
+{"t":"2026-10-15T17:24:10.624Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 1ms"}
+{"t":"2026-10-15T17:24:10.702Z","level":"info","method":"GET","status":200,"url":"/api/releases","msg":"3 items · 52ms"}
+{"t":"2026-10-15T17:24:11.990Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 1ms"}
+{"t":"2026-10-15T17:24:12.154Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 0ms"}
+{"t":"2026-10-15T17:24:12.187Z","level":"info","method":"GET","status":200,"url":"/api/releases","msg":"0 items · 29ms"}
+{"t":"2026-10-15T17:24:16.401Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 94ms"}
+{"t":"2026-10-15T17:24:19.244Z","level":"warn","method":"GET","status":401,"url":"/api/files/release","msg":"policy locked · self"}
+{"t":"2026-10-15T17:24:21.561Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 0ms"}
+{"t":"2026-10-15T17:24:21.603Z","level":"info","method":"GET","status":200,"url":"/api/releases","msg":"0 items · 28ms"}
+{"t":"2026-10-15T17:31:24.937Z","level":"warn","msg":"\nShutting down file portal…"}
+{"t":"2026-10-15T17:31:26.029Z","level":"warn","msg":"[admin-integration] ADMIN_STORAGE_ROOT is no longer used and is ignored (portal path a/b maps to admin client path /a/b)."}
+{"t":"2026-10-15T17:31:26.036Z","level":"info","msg":"[admin-integration] FILES_ROOT is the admin folder /Downloads."}
+{"t":"2026-10-15T17:31:26.081Z","level":"info","msg":"Portal started on port 4000 (auth true, admin gate on)"}
+{"t":"2026-10-15T17:31:37.011Z","level":"warn","msg":"\nShutting down file portal…"}
+{"t":"2026-10-15T17:31:43.882Z","level":"info","msg":"[admin-integration] FILES_ROOT is the admin folder /Downloads."}
+{"t":"2026-10-15T17:31:43.937Z","level":"info","msg":"Portal started on port 4000 (auth true, admin gate on)"}
+{"t":"2026-10-15T17:32:04.400Z","level":"info","method":"GET","status":200,"url":"/download/release","msg":"SPA"}
+{"t":"2026-10-15T17:32:04.624Z","level":"warn","method":"GET","status":403,"url":"/lib/idle-timer.js","msg":""}
+{"t":"2026-10-15T17:32:04.767Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 0ms"}
+{"t":"2026-10-15T17:32:04.950Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 1ms"}
+{"t":"2026-10-15T17:32:05.099Z","level":"warn","method":"GET","status":401,"url":"/api/releases","msg":"policy locked · inherited"}
+{"t":"2026-10-15T17:32:06.533Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 90ms"}
+{"t":"2026-10-15T17:32:09.132Z","level":"warn","method":"GET","status":401,"url":"/api/files/release","msg":"policy locked · self"}
+{"t":"2026-10-15T17:41:22.534Z","level":"info","method":"GET","status":200,"url":"/","msg":"SPA"}
+{"t":"2026-10-15T17:41:22.654Z","level":"warn","method":"GET","status":403,"url":"/lib/idle-timer.js","msg":""}
+{"t":"2026-10-15T17:41:22.696Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 0ms"}
+{"t":"2026-10-15T17:41:22.978Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 85ms"}
+{"t":"2026-10-15T17:41:32.532Z","level":"info","method":"POST","status":200,"url":"/api/auth/login","msg":"login:admin"}
+{"t":"2026-10-15T17:41:32.537Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 2ms"}
+{"t":"2026-10-15T17:41:32.733Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 26ms"}
+{"t":"2026-10-15T17:41:35.268Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 15ms"}
+{"t":"2026-10-15T17:41:36.623Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 18ms"}
+{"t":"2026-10-15T17:41:37.290Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 13ms"}
+{"t":"2026-10-15T17:41:37.475Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 21ms"}
+{"t":"2026-10-15T17:41:37.636Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 20ms"}
+{"t":"2026-10-15T17:42:10.625Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 33ms"}
+{"t":"2026-10-15T17:42:11.472Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 35ms"}
+{"t":"2026-10-15T17:42:12.170Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 108ms"}
+{"t":"2026-10-15T17:42:12.621Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 147ms"}
+{"t":"2026-10-15T17:42:12.630Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 210ms"}
+{"t":"2026-10-15T17:42:12.817Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 90ms"}
+{"t":"2026-10-15T17:42:15.187Z","level":"info","method":"GET","status":200,"url":"/","msg":"SPA"}
+{"t":"2026-10-15T17:42:15.457Z","level":"warn","method":"GET","status":403,"url":"/lib/idle-timer.js","msg":""}
+{"t":"2026-10-15T17:42:15.601Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 0ms"}
+{"t":"2026-10-15T17:42:17.980Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 48ms"}
+{"t":"2026-10-15T17:42:35.344Z","level":"info","method":"GET","status":200,"url":"/","msg":"SPA"}
+{"t":"2026-10-15T17:42:35.482Z","level":"warn","method":"GET","status":403,"url":"/lib/idle-timer.js","msg":""}
+{"t":"2026-10-15T17:42:35.610Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 0ms"}
+{"t":"2026-10-15T17:42:43.607Z","level":"info","method":"POST","status":200,"url":"/api/auth/login","msg":"login:admin"}
+{"t":"2026-10-15T17:42:44.254Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 0ms"}
+{"t":"2026-10-15T17:42:44.322Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 26ms"}
+{"t":"2026-10-15T17:42:46.984Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 11ms"}
+{"t":"2026-10-15T17:43:08.246Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 22ms"}
+{"t":"2026-10-15T17:43:09.015Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 17ms"}
+{"t":"2026-10-15T17:43:09.407Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 14ms"}
+{"t":"2026-10-15T17:43:09.580Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 19ms"}
+{"t":"2026-10-15T17:43:09.755Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 19ms"}
+{"t":"2026-10-15T17:43:09.929Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 16ms"}
+{"t":"2026-10-15T17:43:10.106Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 19ms"}
+{"t":"2026-10-15T17:43:10.297Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 18ms"}
+{"t":"2026-10-15T17:43:20.409Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 17ms"}
+{"t":"2026-10-15T17:43:45.148Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 18ms"}
+{"t":"2026-10-15T17:43:46.137Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 17ms"}
+{"t":"2026-10-15T17:43:47.317Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 1ms"}
+{"t":"2026-10-15T17:43:47.517Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 27ms"}
+{"t":"2026-10-15T17:44:01.268Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 17ms"}
+{"t":"2026-10-15T17:44:06.046Z","level":"info","method":"POST","status":200,"url":"/api/auth/login","msg":"login:erfan"}
+{"t":"2026-10-15T17:44:06.109Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 1ms"}
+{"t":"2026-10-15T17:44:06.295Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 31ms"}
+{"t":"2026-10-15T17:44:11.534Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 0ms"}
+{"t":"2026-10-15T17:44:11.730Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 35ms"}
+{"t":"2026-10-15T17:44:17.260Z","level":"info","method":"POST","status":200,"url":"/api/auth/login","msg":"login:admin"}
+{"t":"2026-10-15T17:44:17.266Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 0ms"}
+{"t":"2026-10-15T17:44:17.445Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 26ms"}
+{"t":"2026-10-15T17:44:19.459Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 15ms"}
+{"t":"2026-10-15T17:44:29.486Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 19ms"}
+{"t":"2026-10-15T17:44:34.655Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 19ms"}
+{"t":"2026-10-15T17:44:35.626Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 21ms"}
+{"t":"2026-10-15T17:44:35.810Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 26ms"}
+{"t":"2026-10-15T17:44:35.993Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 25ms"}
+{"t":"2026-10-15T17:44:36.155Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 19ms"}
+{"t":"2026-10-15T17:44:36.944Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 1ms"}
+{"t":"2026-10-15T17:44:37.148Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 37ms"}
+{"t":"2026-10-15T17:44:42.369Z","level":"info","method":"POST","status":200,"url":"/api/auth/login","msg":"login:admin"}
+{"t":"2026-10-15T17:44:42.422Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 0ms"}
+{"t":"2026-10-15T17:44:42.624Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 35ms"}
+{"t":"2026-10-15T17:44:44.499Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 21ms"}
+{"t":"2026-10-15T17:44:45.190Z","level":"info","method":"GET","status":200,"url":"/api/files/test","msg":"2 items"}
+{"t":"2026-10-15T17:44:45.203Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 1ms"}
+{"t":"2026-10-15T17:44:54.350Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 16ms"}
+{"t":"2026-10-15T17:45:49.139Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 17ms"}
+{"t":"2026-10-15T17:45:49.935Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 14ms"}
+{"t":"2026-10-15T17:45:50.337Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 14ms"}
+{"t":"2026-10-15T17:45:50.542Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 18ms"}
+{"t":"2026-10-15T17:45:51.576Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 13ms"}
+{"t":"2026-10-15T17:45:52.172Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 0ms"}
+{"t":"2026-10-15T17:45:52.359Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 22ms"}
+{"t":"2026-10-15T17:46:01.044Z","level":"info","method":"POST","status":200,"url":"/api/auth/login","msg":"login:admin"}
+{"t":"2026-10-15T17:46:01.049Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 1ms"}
+{"t":"2026-10-15T17:46:01.241Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 25ms"}
+{"t":"2026-10-15T17:46:04.094Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 1ms"}
+{"t":"2026-10-15T17:46:04.275Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 24ms"}
+{"t":"2026-10-15T17:46:09.051Z","level":"info","method":"POST","status":200,"url":"/api/auth/login","msg":"login:erfan"}
+{"t":"2026-10-15T17:46:09.055Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:true · 0ms"}
+{"t":"2026-10-15T17:46:09.239Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"7 cats · 30ms"}
+{"t":"2026-10-15T17:46:20.720Z","level":"info","method":"GET","status":200,"url":"/api/auth/status","msg":"auth:false · 1ms"}
+{"t":"2026-10-15T17:46:20.891Z","level":"info","method":"GET","status":200,"url":"/api/categories","msg":"6 cats · 17ms"}
+{"t":"2026-10-15T17:52:30.120Z","level":"warn","msg":"\nShutting down file portal…"}
