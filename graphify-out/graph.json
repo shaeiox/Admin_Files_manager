@@ -796,7 +796,7 @@
       "file_type": "code",
       "norm_label": "loadtoast()",
       "source_file": "test/frontend/motion.test.js",
-      "source_location": "L186"
+      "source_location": "L201"
     },
     {
       "id": "test_api_auth_refresh_contract_test_value",
@@ -54458,7 +54458,7 @@
       "file_type": "concept",
       "norm_label": "adr-0009",
       "source_file": "public/assets/js/sidebar.js",
-      "source_location": "L240"
+      "source_location": "L376"
     },
     {
       "id": "openspec_changes_api_security_hardening_specs_api_security_spec",
@@ -79324,7 +79324,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "test/frontend/motion.test.js",
-      "source_location": "L186",
+      "source_location": "L201",
       "weight": 1.0
     },
     {
@@ -86044,7 +86044,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "test/frontend/motion.test.js",
-      "source_location": "L183",
+      "source_location": "L198",
       "weight": 1.0
     },
     {
@@ -88332,7 +88332,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "public/assets/js/sidebar.js",
-      "source_location": "L240",
+      "source_location": "L376",
       "weight": 1.0
     },
     {
@@ -146425,7 +146425,7 @@
       "confidence_score": 0.85,
       "context": "collection",
       "source_file": "public/assets/js/settings.js",
-      "source_location": "L411",
+      "source_location": "L406",
       "weight": 1.0
     },
     {
@@ -146437,7 +146437,7 @@
       "confidence_score": 0.85,
       "context": "collection",
       "source_file": "public/assets/js/sidebar.js",
-      "source_location": "L484",
+      "source_location": "L622",
       "weight": 1.0
     },
     {
@@ -172300,5 +172300,5 @@
       "source_file": ".agents/skills/context-engineering/SKILL.md"
     }
   ],
-  "built_at_commit": "2b40131c4aaec72376589440152c6f664bdf3c0d"
+  "built_at_commit": "8b41d0d0e2fbe24fea916073f934847cc365aca3"
 }
