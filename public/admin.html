@@ -567,15 +567,13 @@
             </div>
 
             <!-- ══════════════════════
-               PANE: FILE PORTAL (.env of files-server-web, via PORTAL_ROOT)
+               PANE: FILE PORTAL (logical settings in admin.sqlite; ADR-010)
                ══════════════════════ -->
             <div class="settings-pane" data-pane-content="portal">
 
-              <div class="admin-notice" id="portalUnavailable" role="status" hidden>
+              <div class="admin-notice" id="portalVolume" role="status" hidden>
                 <i data-icon="info" data-icon-size="16"></i>
-                <span>The file portal is not linked: <strong id="portalUnavailableReason"></strong> Set
-                  <code>PORTAL_ROOT</code> to the portal's project folder (e.g. <code>C:\PRO\files-server-web</code>)
-                  and restart this server.</span>
+                <span id="portalVolumeText"></span>
               </div>
 
               <form class="settings-group" id="portalForm" novalidate>
@@ -584,19 +582,19 @@
                     <i data-icon="folder" data-icon-size="18"></i>
                     Content
                   </div>
-                  <div class="sg-desc">Where the portal serves files from. Relative paths resolve from the portal's
-                    project directory.</div>
+                  <div class="sg-desc">A portal's <code>FILES_ROOT</code> may be this storage or any folder in it; the
+                    portal finds where it is by itself, and every policy applies to it as here.</div>
                 </div>
                 <div class="sg-body portal-grid">
                   <div class="field">
-                    <label class="field-label" for="pFILES_ROOT">Files root</label>
-                    <input class="input input-mono" type="text" id="pFILES_ROOT" name="FILES_ROOT" required autocomplete="off" spellcheck="false">
-                    <span class="field-hint"><code>FILES_ROOT</code> · same directory as this server's storage root</span>
+                    <label class="field-label" for="pPortalRoot">Portal folder (optional)</label>
+                    <input class="input input-mono" type="text" id="pPortalRoot" name="portalRootClientPath" autocomplete="off" spellcheck="false" placeholder="not needed">
+                    <span class="field-hint">Only for a portal host that cannot see this storage's root (a container or share mounting one folder, e.g. <code>/Downloads</code>): marks that folder so the portal can place itself</span>
                   </div>
                   <div class="field">
-                    <label class="field-label" for="pRELEASE_PVM">Release folder</label>
-                    <input class="input input-mono" type="text" id="pRELEASE_PVM" name="RELEASE_PVM" autocomplete="off" spellcheck="false" placeholder="optional">
-                    <span class="field-hint"><code>RELEASE_PVM</code> · empty scans the files root</span>
+                    <label class="field-label" for="pReleaseClientPath">Release folder</label>
+                    <input class="input input-mono" type="text" id="pReleaseClientPath" name="releaseClientPath" autocomplete="off" spellcheck="false" placeholder="/release/pvm">
+                    <span class="field-hint">A folder in this storage; a portal uses it when it lies inside that portal · lock it under Files to require sign-in · empty: the portal scans everything</span>
                   </div>
                 </div>
 
@@ -605,45 +603,34 @@
                     <i data-icon="lock" data-icon-size="18"></i>
                     Sign-in gate
                   </div>
-                  <div class="sg-desc">Session length and brute-force lockout for portal sign-in.</div>
+                  <div class="sg-desc">Session length and brute-force lockout for portal sign-in. Empty: the portal's own
+                    configuration applies.</div>
                 </div>
                 <div class="sg-body portal-grid">
-                  <div class="field portal-switch-row">
-                    <label class="admin-switch-label" for="pAUTH_ENABLED">
-                      <span class="switch">
-                        <input type="checkbox" id="pAUTH_ENABLED" name="AUTH_ENABLED">
-                        <span class="track" aria-hidden="true"></span>
-                      </span>
-                      <span>Require sign-in <code>AUTH_ENABLED</code></span>
-                    </label>
-                  </div>
                   <div class="field">
-                    <label class="field-label" for="pAUTH_SESSION_MINUTES">Session length</label>
+                    <label class="field-label" for="pSessionMinutes">Session length</label>
                     <div class="input-suffix">
-                      <input class="input" type="number" inputmode="numeric" min="1" max="10080" step="1" id="pAUTH_SESSION_MINUTES" name="AUTH_SESSION_MINUTES" required>
+                      <input class="input" type="number" inputmode="numeric" min="1" max="10080" step="1" id="pSessionMinutes" name="sessionMinutes">
                       <span>min</span>
                     </div>
-                    <span class="field-hint"><code>AUTH_SESSION_MINUTES</code></span>
                   </div>
                   <div class="field">
-                    <label class="field-label" for="pAUTH_MAX_FAILED_ATTEMPTS">Failed attempts before lockout</label>
-                    <input class="input" type="number" inputmode="numeric" min="1" max="1000" step="1" id="pAUTH_MAX_FAILED_ATTEMPTS" name="AUTH_MAX_FAILED_ATTEMPTS" required>
-                    <span class="field-hint"><code>AUTH_MAX_FAILED_ATTEMPTS</code></span>
+                    <label class="field-label" for="pMaxFailedAttempts">Failed attempts before lockout</label>
+                    <input class="input" type="number" inputmode="numeric" min="1" max="1000" step="1" id="pMaxFailedAttempts" name="maxFailedAttempts">
                   </div>
                   <div class="field">
-                    <label class="field-label" for="pAUTH_LOCKOUT_MINUTES">Lockout duration</label>
+                    <label class="field-label" for="pLockoutMinutes">Lockout duration</label>
                     <div class="input-suffix">
-                      <input class="input" type="number" inputmode="numeric" min="1" max="10080" step="1" id="pAUTH_LOCKOUT_MINUTES" name="AUTH_LOCKOUT_MINUTES" required>
+                      <input class="input" type="number" inputmode="numeric" min="1" max="10080" step="1" id="pLockoutMinutes" name="lockoutMinutes">
                       <span>min</span>
                     </div>
-                    <span class="field-hint"><code>AUTH_LOCKOUT_MINUTES</code></span>
                   </div>
                 </div>
 
                 <div class="portal-actions">
                   <span class="portal-actions-note">
                     <i data-icon="info" data-icon-size="14"></i>
-                    Written to the portal's <code>.env</code>. Takes effect when the portal restarts.
+                    Stored in the admin database. The portal applies it within seconds, no restart.
                   </span>
                   <button type="button" class="btn btn-ghost btn-sm" id="portalReset" disabled>Discard</button>
                   <button type="submit" class="btn btn-primary btn-sm" id="portalSave" disabled>

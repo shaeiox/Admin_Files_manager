@@ -159,6 +159,17 @@ const MIGRATIONS = [
             CREATE INDEX idx_gfp_group_id ON group_file_permissions(group_id);
         `,
     },
+    {
+        // Logical values shared with the File Portal (decouple-storage-and-release-paths):
+        // volume_id, release_client_path, portal.* tunables. Never a physical path.
+        version: 5,
+        sql: `
+            CREATE TABLE integration_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+        `,
+    },
 ];
 
 /** @param {import('node:sqlite').DatabaseSync} db */

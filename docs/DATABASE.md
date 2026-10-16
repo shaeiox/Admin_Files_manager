@@ -218,6 +218,7 @@ understands schema ≤ 4 — upgrade the portal before this admin release).
 | 2 | `files`, `file_access_policies`, `user_file_permissions` + index (ADR-009 phase 2) |
 | 3 | `portal_nav_folders` (File portal navbar links) |
 | 4 | `file_access_policies.default_level`, `user_file_permissions.level`, `user_groups`, `user_group_members`, `group_file_permissions` + indexes (access levels and groups) |
+| 5 | `integration_settings(key, value)`: values shared with the File Portal (ADR-010). Keys: `volume_id` (UUID, also in `STORAGE_ROOT/.dimension-volume`), `release_client_path`, `portal.auth_session_minutes`, `portal.max_failed_attempts`, `portal.lockout_minutes`. Logical values only, never a host path. The portal accepts schema ≤ 5. |
 
 **Adding a migration:** append `{ version: N+1, sql }` — never edit an applied one; a deployed
 database will not re-run it. Prefer additive DDL (`CREATE TABLE`, `ALTER TABLE … ADD COLUMN`).
@@ -238,6 +239,7 @@ and no `node:sqlite` type crosses into services or controllers. Every statement 
 | `FileAccessPolicyRepository` | `findFileByPath`, `findPolicyByPath`, `listPolicies` (by path), `upsertPolicy` (transactional), `renamePath`, `deletePath`, `deletePolicy` | `FileAccessPolicyService` |
 | `UserFilePermissionRepository` | `upsert`, `revoke`, `listForFile`, `listForUser` | `FileAccessPolicyService` |
 | `GroupRepository` | `list` (members inline), `findById`, `findByName`, `create`, `update`, `remove`, `setMembers` (transactional), `upsertPermission`, `revokePermission`, `listPermissionsForFile`, `listPermissionsForUser` | `GroupService`, `FileAccessPolicyService` |
+| `IntegrationSettingsRepository` | `get(key)`, `setMany({key: value\|null})` (transactional; `null` deletes) | `IntegrationSettingsService` |
 
 `upsertPolicy` is the only multi-statement write; it creates the `files` row if absent and inserts
 or updates the policy inside one `BEGIN … COMMIT`. `UserFilePermissionRepository.upsert` is a

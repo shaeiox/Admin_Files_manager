@@ -58,10 +58,9 @@ it does and does not protect:
 | `/etc/dimension/dimension.env` | `root:dimension 0640` | Runtime configuration (out of band, never in a release) |
 | `/var/lib/dimension/` (`AFM_DATA_DIR`) | `dimension:dimension 0750` | `admin.sqlite` (accounts, sessions, policies, audit log), `metadata.json`, `settings.json` |
 | `/srv/dimension/storage/` (`STORAGE_ROOT`) | `dimension:dimension 0750` | The operator's files |
-| `/var/www/html/files-server-web/.env` (optional) | `<portal owner>:dimension 0660` | File Portal settings that Admin → File portal edits (`PORTAL_ROOT`) |
 
 The service identity `dimension` **cannot write** any release or its own configuration. It can write
-only the stores, the storage root and (if linked) the portal's `.env`. systemd's `ReadWritePaths=`
+only the stores, the storage root and the folder markers (ADR-010). systemd's `ReadWritePaths=`
 enforces the same list.
 
 ## Configuration reference
@@ -118,7 +117,39 @@ one**, so an unset value never widens access.
 
 | Variable | Required | Default | Notes |
 |---|---|---|---|
-| `PORTAL_ROOT` | no | *(unset: "not linked")* | Absolute path of the File Portal project (`files-server-web`), the folder that holds its `.env`. Enables Admin → File portal (edits `FILES_ROOT`, `RELEASE_PVM` and the `AUTH_*` keys; the portal applies them on its next restart) and Admin → Logs → File portal (reads `<PORTAL_ROOT>/data/portal.log`). Needs the permissions in step 4. |
+| `PORTAL_LOG_FILE` | no | *(unset)* | Absolute path of the File Portal's trace log (the portal's `LOG_FILE`). Enables Admin → Logs → File portal. `PORTAL_ROOT` is retired and ignored (ADR-010). |
+
+#### How the link works (ADR-010)
+
+The File Portal reads `admin.sqlite` read-only. The two services share **logical** values only, so
+the storage, the release folder and either service's releases may live anywhere:
+
+- **Storage identity.** On first start this service writes `STORAGE_ROOT/.dimension-volume` (a
+  UUID, also stored in `admin.sqlite`). The marker is hidden and unreachable through the API.
+  **Back it up with the storage**, and never copy it into another storage root.
+- **Any folder as portal root, nothing to configure.** The portal's `FILES_ROOT` may be the storage
+  or any folder in it, mounted anywhere. Example: this service's `STORAGE_ROOT=C:\Users\eleven`, the
+  portal's `FILES_ROOT=C:\Users\eleven\Downloads`. The portal climbs to the storage marker, finds it
+  is the admin folder `/Downloads` (it logs `FILES_ROOT is the admin folder /Downloads`), and
+  decides every path as `/Downloads/…`. Policies on `/Downloads` and on `/` apply there too, and a
+  policy on `/docs` does not. Several portals may serve different folders of one storage at once.
+- **Portal folder (optional).** Only for a portal host that cannot see the storage root, such as a
+  container or share that mounts just `Downloads`. Set **Portal folder** to `/Downloads` in Admin →
+  File portal; this service writes a marker into that folder naming it, which such a host trusts.
+  Rename the folder only through the API (the stored path follows it).
+- **Recovery** when Admin → File portal reports the marker `missing`: first make sure `STORAGE_ROOT`
+  points at the real storage. Then recreate it with the id shown there:
+  `printf '{"volumeId":"<id>","clientPath":"/"}\n' > "$STORAGE_ROOT/.dimension-volume"` (owner
+  `dimension`, mode `0640`). The portal-root marker is restored automatically once this one is. `mismatch` means `STORAGE_ROOT` holds another volume's marker: fix the path, do not edit
+  the marker. `unwritable` means the root is read-only: make it writable and restart.
+- **Release folder and portal sign-in limits** are set in Admin → File portal. The portal applies
+  them within its sync interval, with no restart.
+- **A release disk elsewhere:** bind-mount it inside the storage
+  (`mount --bind /mnt/releases /srv/dimension/storage/release`) and select that folder. A symlink
+  or a Windows junction is refused by both services' containment checks.
+- **Upgrade order:** portal first (it accepts admin schema v4 and v5), then this service (migration
+  5, writes the marker), then set and lock the release folder, then remove `RELEASE_PVM` (portal)
+  and `PORTAL_ROOT` (here).
 
 The portal itself (`files-server-web`) reads `admin.sqlite` from `AFM_DATA_DIR` for its access
 policies. Give its service read access to that directory if it runs as a different user.
@@ -158,7 +189,7 @@ AFM_BOOTSTRAP_ADMIN_PASSWORD=<at-least-8-chars-generate-me>
 
 # --- Optional ---
 # APP_VERSION=2.4.0
-# PORTAL_ROOT=/var/www/html/files-server-web
+# PORTAL_LOG_FILE=/var/www/html/files-server-web/data/portal.log
 ```
 
 Generate the password with `openssl rand -base64 18`. Afterwards,
@@ -190,14 +221,6 @@ Run these as root. Replace host names, certificate paths and keys with your own.
    ```bash
    chown root:dimension /etc/dimension/dimension.env && chmod 0640 /etc/dimension/dimension.env
    ```
-   If you set `PORTAL_ROOT`, let this service write the portal's `.env`, and only that file (it is
-   rewritten in place, so its owner and mode are kept):
-   ```bash
-   chgrp dimension /var/www/html/files-server-web/.env
-   chmod 0660 /var/www/html/files-server-web/.env
-   ```
-   The unit's `ReadWritePaths=-/var/www/html/files-server-web/.env` names that path. Edit both if the
-   portal lives elsewhere.
 5. **Deploy script and restart right.**
    ```bash
    install -m 0755 scripts/deploy.sh /opt/dimension/bin/deploy.sh

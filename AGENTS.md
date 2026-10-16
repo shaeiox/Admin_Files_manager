@@ -155,6 +155,13 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 10
   `lib/access-policy.js` (rules in `docs/CONTRACTS.md` → "What a policy does"). CORS stays same-origin by
   default (`cors()` is only registered when `AFM_CORS_ENABLED=true`, from a validated allowlist) —
   this was closed earlier by `api-security-hardening` and is unrelated to the auth work.
+- **The File Portal link shares logical values only (ADR-010).** `admin.sqlite`'s
+  `integration_settings` (migration 5) carries the storage `volume_id`, the release folder as a
+  client path, and the portal's auth tunables. Never put a host path there, and never read or write
+  a portal file other than its log (`PORTAL_LOG_FILE`; `PORTAL_ROOT` is retired). The storage identity
+  is `STORAGE_ROOT/.dimension-volume`. `PathService.resolveSecurePath` answers `404` for it by any
+  spelling, and a stored id is never re-stamped. Changing a key or the schema means changing the
+  portal's `lib/admin-db.js` (schema gate, `buildSettings`) in step.
 - **Filename rules are cross-platform strict:** reject `[<>:"|?*\x00-\x1F]`, reserved Windows names
   (`CON`, `PRN`, `COM1-9`, ...), leading/trailing dots/spaces, and any `/` or `..`. Match
   `validateFileName`; don't loosen it for convenience.

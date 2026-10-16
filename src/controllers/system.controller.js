@@ -3,11 +3,12 @@
 
 const PortalService = require('../services/PortalService');
 const PortalNavService = require('../services/PortalNavService');
+const IntegrationSettingsService = require('../services/IntegrationSettingsService');
 const AuditLogRepository = require('../db/repositories/AuditLogRepository');
 
 const MAX_AUDIT_ENTRIES = 1000;
 
-/** GET /api/admin/portal/config -> bare `{ available, values }` (read-only, rule 6). */
+/** GET /api/admin/portal/config -> retired: always bare `{ available: false, reason, values: null }`. */
 async function getPortalConfig(req, res, next) {
     try {
         return res.json(await PortalService.getConfig());
@@ -16,20 +17,44 @@ async function getPortalConfig(req, res, next) {
     }
 }
 
-/** PUT /api/admin/portal/config -> envelope (mutating). Full replace of the six keys. */
+/** PUT /api/admin/portal/config -> retired: always 503 (see /admin/portal/settings). */
 async function setPortalConfig(req, res, next) {
-    const audit = (outcome) => AuditLogRepository.record({
+    try {
+        return await PortalService.setConfig();
+    } catch (error) {
+        return next(error);
+    }
+}
+
+/** GET /api/admin/portal/settings -> bare `{ volume: { id, status }, portalRoot: { clientPath, status }, releaseClientPath, auth }`. */
+async function getPortalSettings(req, res, next) {
+    try {
+        return res.json(await IntegrationSettingsService.get());
+    } catch (error) {
+        return next(error);
+    }
+}
+
+/**
+ * PUT /api/admin/portal/settings -> envelope `{ success, ...the GET document }`. Strict full replace of
+ * `{ portalRootClientPath, releaseClientPath, auth }`; the portal applies it on its next snapshot (no restart).
+ */
+async function setPortalSettings(req, res, next) {
+    const audit = (outcome, detail) => AuditLogRepository.record({
         actorId: req.user ? req.user.id : null,
-        action: 'portal.config',
+        action: 'portal.settings',
         outcome,
         targetType: 'portal',
+        detail: detail || null,
         ip: req.ip,
         userAgent: req.get('user-agent') || null,
     });
     try {
-        const values = await PortalService.setConfig(req.body);
-        audit('success');
-        return res.json({ success: true, values, restartRequired: true });
+        const settings = await IntegrationSettingsService.set(req.body);
+        audit('success', JSON.stringify({
+            portalRoot: settings.portalRoot.clientPath, releaseClientPath: settings.releaseClientPath, auth: settings.auth,
+        }));
+        return res.json({ success: true, ...settings });
     } catch (error) {
         audit('failure');
         return next(error);
@@ -85,4 +110,6 @@ function getAuditLog(req, res, next) {
     }
 }
 
-module.exports = { getPortalConfig, setPortalConfig, getPortalNav, setPortalNav, getPortalLog, getAuditLog };
+module.exports = {
+    getPortalConfig, setPortalConfig, getPortalSettings, setPortalSettings, getPortalNav, setPortalNav, getPortalLog, getAuditLog,
+};

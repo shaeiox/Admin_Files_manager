@@ -194,8 +194,10 @@ guard → `GET /health` → `/auth` router (self-gated) → `authenticate` → `
 | PUT | `/api/admin/groups/:id` | admin | ✅ live | Rename / re-describe a group |
 | DELETE | `/api/admin/groups/:id` | admin | ✅ live | Delete a group and its grants |
 | PUT | `/api/admin/groups/:id/members` | admin | ✅ live | Replace a group's members |
-| GET | `/api/admin/portal/config` | admin | ✅ live | File portal `.env` keys, or `available:false` |
-| PUT | `/api/admin/portal/config` | admin | ✅ live | Replace the six portal `.env` keys (applies on portal restart) |
+| GET | `/api/admin/portal/settings` | admin | ✅ live | Storage volume status, release folder, portal auth tunables |
+| PUT | `/api/admin/portal/settings` | admin | ✅ live | Replace release folder + tunables (portal applies within seconds) |
+| GET | `/api/admin/portal/config` | admin | ⛔ retired | Always `available:false` (ADR-010) |
+| PUT | `/api/admin/portal/config` | admin | ⛔ retired | Always `503` (ADR-010) |
 | GET | `/api/admin/logs/portal` | admin | ✅ live | File portal trace, newest first |
 | GET | `/api/admin/logs/audit` | admin | ✅ live | Admin audit log, newest first |
 
@@ -984,7 +986,7 @@ not exist. Request field names are camelCase; response fields are the snake_case
 | `POST /api/admin/files/permissions` → `201` | `{success, permission}` | Body: `{path, userId \| groupId, permission: "grant"\|"deny", level?}` — `level` defaults to `download` (what a grant meant before levels). `409` if `path` has no policy yet — grant before policy is a user error, not an implicit policy creation. One row per `(file, user)` / `(file, group)`; a second grant for the same pair updates the existing row. `404` for an unknown user or group. |
 | `DELETE /api/admin/files/permissions` | `{success: true}` | Body: `{path, userId \| groupId}`. |
 | `GET /api/admin/files/group-permissions?path=...` | bare array | Group permission objects, by group name. |
-| `GET /api/admin/files/effective?path=...&userId=...` | bare object | `{outcome: "download"\|"view"\|"locked"\|"hidden"\|"disabled", policies: [{path, outcome}]}` — the File Portal's decision and what each governing policy gave. Omit `userId` for a visitor who is not signed in. |
+| `GET /api/admin/files/effective?path=...&userId=...` | bare object | `{outcome: "download"\|"view"\|"locked"\|"hidden"\|"disabled", policies: [{path, outcome}]}` — the File Portal's decision and what each governing policy gave (for any portal whose `FILES_ROOT` contains the path). Omit `userId` for a visitor who is not signed in. |
 
 ### Groups
 
@@ -1010,15 +1012,31 @@ never depends on it.
 
 ### File portal and logs (`system.controller.js`, `PortalService`)
 
-The File Portal (files-server-web) is linked by `PORTAL_ROOT` — the absolute path of its project
-directory on this host. Unset, not absolute, missing or not a directory (e.g. pointed at `data/portal.log`), every read below answers `available: false` plus a human-readable `reason` (never an empty config
-or an empty log passed off as real) and the write answers `503` with that reason.
+The two apps share logical values only, in `admin.sqlite` (ADR-010). This app never reads or
+writes a portal file except the trace log named by `PORTAL_LOG_FILE`. `PORTAL_ROOT` is retired:
+if set, it is logged as ignored at startup.
+
+**Storage volume markers.** On first start, when the database holds no `volume_id`, this app gives
+`STORAGE_ROOT` an identity. It adopts a valid existing `.dimension-volume`, or creates one
+(`{"volumeId":"<uuid>","clientPath":"/"}`, never overwriting) and stores the same UUID. A stored id
+is never re-stamped. **A portal locates itself:** it climbs from its `FILES_ROOT` to that marker and
+decides every path as `<the folder it found itself in>/<rel>`. So `FILES_ROOT` may be this storage
+or any folder in it, from any mount point, with nothing configured here. Policies apply exactly as
+in this app's view. The optional **portal folder** (e.g. `/Downloads`) only serves portal hosts that
+cannot see the storage root: the same file in that folder names it
+(`{"volumeId":"<uuid>","clientPath":"/Downloads"}`), and those hosts trust it. Markers are reserved at
+any depth: `PathService.resolveSecurePath` answers `404` for them (any case, trailing dots/spaces,
+`:$DATA` suffix), so no `/fs` endpoint can download, rename, move, copy or delete one, and as dot
+entries they are never listed or counted. A rename or move of the portal folder or the release folder
+(or one of their ancestors) through the API rewrites the stored paths and the marker's `clientPath`.
 
 | Endpoint | Envelope | Notes |
 |---|---|---|
-| `GET /api/admin/portal/config` | bare `{available, values}` | `values` holds exactly `FILES_ROOT`, `RELEASE_PVM`, `AUTH_ENABLED`, `AUTH_SESSION_MINUTES`, `AUTH_MAX_FAILED_ATTEMPTS`, `AUTH_LOCKOUT_MINUTES` as strings (`""` when absent); `null` when unavailable. No other key of that `.env` (e.g. `AUTH_JWT_SECRET`) is ever returned. |
-| `PUT /api/admin/portal/config` | `{success, values, restartRequired: true}` | Full replace of the six keys, all strings. `400`: unknown key, missing key, multi-line value, empty `FILES_ROOT`, `AUTH_ENABLED` not `"true"`/`"false"`, minutes not 1–10080, attempts not 1–1000. Each key's line is rewritten in place (comments, order and other keys kept; a missing key is appended), temp-file-then-rename. Audited as `portal.config`. The portal reads its `.env` only at startup. |
-| `GET /api/admin/logs/portal?limit=` | bare `{available, entries}` | Parsed JSON lines from `<PORTAL_ROOT>/data/portal.log` (the portal's `LOG_FILE` default), newest first, `limit` 1–1000 (default 200), only the last 512 KiB read. Entry: `{t, level: "info"|"warn"|"error", msg, method?, status?, url?}`. A missing file is `entries: []`. |
+| `GET /api/admin/portal/settings` | bare `{volume: {id, status}, portalRoot: {clientPath, status}, releaseClientPath, auth: {sessionMinutes, maxFailedAttempts, lockoutMinutes}}` | `volume.status` is read live: `ok`, `missing` (stored id, no marker), `mismatch` (marker of another volume, or unreadable), `unwritable` (no id could be stamped). `portalRoot.clientPath` is the published portal folder, `null` for none (portals that see the storage root need none); its status is `ok`, `missing` (folder gone), `mismatch` (another volume's marker there) or `unverified` (volume not `ok`). A missing folder marker is rewritten on this read once the volume is `ok`. `releaseClientPath` is `null` or `"/a/b"`. An `auth` value is `null` when unset (the portal's own env/default applies). |
+| `PUT /api/admin/portal/settings` | `{success, ...the GET document}` | Strict full replace of `{portalRootClientPath, releaseClientPath, auth}`; `null` clears. `400`: unknown key (including `volume`), a missing field, an `auth` value not `null` and not a whole number in range (minutes 1–10080, attempts 1–1000), a folder that is `/`, has `.`/`..` or is not a folder. The two folders are not checked against each other (each portal uses the release folder only inside itself). `404`: a folder missing. `409`: a new portal folder while `volume.status` is not `ok`, or a folder holding another volume's marker. Paths normalized like navbar folders (`release\pvm/` → `/release/pvm`). A new portal folder gets the marker `{volumeId, clientPath}` before the settings are stored; the previous one's marker is removed afterwards (the storage-root marker never is). Audited as `portal.settings`. The portal applies it within its `ADMIN_SYNC_TTL_MS` (no restart). |
+| `GET /api/admin/portal/config` | bare `{available: false, reason, values: null}` | **Retired** (ADR-010). Always this "not linked" shape; `reason` names `/api/v1/admin/portal/settings`. Kept so no v1 response is retyped (ADR-007). |
+| `PUT /api/admin/portal/config` | error | **Retired.** Always `503`, writes nothing. |
+| `GET /api/admin/logs/portal?limit=` | bare `{available, entries}` | Parsed JSON lines from `PORTAL_LOG_FILE` (absolute; the same file as the portal's `LOG_FILE`), newest first, `limit` 1–1000 (default 200), only the last 512 KiB read. Entry: `{t, level: "info"|"warn"|"error", msg, method?, status?, url?}`. A missing file is `entries: []`. Unset, relative or a directory: `available: false` with a `reason`, never an empty list passed off as a reading. |
 | `GET /api/admin/logs/audit?limit=` | bare array | `audit_logs` rows plus `actor_username` (`null` for a deleted or absent actor), newest first, `limit` 1–1000 (default 200). |
 
 `GET /api/auth/me` additionally carries `appVersion` (additive): `APP_VERSION` when set, else the

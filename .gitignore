@@ -34,3 +34,4 @@ docs/security-audit/
 
 # Knowledge-graph output (generated, no LLM cost to rebuild)
 !graphify-out/
+portal.log

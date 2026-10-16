@@ -140,6 +140,13 @@ if (configProblems.length > 0) {
 // account exists yet; it never overwrites one.
 require('./src/db/connection').get();
 require('./src/db/bootstrap').ensureBootstrapAdmin();
+// Gives STORAGE_ROOT its .dimension-volume identity for the File Portal when the
+// database has none yet (ADR-010). Never throws; a failure is reported in
+// Admin > File portal. PORTAL_ROOT is retired: say so instead of ignoring it.
+require('./src/services/IntegrationSettingsService').stampVolume();
+if (String(process.env.PORTAL_ROOT || '').trim()) {
+    console.warn('[integration] PORTAL_ROOT is no longer used and is ignored; set PORTAL_LOG_FILE for the portal log.');
+}
 
 /* ─── Boot Server ─── */
 // The handle is exported so integration tests can read the bound port and close

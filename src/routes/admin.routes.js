@@ -44,6 +44,8 @@ router.get('/files/effective', filePolicyController.effectiveAccess);
 
 router.get('/portal/config', systemController.getPortalConfig);
 router.put('/portal/config', systemController.setPortalConfig);
+router.get('/portal/settings', systemController.getPortalSettings);
+router.put('/portal/settings', systemController.setPortalSettings);
 router.get('/portal/nav', systemController.getPortalNav);
 router.put('/portal/nav', systemController.setPortalNav);
 router.get('/logs/portal', systemController.getPortalLog);

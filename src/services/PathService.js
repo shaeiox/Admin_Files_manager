@@ -6,6 +6,9 @@ const fs = require('fs/promises');
 const config = require('../config/env');
 const AppError = require('../utils/AppError');
 
+/** Reserved name of the storage-volume marker at the root (ADR-010). */
+const VOLUME_MARKER = '.dimension-volume';
+
 class PathService {
     /**
      * Safely resolves a client-provided path against the configured storage root.
@@ -37,6 +40,16 @@ class PathService {
         const contained = targetPath === rootPath || targetPath.startsWith(rootPath + path.sep);
         if (!contained) {
             throw new AppError('Access denied. Path traversal detected.', 403);
+        }
+
+        // Storage-volume markers (IntegrationSettingsService, ADR-010) - at the root
+        // and in the portal root - are not client content: no endpoint may read,
+        // rename, move, copy or delete one, so they do not exist at any depth by any
+        // spelling Windows folds onto them (case, trailing dots/spaces, `:$DATA`).
+        // ponytail: an 8.3 short name (DIMENS~1) is not caught; resolve via realpath if 8.3 names are enabled on the storage volume.
+        const segments = path.relative(rootPath, targetPath).split(path.sep);
+        if (segments.some((s) => s.replace(/:.*$/, '').replace(/[. ]+$/, '').toLowerCase() === VOLUME_MARKER)) {
+            throw new AppError(`Item not found: ${clientPath}`, 404);
         }
 
         return targetPath;
@@ -140,5 +153,7 @@ class PathService {
         return relative.startsWith('/') ? relative : `/${relative}`;
     }
 }
+
+PathService.VOLUME_MARKER = VOLUME_MARKER;
 
 module.exports = PathService;

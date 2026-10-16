@@ -25,6 +25,14 @@ describe('schema.migrate', () => {
         assert.ok(tables.includes('schema_migrations'));
     });
 
+    test('migration 5 creates integration_settings as a key/value table', () => {
+        const db = new DatabaseSync(':memory:');
+        migrate(db);
+        const cols = db.prepare('PRAGMA table_info(integration_settings)').all();
+        assert.deepEqual(cols.map((c) => [c.name, c.type, c.pk]), [['key', 'TEXT', 1], ['value', 'TEXT', 0]]);
+        assert.ok(MIGRATIONS.some((m) => m.version === 5));
+    });
+
     test('records the applied version', () => {
         const db = new DatabaseSync(':memory:');
         migrate(db);

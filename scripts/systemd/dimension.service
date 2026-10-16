@@ -52,10 +52,6 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/lib/dimension /srv/dimension/storage
-# Admin -> File portal edits <PORTAL_ROOT>/.env in place; only that one file is
-# writable ("-": ignored when the portal is not installed). Edit if PORTAL_ROOT differs.
-# The file must also be writable by this user, e.g. chgrp dimension + chmod 0660.
-ReadWritePaths=-/var/www/html/files-server-web/.env
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
