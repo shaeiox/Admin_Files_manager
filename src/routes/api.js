@@ -53,9 +53,9 @@ router.get('/health', (req, res) => {
     res.json({ success: true, message: 'Dimension API is running', apiVersion: API_VERSION });
 });
 
-// Auth routes self-gate (login is public; logout/me require a session) and
-// must stay mounted BEFORE the blanket `authenticate` below, or login could
-// never be reached (ADR-009).
+// Auth routes self-gate (login is public; refresh/logout check their own
+// credentials; me requires a session) and must stay mounted BEFORE the blanket
+// `authenticate` below, or login and refresh could never be reached (ADR-009).
 router.use('/auth', authRoutes);
 
 // Everything below requires a session - applied once, so /api/v1 and /api

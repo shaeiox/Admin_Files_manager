@@ -40,8 +40,8 @@ describe('SessionService.login', () => {
         createUser('kate', 'kate-password-1');
         const result = SessionService.login({ username: 'kate', password: 'kate-password-1' });
         assert.equal(result.ok, true);
-        assert.equal(typeof result.token, 'string');
-        assert.ok(result.token.length >= 32);
+        assert.equal(typeof result.accessToken, 'string');
+        assert.ok(result.accessToken.length >= 32);
         assert.equal(typeof result.csrfSecret, 'string');
     });
 
@@ -102,7 +102,7 @@ describe('SessionService.login', () => {
 describe('SessionService.validateSession / revokeSession', () => {
     test('a freshly issued session validates and resolves the user', () => {
         createUser('olga', 'olga-password-1');
-        const { token } = SessionService.login({ username: 'olga', password: 'olga-password-1' });
+        const { accessToken: token } = SessionService.login({ username: 'olga', password: 'olga-password-1' });
         const resolved = SessionService.validateSession(token);
         assert.ok(resolved);
         assert.equal(resolved.user.username, 'olga');
@@ -114,14 +114,14 @@ describe('SessionService.validateSession / revokeSession', () => {
 
     test('revokeSession invalidates the session immediately', () => {
         createUser('pete', 'pete-password-1');
-        const { token, session } = SessionService.login({ username: 'pete', password: 'pete-password-1' });
+        const { accessToken: token, session } = SessionService.login({ username: 'pete', password: 'pete-password-1' });
         SessionService.revokeSession(session.id);
         assert.equal(SessionService.validateSession(token), null);
     });
 
     test('disabling the user invalidates their existing session', () => {
         const user = createUser('quinn', 'quinn-password-1');
-        const { token } = SessionService.login({ username: 'quinn', password: 'quinn-password-1' });
+        const { accessToken: token } = SessionService.login({ username: 'quinn', password: 'quinn-password-1' });
         UserRepository.setStatus(user.id, 'disabled');
         assert.equal(SessionService.validateSession(token), null);
     });

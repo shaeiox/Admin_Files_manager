@@ -34,6 +34,9 @@ it does and does not protect:
 - [ ] Linux host with systemd, nginx, Node **24.x** at `/usr/bin/node`, `npm`, `curl`, `tar`, `flock`
 - [ ] DNS for the admin name (and the portal name, if used) points at the host
 - [ ] TLS certificate covering **every** name nginx serves (`scripts/nginx/README.md` §1)
+- [ ] The admin origin is served over **HTTPS** — session renewal needs it: browsers expose
+      WebCrypto only in a secure context, so over plain HTTP a session ends with its first access
+      token (`AFM_ACCESS_TTL_SECONDS`, 15 min by default) and the operator signs in again
 - [ ] Users `dimension` (service) and `dimension-deploy` (deploys) created
 - [ ] Directories created with the owners and modes in **Host layout**
 - [ ] `/etc/dimension/dimension.env` written from **Production env file**, mode `0640 root:dimension`
@@ -329,6 +332,12 @@ This swaps `current` and `previous`, restarts and health-checks. It needs no reb
 no network, and running it twice returns to where you started. Rollback restores **code only**: the
 stores and `STORAGE_ROOT` are not touched. A schema migration in `admin.sqlite` is forward-only, so
 check `docs/DATABASE.md` before rolling back across one.
+
+**Rolling back across migration 6 (access/refresh session tokens)** needs the store too: an older
+release refuses to start on a v6 database ("newer than this release understands"). Stop the
+service, restore the `admin.sqlite` backup taken before the deploy, then roll back. **Every session
+is invalidated** either way — the old code reads `afm_session`, which the new release never set —
+so every operator signs in again. That is fail-closed, not a fault.
 
 ## Status and logs
 

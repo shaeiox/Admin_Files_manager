@@ -60,7 +60,7 @@
 **Closed by ADR-009 / `admin-identity-and-access-control` (phase 1):**
 
 - **The API is authenticated.** Every endpoint below, except `GET /health` and `POST /auth/login`,
-  requires a session (`afm_session` cookie or `Authorization: Bearer`). This closes ADR-003 §9's
+  requires a session (access token as the `afm_access` cookie or `Authorization: Bearer`). This closes ADR-003 §9's
   Critical, scoped to single-tenant authentication — see "Auth endpoints (ADR-009)" below.
 - **CSRF defence is in place.** Every non-GET request requires a session-bound `X-CSRF-Token`
   header, checked before any mutation. **File-access policies do not restrict this app**: they
@@ -142,7 +142,7 @@
 ## Endpoints
 
 Every path is served identically under `/api/v1` (the contract) and `/api` (the alias). **Access**
-column: *public* = no session; *session* = `afm_session` cookie or `Authorization: Bearer`, plus
+column: *public* = no session; *session* = access token as the `afm_access` cookie or `Authorization: Bearer`, plus
 `X-CSRF-Token` on every non-GET; *admin* = session whose user has `role = "admin"`.
 
 **Middleware order for every `/api` request** (`server.js`, then `src/routes/api.js`):
@@ -219,32 +219,55 @@ rather than the environment name. `apiVersion` is the deployment activation gate
 
 ### Auth endpoints (ADR-009)
 
-Mounted at `/api/auth` (and `/api/v1/auth`), served by `src/routes/auth.routes.js`. These three
-routes are the only ones reachable without a session besides `GET /health` — every other endpoint
-in this document now requires one. A session is carried either as the `afm_session` cookie
-(`HttpOnly`, `SameSite=Lax`, `Secure` in production) or as `Authorization: Bearer <token>`; both
-resolve to the same session. Every non-GET request — including `/auth/logout` — also requires an
-`X-CSRF-Token` header matching the session's issued token, or it is refused with `403` before any
-state changes.
+Mounted at `/api/auth` (and `/api/v1/auth`), served by `src/routes/auth.routes.js`, **above** the
+blanket `authenticate` in `src/routes/api.js` — each route gates itself. Everything else in this
+document requires a session (`access-refresh-session-tokens`).
 
-Sessions and accounts are stored in `admin.sqlite` — schema, lifecycle and retention in
-`docs/DATABASE.md`. The token is 32 random bytes (hex); only its SHA-256 is persisted. Sessions last
-a flat **24 hours** from login (no sliding renewal) and end early on logout, account disable,
-password reset, admin revoke or account delete. A session whose user is no longer `active` stops
-validating immediately.
+A session grants **two credentials**, both 32 random bytes (hex), both stored only as SHA-256 rows
+in `session_tokens`, neither ever in a response body:
+
+| Credential | Browser transport | Other transport | Accepted by |
+|---|---|---|---|
+| **access token** | `afm_access` cookie — `Path=/`, `HttpOnly`, `SameSite=Lax`, `Max-Age` = access lifetime, `Secure` when `req.secure` | `Authorization: Bearer <token>` | every authenticated endpoint |
+| **refresh token** | `afm_refresh` cookie, set **twice** — `Path=/api/v1/auth` and `Path=/api/auth` — `HttpOnly`, `SameSite=Strict`, `Max-Age` = refresh lifetime | — | `POST /auth/refresh` and `POST /auth/logout` only; refused (`401`) as an API credential |
+
+`afm_session` is retired; an old cookie simply no longer authenticates (`401` → login).
+
+**Lifetime policy.**
+
+| | Default | Configurable | Variable |
+|---|---|---|---|
+| Access token | 15 min | 1 s – 1 h | `AFM_ACCESS_TTL_SECONDS` |
+| Refresh token | 30 days | 1 s – 1 year | `AFM_REFRESH_TTL_SECONDS` |
+| Reuse grace window | 10 s | 1 – 60 s | `AFM_REFRESH_GRACE_SECONDS` |
+| Absolute session cap | 1 year from login | fixed | — |
+
+An out-of-range value stops the server at startup (`validateStartup`), naming the variable; it is
+never clamped. No token outlives the session's absolute cap, and nothing — activity, refresh,
+rotation — extends the cap. **The user must re-enter credentials** when the refresh token expires
+unused (30 days idle by default), when the absolute cap is reached, after logout or any revocation,
+or when the browser has lost its device key (cleared site data).
+
+A session ends early on logout, account disable, password reset, admin revoke or account delete —
+each revokes the session row **and** every token of it in one transaction, so a just-issued access
+token stops working on the next request. A session whose user is no longer `active` stops
+validating immediately. Every non-GET request on an authenticated endpoint also requires an
+`X-CSRF-Token` header matching the session's issued token, or it is refused with `403`.
 
 #### POST /api/auth/login → `200` (mutating envelope)
 
 Request (JSON or `application/x-www-form-urlencoded`):
 
 ```json
-{ "username": "admin", "password": "..." }
+{ "username": "admin", "password": "...", "dpopJwk": { "kty": "EC", "crv": "P-256", "x": "...", "y": "..." } }
 ```
 
 Response:
 
 ```http
-Set-Cookie: afm_session=<token>; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400[; Secure]
+Set-Cookie: afm_access=<access>; Path=/; HttpOnly; SameSite=Lax; Max-Age=900[; Secure]
+Set-Cookie: afm_refresh=<refresh>; Path=/api/v1/auth; HttpOnly; SameSite=Strict; Max-Age=2592000[; Secure]
+Set-Cookie: afm_refresh=<refresh>; Path=/api/auth; HttpOnly; SameSite=Strict; Max-Age=2592000[; Secure]
 ```
 
 ```json
@@ -252,7 +275,12 @@ Set-Cookie: afm_session=<token>; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400[;
 ```
 
 - `Secure` is added when the request arrived over https (`req.secure`, i.e. `X-Forwarded-Proto: https` from the one trusted nginx hop) — not by `NODE_ENV`, which systemd pins to production even behind the plain-HTTP test config. The raw token is **only** in the cookie — the
-  body carries no token, so a Bearer client must read the cookie value.
+  body carries no token, so a Bearer client must read the `afm_access` cookie value.
+- `dpopJwk` (optional) is the client's **public** ECDSA P-256 key. Its RFC 7638 thumbprint is pinned
+  on the session and never changes. A present-but-invalid key (not `kty: EC` / `crv: P-256`, a bad
+  point, or any private member `d`) is the same `401` as a wrong password. Without one the session
+  works but can **never** refresh — it ends with its first access token. The SPA always sends one
+  (`API.devicePublicJwk()`).
 - Username matching is case-insensitive and trimmed.
 - `401 { "error": "Invalid username or password." }` for every failure: unknown user, wrong
   password, disabled account, locked account. The shape never discloses which one occurred.
@@ -262,15 +290,61 @@ Set-Cookie: afm_session=<token>; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400[;
 - After 10 consecutive wrong passwords for one account, it is locked for 15 minutes even against
   its correct password.
 
+#### POST /api/auth/refresh → `200` (mutating envelope)
+
+Exchanges the refresh cookie for a new access token **and** a new refresh token (rotation).
+Reachable with no access token at all — that is when it is needed.
+
+```http
+POST /api/v1/auth/refresh
+Cookie: afm_refresh=<refresh>
+DPoP: <compact JWS>
+```
+
+```json
+{ "success": true, "csrfToken": "..." }
+```
+
+- **DPoP proof (mandatory).** Header `DPoP`: a compact JWS with header
+  `{ "typ": "dpop+jwt", "alg": "ES256", "jwk": <public P-256 JWK> }` and claims
+  `{ "htm": "POST", "htu": "<request path, e.g. /api/v1/auth/refresh>", "iat": <unix seconds>, "jti": "..." }`,
+  signed with the device key (raw `r||s` signature). The JWK's thumbprint must equal the one pinned
+  at login, `htu` is the **path** only (not scheme/host — nginx-proof), and `iat` must be within 60 s
+  of the server clock. No `jti` replay cache.
+- **Rotation.** The presented refresh token is marked used and a successor issued in one
+  transaction; `Set-Cookie` carries the same three cookies as login. `csrfToken` is the session's
+  unchanged secret (lets a reloaded page recover it in the same round trip).
+- **Grace window.** A refresh token presented again within `AFM_REFRESH_GRACE_SECONDS` of its first
+  use (a retried or duplicated request) re-rotates: it succeeds and issues another successor.
+- **Reuse.** Presented again after the window, it is treated as theft: the whole session (every
+  token) is revoked with `revoke_reason = 'token_reuse'`, an audit row `session.token_reuse` is
+  written (no token value), and the response is `401`. This check runs before the proof check.
+- No `X-CSRF-Token`: the refresh cookie is `SameSite=Strict` and path-scoped, so a cross-site request
+  cannot carry it.
+- Throttled per-IP by its own limiter (`AFM_REFRESH_RATE_LIMIT_PER_MINUTE`, default 30/minute, `0`
+  disables; same factory as login) **in addition to** the general `/api` write limiter → `429` with
+  `Retry-After`, before the token is looked at — a throttled response says nothing about the token.
+- **`htu` must match the path the app itself sees** (`req.originalUrl`). That holds while nginx
+  proxies the app at `/`; mounting it under a sub-path makes every refresh fail.
+- `401 { "success": false, "error": "Session could not be renewed." }` for every failure — no/unknown
+  /expired/revoked token, access token presented instead, session past its cap, missing or invalid
+  proof, other key, session without a pinned key, disabled user. The response never says which.
+
 #### POST /api/auth/logout → `200` (mutating envelope)
 
 ```json
 { "success": true }
 ```
 
-Requires a session and its CSRF token. Revokes exactly the calling session and clears the cookie
-(`Max-Age=0`); other sessions for the same user are unaffected (bulk revoke is an admin-panel
-capability, not part of this endpoint). `401` without a session, `403` without the CSRF token.
+Self-gated, two ways:
+
+- **with a live access token** — requires its CSRF token (`403` without it), as before;
+- **with only the refresh cookie** (access already expired) — no proof and no CSRF header needed:
+  revocation can only fail safe, and the cookie is `SameSite=Strict`.
+
+Either way the calling session and every token in it are revoked, and all three cookies are cleared
+(`Max-Age=0`). Other sessions for the same user are unaffected (bulk revoke is an admin-panel
+capability). `401` with neither credential.
 
 #### GET /api/auth/me → `200` (bare object — read-only aggregate precedent)
 
@@ -280,7 +354,9 @@ capability, not part of this endpoint). `401` without a session, `403` without t
 
 `csrfToken` is the calling session's existing secret, re-issued so a reloaded page (which lost
 `api.js`'s in-memory copy) can keep making mutations without logging in again. It is not rotated.
-`401` without a valid session — this is how the SPA detects it must send the user to `/login.html`.
+`401` without a valid access token. The SPA (`api.js`) answers any `401` by one single-flight
+`POST /auth/refresh` and replays the call once; only a failed renewal or a second `401` sends the
+user to `/login.html?redirect=<page>`. The login request itself (`skipAuthRedirect`) never renews.
 
 #### Using the API from a script
 
@@ -295,8 +371,9 @@ curl -s -b jar -X POST -H 'Content-Type: application/json' -H 'X-CSRF-Token: <cs
   -d '{"path":"/reports"}' http://localhost:3000/api/v1/fs/folder
 ```
 
-`Authorization: Bearer <cookie value>` may replace `-b jar`; the CSRF header is still required on
-mutations.
+`Authorization: Bearer <afm_access value>` may replace `-b jar`; the CSRF header is still required on
+mutations. A script that logs in without `dpopJwk` cannot refresh: it logs in again when its access
+token expires (15 min by default).
 
 No `password_hash` or throttle bookkeeping ever leaves `UserService`/`SessionService` — every shape
 returned to a client is stripped of those fields at the service boundary, not the controller.

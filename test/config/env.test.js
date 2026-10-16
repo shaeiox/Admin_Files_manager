@@ -116,3 +116,24 @@ describe('listen address', () => {
         assert.equal(config.listenHost({}), undefined);
     });
 });
+
+describe('validateStartup: session token lifetimes (access-refresh-session-tokens)', () => {
+    test('defaults are 15 min access, 30 d refresh, 10 s grace, 1 y absolute cap', () => {
+        assert.deepEqual(config.sessionTokens, {
+            accessTtlSeconds: 900, refreshTtlSeconds: 2592000, refreshGraceSeconds: 10, absoluteTtlSeconds: 31536000,
+        });
+    });
+
+    test('an out-of-range value is refused, naming the variable, never clamped', () => {
+        for (const [name, bad] of [['AFM_ACCESS_TTL_SECONDS', '3601'], ['AFM_REFRESH_TTL_SECONDS', '31536001'],
+            ['AFM_ACCESS_TTL_SECONDS', '0'], ['AFM_REFRESH_GRACE_SECONDS', 'ten']]) {
+            const p = config.validateStartup({ [name]: bad });
+            assert.ok(p.some((m) => m.startsWith(name)), `${name}=${bad}: ${p.join(' | ')}`);
+        }
+    });
+
+    test('the maxima themselves are accepted', () => {
+        const p = config.validateStartup({ AFM_ACCESS_TTL_SECONDS: '3600', AFM_REFRESH_TTL_SECONDS: '31536000' });
+        assert.ok(!p.some((m) => /TTL_SECONDS/.test(m)), p.join(' | '));
+    });
+});

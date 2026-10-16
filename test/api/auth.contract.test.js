@@ -133,7 +133,7 @@ describe('POST /api/v1/auth/login', () => {
         assert.equal(res.json.user.role, 'admin');
         assert.equal(typeof res.json.csrfToken, 'string');
         const setCookie = (res.headers['set-cookie'] || []).join(';');
-        assert.match(setCookie, /afm_session=/);
+        assert.match(setCookie, /afm_access=/);
         assert.match(setCookie, /HttpOnly/);
         assert.match(setCookie, /SameSite=Lax/);
     });
@@ -148,7 +148,7 @@ describe('POST /api/v1/auth/login', () => {
 
     test('a malformed session cookie is a 401, not a 500', async () => {
         // decodeURIComponent threw URIError on a stray '%'.
-        const res = await send('GET', '/api/v1/fs/list?path=/', { headers: { Cookie: 'afm_session=%E0%A4%A' } });
+        const res = await send('GET', '/api/v1/fs/list?path=/', { headers: { Cookie: 'afm_access=%E0%A4%A' } });
         assert.equal(res.status, 401);
     });
 
@@ -228,6 +228,21 @@ describe('POST /api/v1/auth/logout', () => {
         const auth = await authLogin(port);
         const res = await send('POST', '/api/v1/auth/logout', { headers: { Cookie: auth.headers.Cookie } });
         assert.equal(res.status, 403);
+    });
+});
+
+describe('POST /api/v1/auth/refresh default throttle', () => {
+    test('with AFM_REFRESH_RATE_LIMIT_PER_MINUTE unset, an ordinary session renewing repeatedly is never throttled', async () => {
+        assert.equal(process.env.AFM_REFRESH_RATE_LIMIT_PER_MINUTE, undefined);
+        const { deviceKey } = require('../helpers/dpop');
+        const key = deviceKey();
+        const login = await sendJson('POST', '/api/v1/auth/login', { username: BOOTSTRAP_USERNAME, password: BOOTSTRAP_PASSWORD, dpopJwk: key.jwk });
+        let refresh = (login.headers['set-cookie'] || []).find((c) => c.startsWith('afm_refresh=')).split(';')[0];
+        for (let i = 0; i < 10; i++) {
+            const res = await send('POST', '/api/v1/auth/refresh', { headers: { Cookie: refresh, DPoP: key.proof() } });
+            assert.equal(res.status, 200, `refresh #${i + 1}`);
+            refresh = res.headers['set-cookie'].find((c) => c.startsWith('afm_refresh=')).split(';')[0];
+        }
     });
 });
 

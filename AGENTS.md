@@ -28,7 +28,7 @@
 ```bash
 npm run dev      # Start with nodemon (http://localhost:3000)
 npm start        # Start in production mode
-npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 1051 tests, exits 0:
+npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 1161 tests, exits 0:
                  # services, API contracts (live server, incl. versioning.contract), frontend modules in a vm
                  # (incl. api-boundary), integration, guardrails.
 ```
@@ -143,9 +143,18 @@ npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 10
   transformer is installed (none is; adding one is its own security-reviewed change). Non-images are refused
   from the name before any byte is read; failures carry `X-Preview: unavailable`. Never point an `<img>` at
   `/api/fs/download`, and never relax its `application/octet-stream`.
-- **The API is authenticated (ADR-009, phase 1).** Every endpoint except `GET /health` and
-  `POST /auth/login` requires a session (`afm_session` cookie or `Authorization: Bearer`), checked
-  by `authenticate` in `src/routes/api.js`, plus a CSRF header on every non-GET request. This is a
+- **The API is authenticated (ADR-009, phase 1; access-refresh-session-tokens).** Every endpoint except
+  `GET /health`, `POST /auth/login`, `POST /auth/refresh` and `POST /auth/logout` (the last two
+  self-gated) requires an **access token** (`afm_access` cookie or `Authorization: Bearer`), checked
+  by `authenticate` in `src/routes/api.js`, plus a CSRF header on every non-GET request. A session
+  grants two opaque, DB-backed credentials: the access token (default 15 min, max 1 h —
+  `AFM_ACCESS_TTL_SECONDS`) and a refresh token (default 30 d, max 1 y — `AFM_REFRESH_TTL_SECONDS`)
+  in the `afm_refresh` cookie scoped to `/api/v1/auth` and `/api/auth`. Every refresh rotates, needs a
+  DPoP proof from the device key pinned at login, tolerates a retry for `AFM_REFRESH_GRACE_SECONDS`
+  (10 s; safe only because DPoP is mandatory) and treats later reuse as theft (whole session
+  revoked). Sessions have a hard 1-year absolute cap that nothing extends; the user re-enters
+  credentials after refresh expiry, the cap, any revocation, or loss of the device key. `/auth/refresh`
+  must stay in `auth.routes.js` above `authenticate`, or it is unreachable. This is a
   **single-tenant, flat-authorization** slice — any active session has today's full capability set;
   there is no tenancy and no permission catalogue yet. **File-access policies govern the File Portal
   only** (files-server-web reads them from `admin.sqlite`); this app never consults them — no `/fs`,

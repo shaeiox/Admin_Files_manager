@@ -98,6 +98,7 @@ function createRateLimit(options = {}) {
 }
 
 module.exports = {
+    perMinute,
     createRateLimit,
     WINDOW_MS,
     DEFAULT_WRITE_PER_MINUTE,

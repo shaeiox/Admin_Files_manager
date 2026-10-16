@@ -195,9 +195,10 @@ describe('every API URL is built inside the boundary', () => {
     test('there is no general-purpose URL escape hatch', () => {
         const { API } = loadApi();
         // setCsrfToken/clearCsrfToken/redirectToLogin added by ADR-009: session
-        // state, not a URL builder - they don't widen this boundary.
+        // state, not a URL builder - they don't widen this boundary. Neither does
+        // devicePublicJwk (access-refresh-session-tokens): login.js sends it.
         assert.deepEqual(Object.keys(API).sort(), [
-            'BASE_URL', 'clearCsrfToken', 'del', 'downloadFile', 'downloadMultipleFiles', 'downloadZip',
+            'BASE_URL', 'clearCsrfToken', 'del', 'devicePublicJwk', 'downloadFile', 'downloadMultipleFiles', 'downloadZip',
             'get', 'post', 'put', 'redirectToLogin', 'setCsrfToken', 'thumbnailUrl', 'upload',
         ]);
     });

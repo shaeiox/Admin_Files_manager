@@ -74,7 +74,7 @@ async function createUser(username, password = 'a-password-123', role = 'user') 
 async function loginAs(username, password = 'a-password-123') {
     const res = await sendJson('POST', '/api/v1/auth/login', { username, password });
     assert.equal(res.status, 200, JSON.stringify(res.json));
-    const setCookie = (res.headers['set-cookie'] || []).map((c) => c.split(';')[0]).find((c) => c.startsWith('afm_session='));
+    const setCookie = (res.headers['set-cookie'] || []).map((c) => c.split(';')[0]).find((c) => c.startsWith('afm_access='));
     return { Cookie: setCookie, 'X-CSRF-Token': res.json.csrfToken };
 }
 
