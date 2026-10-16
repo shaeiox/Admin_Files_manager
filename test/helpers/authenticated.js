@@ -68,7 +68,7 @@ function login(port) {
                         return;
                     }
                     const setCookie = res.headers['set-cookie'] || [];
-                    const sessionCookie = setCookie.map((c) => c.split(';')[0]).find((c) => c.startsWith('afm_session='));
+                    const sessionCookie = setCookie.map((c) => c.split(';')[0]).find((c) => c.startsWith('afm_access='));
                     if (!sessionCookie) {
                         reject(new Error('authenticated helper: no session cookie in login response'));
                         return;

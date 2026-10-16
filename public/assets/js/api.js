@@ -44,10 +44,9 @@ const API = (() => {
     })();
 
     /* ══════════════════════════════════════════
-       SESSION STATE (ADR-009)
-       The session itself lives in an HttpOnly cookie the browser already
-       sends automatically on every same-origin request - this module never
-       touches it. The CSRF token is NOT a secret (it is useless without that
+       SESSION STATE (ADR-009, access-refresh-session-tokens)
+       The access and refresh tokens live in HttpOnly cookies the browser
+       already sends automatically - this module never touches them. The CSRF token is NOT a secret (it is useless without that
        cookie), but it must be attached to every mutating request by hand, so
        it is kept here, the one place that builds every request.
        ══════════════════════════════════════════ */
@@ -78,6 +77,108 @@ const API = (() => {
     }
 
     /* ══════════════════════════════════════════
+       DEVICE KEY + RENEWAL (access-refresh-session-tokens D5/D8)
+       A non-extractable ECDSA P-256 key, generated once and kept in
+       IndexedDB (a CryptoKey is structured-cloneable; localStorage cannot
+       hold it). Its public half is pinned on the session at login; every
+       refresh carries a DPoP proof signed by it. A key regenerated per load
+       would have a new thumbprint and be refused, so it must persist.
+       ══════════════════════════════════════════ */
+
+    const DPOP_DB = 'afm-dpop';
+    const DPOP_STORE = 'keys';
+    const DPOP_KEY_ID = 'device';
+    let deviceKeyPromise = null;
+    let renewing = null;
+
+    function keyStore(mode, operate) {
+        return new Promise((resolve, reject) => {
+            const open = indexedDB.open(DPOP_DB, 1);
+            open.onupgradeneeded = () => open.result.createObjectStore(DPOP_STORE);
+            open.onerror = () => reject(open.error);
+            open.onsuccess = () => {
+                const db = open.result;
+                const tx = db.transaction(DPOP_STORE, mode);
+                const req = operate(tx.objectStore(DPOP_STORE));
+                tx.oncomplete = () => { db.close(); resolve(req.result); };
+                tx.onerror = () => { db.close(); reject(tx.error); };
+            };
+        });
+    }
+
+    /** The persisted device keypair, generated only when none is stored. */
+    function deviceKey() {
+        if (!deviceKeyPromise) {
+            deviceKeyPromise = (async () => {
+                const stored = await keyStore('readonly', (store) => store.get(DPOP_KEY_ID));
+                if (stored) return stored;
+                const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']);
+                await keyStore('readwrite', (store) => store.put(pair, DPOP_KEY_ID));
+                return pair;
+            })();
+            deviceKeyPromise.catch(() => { deviceKeyPromise = null; });
+        }
+        return deviceKeyPromise;
+    }
+
+    function b64url(bytes) {
+        let binary = '';
+        for (const b of bytes) binary += String.fromCharCode(b);
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    const b64urlJson = (value) => b64url(new TextEncoder().encode(JSON.stringify(value)));
+
+    /**
+     * The public JWK sent once with the login body, or null where WebCrypto or
+     * IndexedDB is unavailable (e.g. a plain-HTTP origin): that session still
+     * works but cannot renew, so it ends when its access token does.
+     */
+    async function devicePublicJwk() {
+        try {
+            const { kty, crv, x, y } = await crypto.subtle.exportKey('jwk', (await deviceKey()).publicKey);
+            return { kty, crv, x, y };
+        } catch {
+            return null;
+        }
+    }
+
+    /** A DPoP proof (compact JWS, ES256) for one request; `htu` is the path only. */
+    async function dpopProof(method, url) {
+        const pair = await deviceKey();
+        const jwk = await devicePublicJwk();
+        const header = b64urlJson({ typ: 'dpop+jwt', alg: 'ES256', jwk });
+        const payload = b64urlJson({
+            htm: method,
+            htu: new URL(url, window.location.href).pathname,
+            iat: Math.floor(Date.now() / 1000),
+            jti: crypto.randomUUID(),
+        });
+        const signature = await crypto.subtle.sign(
+            { name: 'ECDSA', hash: 'SHA-256' }, pair.privateKey, new TextEncoder().encode(`${header}.${payload}`));
+        return `${header}.${payload}.${b64url(new Uint8Array(signature))}`;
+    }
+
+    /**
+     * Single-flight renewal: concurrent 401s share ONE refresh, because N
+     * refreshes would rotate N times. Resolves true when a new access cookie
+     * was issued; never rejects.
+     */
+    function renewSession() {
+        if (!renewing) {
+            renewing = (async () => {
+                const url = `${BASE_URL}/auth/refresh`;
+                const response = await fetch(url, { method: 'POST', headers: { DPoP: await dpopProof('POST', url) } });
+                if (!response.ok) return false;
+                const data = await response.json().catch(() => null);
+                if (data && data.csrfToken) setCsrfToken(data.csrfToken);
+                return true;
+            })().catch(() => false).finally(() => { renewing = null; });
+        }
+        return renewing;
+    }
+
+    /* ══════════════════════════════════════════
        INTERNAL: JSON REQUEST CORE
        ══════════════════════════════════════════ */
 
@@ -90,15 +191,19 @@ const API = (() => {
      * failure token. Callers branch on those, never on the message text.
      *
      * @param {string} endpoint - Path under BASE_URL (e.g. "/fs/list")
+     * A 401 first tries one session renewal and, on success, replays the call
+     * once; only a failed renewal (or a 401 on the replay) goes to login.
+     *
      * @param {RequestInit & { silent?: boolean, skipAuthRedirect?: boolean }} options -
      *   `silent` suppresses the generic error toast, for callers that report the
-     *   failure themselves. `skipAuthRedirect` suppresses the 401-redirect-to-login
-     *   behavior, for the login request itself.
+     *   failure themselves. `skipAuthRedirect` suppresses the renewal and the
+     *   401-redirect-to-login behavior, for the login request itself.
      * @returns {Promise<any>}
      */
     async function request(endpoint, options = {}) {
         const url = `${BASE_URL}${endpoint}`;
-        const { silent = false, skipAuthRedirect = false, ...fetchOptions } = options;
+        const original = options;
+        const { silent = false, skipAuthRedirect = false, renewed = false, ...fetchOptions } = options;
         options = fetchOptions;
         const headers = { ...(options.headers || {}) };
 
@@ -136,6 +241,12 @@ const API = (() => {
 
             if (!response.ok) {
                 if (response.status === 401 && !skipAuthRedirect) {
+                    // Renew once and replay once; the replay carries `renewed`
+                    // so a second 401 goes to login instead of looping. Returned, not
+                    // awaited: the replay reports its own failure, never twice.
+                    if (!renewed && await renewSession()) {
+                        return request(endpoint, { ...original, renewed: true });
+                    }
                     clearCsrfToken();
                     redirectToLogin();
                 }
@@ -240,9 +351,15 @@ const API = (() => {
                     return;
                 }
 
+                // An upload is not replayed (the caller retries it); a 401
+                // still renews the session so that retry can succeed.
                 if (xhr.status === 401) {
-                    clearCsrfToken();
-                    redirectToLogin();
+                    renewSession().then((ok) => {
+                        if (!ok) {
+                            clearCsrfToken();
+                            redirectToLogin();
+                        }
+                    });
                 }
 
                 let message = xhr.statusText || 'Upload failed';
@@ -434,6 +551,7 @@ const API = (() => {
         setCsrfToken,
         clearCsrfToken,
         redirectToLogin,
+        devicePublicJwk,
     });
 })();
 

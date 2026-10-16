@@ -33,6 +33,33 @@ describe('schema.migrate', () => {
         assert.ok(MIGRATIONS.some((m) => m.version === 5));
     });
 
+    test('migration 6 adds the session cap, the DPoP thumbprint and session_tokens', () => {
+        const db = new DatabaseSync(':memory:');
+        migrate(db);
+        const sessionCols = db.prepare('PRAGMA table_info(sessions)').all().map((c) => c.name);
+        assert.ok(sessionCols.includes('absolute_expires_at'));
+        assert.ok(sessionCols.includes('dpop_thumbprint'));
+        const tokenCols = db.prepare('PRAGMA table_info(session_tokens)').all().map((c) => c.name);
+        assert.deepEqual(tokenCols, ['id', 'session_id', 'kind', 'token_hash', 'parent_id', 'issued_at',
+            'expires_at', 'used_at', 'revoked_at', 'revoke_reason']);
+        const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'session_tokens'").all().map((r) => r.name);
+        assert.ok(indexes.includes('idx_session_tokens_session_id'));
+        assert.ok(indexes.includes('idx_session_tokens_expires_at'));
+    });
+
+    test('migration 6 backfills a legacy session cap from its expires_at', () => {
+        const db = new DatabaseSync(':memory:');
+        db.exec('CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)');
+        for (const m of MIGRATIONS.filter((x) => x.version <= 5)) {
+            db.exec(m.sql);
+            db.prepare('INSERT INTO schema_migrations VALUES (?, ?)').run(m.version, Date.now());
+        }
+        db.prepare("INSERT INTO users (username, password_hash, created_at, updated_at) VALUES ('u', 'h', 1, 1)").run();
+        db.prepare("INSERT INTO sessions (token_hash, user_id, csrf_secret, created_at, last_seen_at, expires_at) VALUES ('t', 1, 'c', 1, 1, 123456)").run();
+        migrate(db);
+        assert.equal(db.prepare('SELECT absolute_expires_at FROM sessions').get().absolute_expires_at, 123456);
+    });
+
     test('records the applied version', () => {
         const db = new DatabaseSync(':memory:');
         migrate(db);

@@ -18,6 +18,12 @@
  * Existing rows default to 'download' - exactly what a grant meant before.
  * Policies govern the portal only; this application never enforces them.
  *
+ * Migration 6: access/refresh session tokens (access-refresh-session-tokens).
+ * sessions gains the hard absolute cap and the DPoP key thumbprint pinned at
+ * login; session_tokens holds one row per issued access or refresh token. The
+ * token family IS the session (design D2): no family column. Legacy rows get
+ * absolute_expires_at = expires_at so none becomes un-cappable.
+ *
  * Idempotent: migrate() records applied versions in schema_migrations and is
  * a no-op when the stored schema is already current. A stored version newer
  * than this module knows about is refused rather than silently ignored.
@@ -168,6 +174,29 @@ const MIGRATIONS = [
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+        `,
+    },
+    {
+        version: 6,
+        sql: `
+            ALTER TABLE sessions ADD COLUMN absolute_expires_at INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE sessions ADD COLUMN dpop_thumbprint TEXT;
+            UPDATE sessions SET absolute_expires_at = expires_at;
+
+            CREATE TABLE session_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+                kind TEXT NOT NULL CHECK (kind IN ('access','refresh')),
+                token_hash TEXT NOT NULL UNIQUE,
+                parent_id INTEGER REFERENCES session_tokens(id),
+                issued_at INTEGER NOT NULL,
+                expires_at INTEGER NOT NULL,
+                used_at INTEGER,
+                revoked_at INTEGER,
+                revoke_reason TEXT
+            );
+            CREATE INDEX idx_session_tokens_session_id ON session_tokens(session_id);
+            CREATE INDEX idx_session_tokens_expires_at ON session_tokens(expires_at);
         `,
     },
 ];

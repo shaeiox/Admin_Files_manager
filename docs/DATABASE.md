@@ -84,18 +84,48 @@ uses. Booleans are `INTEGER` `0`/`1`. Every table has `id INTEGER PRIMARY KEY AU
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | `id` | INTEGER | PK | |
-| `token_hash` | TEXT | NOT NULL, UNIQUE | SHA-256 hex of the opaque 32-byte token. **The raw token is never stored** — it exists only in the client's cookie / bearer header. |
+| `token_hash` | TEXT | NOT NULL, UNIQUE | Before migration 6: SHA-256 hex of the session token. Since: hash of a discarded random value (see below). |
 | `user_id` | INTEGER | NOT NULL, FK → `users.id` **ON DELETE CASCADE** | |
 | `csrf_secret` | TEXT | NOT NULL | 16 random bytes, hex. Stored raw: it is compared against the `X-CSRF-Token` header, and `GET /auth/me` re-issues it to a reloaded page. |
 | `created_at`, `last_seen_at` | INTEGER | NOT NULL | `last_seen_at` is rewritten on **every** authenticated request (`SessionService.validateSession` → `touch`). |
-| `expires_at` | INTEGER | NOT NULL | `created_at + 24 h`. Flat expiry — no sliding renewal (design D3). |
+| `expires_at` | INTEGER | NOT NULL | Before migration 6: `created_at + 24 h`. Since: equal to `absolute_expires_at`; token expiry lives in `session_tokens`. |
 | `revoked_at` | INTEGER | nullable | Set by logout, disable, password reset, revoke-sessions, delete. |
 | `ip`, `user_agent` | TEXT | nullable | Recorded at login only. |
 
+| `absolute_expires_at` | INTEGER | NOT NULL, default 0 (migration 6) | Hard cap, login + 1 year. Never extended. Legacy rows backfilled from `expires_at`. |
+| `dpop_thumbprint` | TEXT | nullable (migration 6) | RFC 7638 thumbprint of the device key pinned at login. `NULL` = session cannot refresh. |
+
 Indexes: `idx_sessions_user_id (user_id)`, `idx_sessions_expires_at (expires_at)`.
 
-A session is **active** iff `revoked_at IS NULL AND expires_at > now` (`findActiveByTokenHash`)
-**and** its user's `status = 'active'` (checked in `SessionService`).
+Since migration 6 `sessions.token_hash` is filled with the hash of a discarded random value: no
+credential resolves through it (a rolled-back release fails closed), and `expires_at` equals
+`absolute_expires_at`. The credentials live in `session_tokens`.
+
+#### `session_tokens` (migration 6)
+
+One row per issued access or refresh token. The token **family is the session**: there is no
+family column, and `UPDATE session_tokens ... WHERE session_id = ?` revokes a whole family.
+
+| Column | Type | Constraints | Meaning |
+|---|---|---|---|
+| `id` | INTEGER | PK autoincrement | |
+| `session_id` | INTEGER | NOT NULL, FK `sessions(id)` ON DELETE CASCADE | Owning session (= family). |
+| `kind` | TEXT | NOT NULL, CHECK `access`\|`refresh` | An access token never refreshes; a refresh token never authenticates. |
+| `token_hash` | TEXT | NOT NULL UNIQUE | SHA-256 hex of the raw token. The raw value is never stored. |
+| `parent_id` | INTEGER | nullable, FK `session_tokens(id)` | The refresh token this one was rotated from (`NULL` at login). |
+| `issued_at` | INTEGER | NOT NULL | |
+| `expires_at` | INTEGER | NOT NULL | `min(issued + lifetime, sessions.absolute_expires_at)`. |
+| `used_at` | INTEGER | nullable | First rotation of a refresh token; never overwritten, so the grace window is anchored to it. |
+| `revoked_at` | INTEGER | nullable | |
+| `revoke_reason` | TEXT | nullable | `logout`, `admin` (disable/reset/revoke/delete), `token_reuse`. |
+
+Indexes: `idx_session_tokens_session_id (session_id)`, `idx_session_tokens_expires_at (expires_at)`,
+plus the implicit unique index on `token_hash`.
+
+A token authenticates iff `findByTokenHash` finds it with `kind = 'access'`, its `session_tokens`
+row and its `sessions` row are both unrevoked, the token is unexpired, the session is before
+`absolute_expires_at`, **and** its user's `status = 'active'` — all judged by
+`SessionService.validateSession`.
 
 #### `audit_logs` (migration 1)
 
@@ -219,6 +249,7 @@ understands schema ≤ 4 — upgrade the portal before this admin release).
 | 3 | `portal_nav_folders` (File portal navbar links) |
 | 4 | `file_access_policies.default_level`, `user_file_permissions.level`, `user_groups`, `user_group_members`, `group_file_permissions` + indexes (access levels and groups) |
 | 5 | `integration_settings(key, value)`: values shared with the File Portal (ADR-010). Keys: `volume_id` (UUID, also in `STORAGE_ROOT/.dimension-volume`), `release_client_path`, `portal.auth_session_minutes`, `portal.max_failed_attempts`, `portal.lockout_minutes`. Logical values only, never a host path. The portal accepts schema ≤ 5. |
+| 6 | `sessions.absolute_expires_at` (backfilled from `expires_at`), `sessions.dpop_thumbprint`, `session_tokens` + indexes (access-refresh-session-tokens). **The File Portal gate accepts schema ≤ 5 — its `lib/admin-db.js` must accept 6 before this release is deployed.** |
 
 **Adding a migration:** append `{ version: N+1, sql }` — never edit an applied one; a deployed
 database will not re-run it. Prefer additive DDL (`CREATE TABLE`, `ALTER TABLE … ADD COLUMN`).
@@ -234,7 +265,7 @@ and no `node:sqlite` type crosses into services or controllers. Every statement 
 | Repository | Operations | Called by |
 |---|---|---|
 | `UserRepository` | `create`, `findById`, `findByUsername` (NOCASE), `list` (by `created_at`), `setStatus`, `setPasswordHash`, `recordLoginFailure`, `resetLoginFailures`, `lockUntil`, `delete`, `count` | `UserService`, `SessionService`, `FileAccessPolicyService`, `bootstrap.js` |
-| `SessionRepository` | `create`, `findById`, `findActiveByTokenHash`, `touch`, `revoke`, `revokeAllForUser` | `SessionService` |
+| `SessionRepository` | `create`, `findById`, `createToken`, `findByTokenHash` (token joined to its session), `markUsed` (first use only), `transaction(fn)`, `touch`, `revokeSession(id, reason)`, `revokeAllForUser(userId, reason)` — both revokes cover the session rows **and** their `session_tokens` in one transaction | `SessionService` |
 | `AuditLogRepository` | `record`, `list({limit})`, `prune(olderThanMs)` | admin controllers (`record` only) |
 | `FileAccessPolicyRepository` | `findFileByPath`, `findPolicyByPath`, `listPolicies` (by path), `upsertPolicy` (transactional), `renamePath`, `deletePath`, `deletePolicy` | `FileAccessPolicyService` |
 | `UserFilePermissionRepository` | `upsert`, `revoke`, `listForFile`, `listForUser` | `FileAccessPolicyService` |
@@ -258,16 +289,26 @@ be removed from the environment file after first boot. No default credential exi
 1. `findByUsername` (case-insensitive). Missing or `disabled` → failure.
 2. `locked_until > now` → failure, even with the right password.
 3. Wrong password → `failed_login_count + 1`; at 10, `locked_until = now + 15 min`.
-4. Success → reset counter and lock; insert a `sessions` row with the token **hash**, a fresh CSRF
-   secret and `expires_at = now + 24 h`.
+4. A `dpopJwk` that is present but not a valid public P-256 key → failure (same `401`).
+5. Success → reset counter and lock; in one transaction insert a `sessions` row (fresh CSRF secret,
+   `absolute_expires_at = now + 1 year`, the key thumbprint or `NULL`) and two `session_tokens`
+   rows — an access token (`now + AFM_ACCESS_TTL_SECONDS`) and a refresh token
+   (`now + AFM_REFRESH_TTL_SECONDS`), both capped at `absolute_expires_at`.
 
 Every failure produces the same `401` body.
 
-**Each authenticated request.** Hash the presented token → `findActiveByTokenHash` → load the user
-→ require `status = 'active'` → `touch` (`UPDATE last_seen_at`).
+**Each authenticated request.** Hash the presented token → `findByTokenHash` (one indexed lookup,
+joined to the session) → require `kind = 'access'`, token and session unrevoked, token unexpired,
+session before its cap → load the user → require `status = 'active'` → `touch`.
 
-**Revocation.** Rows are marked, never deleted: `revoked_at = now`. Logout revokes the calling
-session; disable, password reset, revoke-sessions and user delete revoke every session of that user.
+**Refresh.** `findByTokenHash` → require `kind = 'refresh'` and a live token/session → if `used_at`
+is older than the grace window: revoke the session (`token_reuse`), audit, fail → verify the DPoP
+proof against `sessions.dpop_thumbprint` → require an active user → in one transaction `markUsed`
+and insert a new access + refresh pair with `parent_id` = the presented token.
+
+**Revocation.** Rows are marked, never deleted: `revoked_at = now` on the session and every token
+(`revoke_reason`). Logout revokes the calling session; disable, password reset, revoke-sessions and
+user delete revoke every session of that user; refresh-token reuse revokes that session.
 
 **Filesystem hooks.** `fs.controller.js` calls `FileAccessPolicyService.onPathRenamed` after a
 successful rename (`:286`) or move (`:336`), and `onPathDeleted` after a delete (`:453`). Both
@@ -275,7 +316,7 @@ swallow every error. Copy does not touch policies: a copy is a new, ungoverned i
 
 **Retention.** None runs today. Expired and revoked `sessions` rows and all `audit_logs` rows
 accumulate indefinitely; `AuditLogRepository.prune` exists but nothing calls it. At this
-application's scale (one operator, 24 h sessions) that is kilobytes per year, but there is no upper
+application's scale (one operator; since migration 6 also one `session_tokens` pair per login and per refresh, i.e. roughly one per 15 active minutes) that is still small, but there is no upper
 bound.
 
 ### Known defects (tracked in `docs-vault/Health/Code Review.md`)

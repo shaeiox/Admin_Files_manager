@@ -2,9 +2,8 @@
 'use strict';
 
 const express = require('express');
-const { createRateLimit } = require('../middlewares/rateLimit');
+const { createRateLimit, perMinute } = require('../middlewares/rateLimit');
 const { authenticate } = require('../middlewares/authenticate');
-const csrf = require('../middlewares/csrf');
 const authController = require('../controllers/auth.controller');
 
 /**
@@ -14,27 +13,34 @@ const authController = require('../controllers/auth.controller');
  *   - POST /login  - public (that's how a session is obtained at all),
  *     throttled by a dedicated, tight instance of the existing rate-limit
  *     factory rather than a second mechanism.
- *   - POST /logout - requires a session AND a CSRF token (it mutates).
+ *   - POST /refresh - self-gated by the refresh cookie + DPoP proof; it must
+ *     stay here, above the blanket `authenticate`, or it is unreachable
+ *     exactly when the access token has expired.
+ *   - POST /logout - self-gated: access token + CSRF token, or the refresh
+ *     cookie alone (see auth.controller.logout).
  *   - GET  /me     - requires a session; no CSRF needed (GET is safe).
  *
  * AFM_LOGIN_RATE_LIMIT_PER_MINUTE overrides the login budget, the same
  * override pattern AFM_RATE_LIMIT_WRITE_PER_MINUTE already uses - a suite
  * that logs in many times per test file raises this instead of fighting
  * the production default.
+ *
+ * AFM_REFRESH_RATE_LIMIT_PER_MINUTE (default 30, 0 disables) throttles
+ * /refresh the same way: it is reachable with no credential and each call
+ * costs a DB lookup plus an ECDSA verify. A real client refreshes about once
+ * per access lifetime, so the default never touches an ordinary session.
  */
 const router = express.Router();
 
-function loginPerMinute(raw, fallback) {
-    if (raw === undefined || raw === null || raw.trim() === '') return fallback;
-    const n = Number(raw);
-    return Number.isSafeInteger(n) && n >= 0 ? n : fallback;
-}
-
-const LOGIN_PER_MINUTE = loginPerMinute(process.env.AFM_LOGIN_RATE_LIMIT_PER_MINUTE, 10);
+const LOGIN_PER_MINUTE = perMinute(process.env.AFM_LOGIN_RATE_LIMIT_PER_MINUTE, 10);
 const loginThrottle = createRateLimit({ writePerMinute: LOGIN_PER_MINUTE, readPerMinute: 0 });
 
+const REFRESH_PER_MINUTE = perMinute(process.env.AFM_REFRESH_RATE_LIMIT_PER_MINUTE, 30);
+const refreshThrottle = createRateLimit({ writePerMinute: REFRESH_PER_MINUTE, readPerMinute: 0 });
+
 router.post('/login', loginThrottle, authController.login);
-router.post('/logout', authenticate, csrf, authController.logout);
+router.post('/refresh', refreshThrottle, authController.refresh);
+router.post('/logout', authController.logout);
 router.get('/me', authenticate, authController.me);
 
 module.exports = router;

@@ -55,7 +55,9 @@
 
         setBusy(true);
         try {
-            const result = await window.API.post('/auth/login', { username, password }, {
+            // The device key's public half is pinned on the session so it can renew.
+            const dpopJwk = await window.API.devicePublicJwk();
+            const result = await window.API.post('/auth/login', { username, password, dpopJwk }, {
                 skipAuthRedirect: true,
                 silent: true,
             });

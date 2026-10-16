@@ -18,7 +18,30 @@ const DEFAULT_UPLOAD_FREE_SPACE_BYTES = 100 * 1024 * 1024; // 100 MiB
 /** Max distinct CORS origins accepted in the allowlist. */
 const MAX_CORS_ORIGINS = 20;
 
+/**
+ * Session token lifetimes (access-refresh-session-tokens D9), in seconds:
+ * [default, max]. A value outside 1..max is refused by validateStartup(),
+ * never clamped. The grace window is how long a just-rotated refresh token is
+ * still accepted as a retry (design D3); it is only safe because DPoP is
+ * mandatory at refresh.
+ */
+const TOKEN_LIFETIMES = {
+    AFM_ACCESS_TTL_SECONDS: [900, 3600],
+    AFM_REFRESH_TTL_SECONDS: [2592000, 31536000],
+    AFM_REFRESH_GRACE_SECONDS: [10, 60],
+};
+
+/** Hard absolute session cap: one year from login, never extended by rotation. */
+const SESSION_ABSOLUTE_TTL_SECONDS = 31536000;
+
 const env = process.env.NODE_ENV || 'development';
+
+function parseLifetime(name, source = process.env) {
+    const raw = source[name];
+    if (raw === undefined || raw === null || raw.trim() === '') return TOKEN_LIFETIMES[name][0];
+    const n = Number(raw);
+    return /^\d+$/.test(raw.trim()) && n >= 1 && n <= TOKEN_LIFETIMES[name][1] ? n : undefined;
+}
 
 function parseBool(raw, fallback) {
     if (raw === undefined || raw === null || raw.trim() === '') return fallback;
@@ -62,6 +85,15 @@ const config = {
     // upload may stage bytes. Default keeps a small reserve; 0 disables the
     // admission check.
     uploadFreeSpaceBytes: parseUploadFreeSpaceBytes(process.env.AFM_UPLOAD_FREE_SPACE_BYTES),
+
+    // Session token lifetimes in seconds. An out-of-range value reads as
+    // undefined here and is refused by validateStartup() before listen.
+    sessionTokens: {
+        accessTtlSeconds: parseLifetime('AFM_ACCESS_TTL_SECONDS'),
+        refreshTtlSeconds: parseLifetime('AFM_REFRESH_TTL_SECONDS'),
+        refreshGraceSeconds: parseLifetime('AFM_REFRESH_GRACE_SECONDS'),
+        absoluteTtlSeconds: SESSION_ABSOLUTE_TTL_SECONDS,
+    },
 };
 
 config.DEFAULT_UPLOAD_FREE_SPACE_BYTES = DEFAULT_UPLOAD_FREE_SPACE_BYTES;
@@ -113,6 +145,13 @@ function validateStartup(source = process.env) {
         const parsed = Number(limit);
         if (!/^\d+$/.test(limit.trim()) || !Number.isSafeInteger(parsed) || parsed <= 0) {
             problems.push(`UPLOAD_MAX_BYTES must be a positive integer number of bytes (at most ${Number.MAX_SAFE_INTEGER}); default ${DEFAULT_UPLOAD_MAX_BYTES}.`);
+        }
+    }
+
+    for (const name of Object.keys(TOKEN_LIFETIMES)) {
+        if (parseLifetime(name, source) === undefined) {
+            const [fallback, max] = TOKEN_LIFETIMES[name];
+            problems.push(`${name} must be an integer number of seconds from 1 to ${max}; default ${fallback}.`);
         }
     }
 

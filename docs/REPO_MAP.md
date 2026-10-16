@@ -40,8 +40,8 @@ admin-files-manager/
 │   │   ├── dashboard.routes.js   # /api/dashboard router — /summary + /health (read-only, no fs remount)
 │   │   ├── settings.routes.js    # /api/settings router — GET (bare read) + PUT (full replace) only;
 │   │   │                         #   no POST /action, no destructive route (ADR-006)
-│   │   ├── auth.routes.js        # /api/auth router (ADR-009) — login (public, throttled), logout, me;
-│   │   │                         #   mounted BEFORE the blanket authenticate so login is reachable
+│   │   ├── auth.routes.js        # /api/auth router (ADR-009) — login (public, throttled), refresh + logout (self-gated), me;
+│   │   │                         #   mounted BEFORE the blanket authenticate so login and refresh are reachable
 │   │   └── admin.routes.js       # /api/admin router (ADR-009) — requireAdmin gates the whole router;
 │   │                             #   user management + file-access-policy management
 │   ├── controllers/
@@ -67,7 +67,7 @@ admin-files-manager/
 │   │   ├── PortalService.js      # File portal trace tail (PORTAL_LOG_FILE); the retired .env editor answers "not linked"
 │   │   ├── IntegrationSettingsService.js  # ADR-010: what the portal reads from admin.sqlite — volume marker
 │   │   │                         #   (.dimension-volume stamp/status), release folder (client path), auth tunables
-│   │   ├── SessionService.js     # Login/validateSession/logout/revoke — flat 24h expiry, lockout after 10 failures
+│   │   ├── SessionService.js     # Login (access+refresh pair, DPoP key pin), validateSession, refresh (rotation, grace, reuse → revoke), revoke; lockout after 10 failures
 │   │   ├── GroupService.js       # User groups: validation + membership (a group grants nothing by itself)
 │   │   └── FileAccessPolicyService.js  # Per-file policy CRUD + user/group grants; onPathRenamed/onPathDeleted
 │   │                             #   best-effort hooks called from fs.controller.js. Policies govern the File Portal
@@ -95,7 +95,7 @@ admin-files-manager/
 │       ├── validators.js         # validateFileName / validateClientPath / validateSettingsPayload
 │       ├── fileTypes.js          # File-type taxonomy (CATEGORIES/EXTENSION_MAP) — single server-side source, = client FileTypes
 │       ├── concurrency.js        # mapWithConcurrency — bounded, order-preserving async map (listing enrichment)
-│       └── crypto.js             # hashPassword/verifyPassword (scrypt), randomToken/hashToken — stdlib only
+│       └── crypto.js             # hashPassword/verifyPassword (scrypt), randomToken/hashToken, publicJwkThumbprint/verifyDpopProof (ES256) — stdlib only
 │
 ├── public/                       # ─── Frontend SPA (served statically, no build) ───
 │   ├── index.html                # Dashboard page        (data-page="dashboard")
@@ -161,14 +161,16 @@ admin-files-manager/
 │   │   │                                    #   and validateSettingsPayload (whitelist, bounds, client paths)
 │   │   ├── UserService.test.js              # create validation, duplicate username, password_hash never returned
 │   │   ├── SessionService.test.js           # login identical-failure shape, lockout, validateSession, revoke
+│   │   ├── SessionTokenService.test.js      # DPoP verify, token pair, rotation, grace window, reuse → family revoke, revocation cascade
 │   │   └── FileAccessPolicyService.test.js  # upsert-in-place, grant/revoke, onPathRenamed/onPathDeleted hooks
 │   ├── db/
 │   │   └── schema.test.js                   # migrate() idempotency, CHECK/UNIQUE constraints, cascade deletes,
 │   │                                        #   refuses a schema version newer than this code understands
 │   ├── helpers/
-│   │   └── authenticated.js                 # NOT a *.test.js - shared login helper every server-booting
+│   │   ├── authenticated.js                 # NOT a *.test.js - shared login helper every server-booting
 │   │                                        #   suite imports (ADR-009); see AGENTS.md "Tests never touch
 │   │                                        #   the real stores"
+│   │   └── dpop.js                          # NOT a *.test.js - P-256 device key + DPoP proof builder
 │   ├── api/
 │   │   ├── versioning.contract.test.js      # /api/v1 vs /api on a live server: same status + shape for every
 │   │   │                                    #   endpoint, /api/v2 + /api/V1 refused, no fs route under either
@@ -184,6 +186,7 @@ admin-files-manager/
 │   │   │                                    #   child `node server.js` with NODE_ENV unset), authored reasons
 │   │   │                                    #   forwarded, generic text for the rest, status per failure class
 │   │   ├── auth.contract.test.js            # live-server: health/login stay public, every other route 401s
+│   │   ├── auth-refresh.contract.test.js    # live-server: afm_access/afm_refresh attributes, refresh on /api/v1 and /api, logout by refresh cookie
 │   │   │                                    #   with no session, CSRF enforcement, cookie+bearer both work,
 │   │   │                                    #   logout revokes, /api/v1 ↔ /api parity (ADR-009)
 │   │   └── admin.contract.test.js           # live-server: requireAdmin (403 vs 401), full user-management
@@ -198,6 +201,8 @@ admin-files-manager/
 │       ├── api-boundary.test.js             # the real api.js in a vm: BASE_URL resolution (global → meta →
 │       │                                    #   /api/v1), every URL builder carries the base, failures carry
 │       │                                    #   status and never an invented kind
+│       ├── api.test.js                      # the real api.js in a vm: single-flight 401 renewal, replay once,
+│       │                                    #   DPoP proof verifies server-side, device key reused across loads
 │       ├── app.test.js                      # shared core helpers (panel states, storage display)
 │       ├── dashboard.test.js                # dashboard renderers, no-history guarantees
 │       ├── files.test.js                    # files.js in a vm with stub DOM/API: states, navigation, selection,

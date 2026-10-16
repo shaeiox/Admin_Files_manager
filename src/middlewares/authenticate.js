@@ -4,8 +4,13 @@
 const AppError = require('../utils/AppError');
 const SessionService = require('../services/SessionService');
 
-/** Session cookie name (ADR-009 design D3). */
-const SESSION_COOKIE = 'afm_session';
+/**
+ * Cookie names (access-refresh-session-tokens D6). Only the access token
+ * authenticates an API call; the refresh cookie is read solely by
+ * /auth/refresh and /auth/logout. `afm_session` is retired.
+ */
+const ACCESS_COOKIE = 'afm_access';
+const REFRESH_COOKIE = 'afm_refresh';
 
 function readCookie(req, name) {
     const header = req.headers.cookie;
@@ -26,13 +31,14 @@ function readCookie(req, name) {
 function readToken(req) {
     const auth = req.get('authorization');
     if (auth && auth.startsWith('Bearer ')) return auth.slice(7).trim();
-    return readCookie(req, SESSION_COOKIE);
+    return readCookie(req, ACCESS_COOKIE);
 }
 
 /**
- * Session authentication (ADR-009, identity/authentication spec). Accepts
- * the session cookie or an `Authorization: Bearer` token - both resolve to
- * the same session. Attaches `req.user`/`req.session`.
+ * Session authentication (ADR-009, identity/session-tokens spec). Accepts
+ * the access token as the `afm_access` cookie or an `Authorization: Bearer`
+ * header; a refresh token is refused by kind (SessionService.validateSession).
+ * Attaches `req.user`/`req.session`.
  *
  * Mounted in src/routes/api.js after `/health` and `/auth`, in front of
  * every other router, so `/api/v1` and `/api` are secured identically
@@ -47,4 +53,4 @@ function authenticate(req, res, next) {
     next();
 }
 
-module.exports = { authenticate, SESSION_COOKIE, readCookie };
+module.exports = { authenticate, ACCESS_COOKIE, REFRESH_COOKIE, readCookie, readToken };
