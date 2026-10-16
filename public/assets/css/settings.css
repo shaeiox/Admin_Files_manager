@@ -8,72 +8,90 @@
    ══════════════════════════════════════════ */
 
 .settings-layout {
-  display: grid;
-  grid-template-columns: 228px minmax(0, 1fr);
-  gap: var(--spacing-32);
-  align-items: start;
-}
-
-/* ── Settings side nav ── */
-.settings-nav {
-  position: sticky;
-  top: calc(var(--topbar-height) + 20px);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2);
+  gap: var(--spacing-24);
+}
+
+/* ── Settings section tabs (top bar, sticky under the topbar) ──
+   Shared by settings.html and admin.html. Mirrors components.css .tabs/.tab
+   (colour, weight, padding, underline) and the topbar's frosted surface.
+   A group label after the first is a hairline divider between tab groups;
+   its text stays for screen readers. */
+.settings-nav {
+  position: sticky;
+  top: var(--topbar-height);
+  z-index: var(--z-base);
+  display: flex;
+  align-items: stretch;
+  gap: var(--spacing-4);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-topbar);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+}
+
+.settings-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .settings-nav-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-tertiary);
-  padding: var(--spacing-10) var(--spacing-12) var(--spacing-6);
-  font-weight: var(--font-weight-medium);
+  flex: 0 0 1px;
+  align-self: center;
+  height: var(--spacing-20);
+  margin: 0 var(--spacing-8);
+  background: var(--border-primary);
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+}
+
+.settings-nav-label:first-child {
+  display: none;
 }
 
 .settings-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--spacing-10);
-  padding: var(--spacing-10) var(--spacing-12);
-  border-radius: var(--radius-md);
+  gap: var(--spacing-8);
+  padding: var(--spacing-12) var(--spacing-16);
   font-size: var(--text-body-sm);
-  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-tertiary);
+  white-space: nowrap;
   cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
-    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
-  position: relative;
-  text-align: left;
-  width: 100%;
+  transition: color var(--transition-fast);
 }
 
-.settings-nav-item:hover {
-  background: var(--bg-hover);
+.settings-nav-item:hover,
+.settings-nav-item.is-active {
   color: var(--text-primary);
+}
+
+/* The bar scrolls horizontally, which would clip base.css's outset ring. */
+.settings-nav-item:focus-visible {
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
 }
 
 .settings-nav-item svg {
   width: 16px;
   height: 16px;
-  opacity: 0.8;
   flex-shrink: 0;
+  transition: color var(--transition-fast);
 }
 
-.settings-nav-item.is-active {
-  background: var(--bg-active);
-  color: var(--text-primary);
-  font-weight: var(--font-weight-medium);
-}
-
-.settings-nav-item.is-active::before {
+.settings-nav-item.is-active::after {
   content: '';
   position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 16px;
+  left: var(--spacing-12);
+  right: var(--spacing-12);
+  bottom: 0;
+  height: 2px;
   border-radius: var(--radius-pill);
   background: var(--accent-primary);
   box-shadow: 0 0 10px var(--accent-primary);
@@ -81,7 +99,6 @@
 
 .settings-nav-item.is-active svg {
   color: var(--accent-primary);
-  opacity: 1;
 }
 
 /* ── Settings content pane ── */
@@ -622,34 +639,7 @@
    RESPONSIVE
    ══════════════════════════════════════════ */
 
-@media (max-width: 1024px) {
-  .settings-layout { grid-template-columns: 190px minmax(0, 1fr); gap: var(--spacing-24); }
-}
-
 @media (max-width: 860px) {
-  .settings-layout { grid-template-columns: 1fr; }
-
-  .settings-nav {
-    position: static;
-    flex-direction: row;
-    overflow-x: auto;
-    gap: var(--spacing-4);
-    padding-bottom: var(--spacing-8);
-    border-bottom: 1px solid var(--border-primary);
-    scrollbar-width: none;
-  }
-
-  .settings-nav::-webkit-scrollbar { display: none; }
-  .settings-nav-label { display: none; }
-
-  .settings-nav-item {
-    white-space: nowrap;
-    border-radius: var(--radius-pill);
-    padding: var(--spacing-8) var(--spacing-14);
-  }
-
-  .settings-nav-item.is-active::before { display: none; }
-
   .setting-row {
     flex-direction: column;
     align-items: stretch;

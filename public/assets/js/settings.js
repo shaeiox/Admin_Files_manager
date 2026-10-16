@@ -317,11 +317,6 @@ const Settings = (() => {
                 $$('.settings-pane').forEach(p => {
                     p.classList.toggle('is-active', p.getAttribute('data-pane-content') === target);
                 });
-
-                // Scroll into view on mobile
-                if (window.innerWidth <= 860) {
-                    document.querySelector('.settings-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
             });
         });
 

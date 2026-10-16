@@ -841,5 +841,5 @@
   .perm-level { min-width: 0; }
 }
 
-/* Opening the panel scrolls it to the top; keep its title clear of the sticky top bar. */
-#permissionsGroup { scroll-margin-top: 96px; }
+/* Opening the panel scrolls it to the top; keep its title clear of the sticky top bar and section tabs. */
+#permissionsGroup { scroll-margin-top: calc(var(--topbar-height) + 76px); }
