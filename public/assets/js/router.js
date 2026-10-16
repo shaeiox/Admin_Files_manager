@@ -165,7 +165,9 @@ const Router = (() => {
       target.scrollIntoView();
       return;
     }
-    window.scrollTo(0, 0);
+    // 'instant' overrides the global `scroll-behavior: smooth`: a new page starts
+    // at its top, it does not scroll there from where the old one was.
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     if (main) main.scrollTop = 0;
   }
 
@@ -216,10 +218,9 @@ const Router = (() => {
       }
     } catch (err) {
       console.warn('[Router] falling back to a full page load:', err && err.message);
+      if (token === navToken) root.classList.remove('is-navigating');
       window.location.assign(target.url.href);
       return;
-    } finally {
-      if (token === navToken) root.classList.remove('is-navigating');
     }
 
     teardown(leaving);
@@ -238,6 +239,18 @@ const Router = (() => {
     }
     settleScroll(target.url.hash);
     focusHeading();
+    // Only now is the new page in place: the indicator covered the whole wait.
+    root.classList.remove('is-navigating');
+    signalArrival();
+  }
+
+  /** A brief fade on the arriving page (components.css `.is-arriving`). */
+  function signalArrival() {
+    const main = document.querySelector('main.main-area');
+    if (!main || !main.classList) return;
+    main.classList.remove('is-arriving');
+    void main.offsetWidth; // restart the animation on a repeat navigation
+    main.classList.add('is-arriving');
   }
 
   function onClick(e) {

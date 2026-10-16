@@ -142,14 +142,15 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   position: relative;
 }
 
@@ -157,6 +158,39 @@
   background: var(--bg-hover);
   color: var(--text-primary);
 }
+
+/* Press feedback by transform (never size): the box keeps its layout slot. */
+.btn-icon:active,
+.theme-toggle:active {
+  transform: scale(0.92);
+}
+
+/* Topbar theme toggle (theme.js shows one of its two icons). It had no rule of
+   its own and rendered as a bare 12x24 glyph; it is an icon button. */
+.theme-toggle {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  transition: background-color var(--transition-fast), color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.theme-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.theme-toggle svg { width: 16px; height: 16px; }
+
+/* One icon at a time, from the theme itself: theme.js's inline display is set
+   before the topbar exists on first load, so CSS carries the default. */
+.theme-toggle .icon-sun,
+[data-theme="light"] .theme-toggle .icon-moon { display: none; }
+[data-theme="light"] .theme-toggle .icon-sun { display: block; }
 
 .btn-icon.is-bordered {
   border-color: var(--border-primary);
@@ -186,13 +220,39 @@
   height: 15px;
 }
 
+/* ── Touch hit areas (control-hit-areas spec) ──
+   Where any pointer is coarse, every button answers to at least 44x44 CSS px.
+   The extra area is a transparent, centred ::before - the visible box, icon
+   size, row height and topbar height are unchanged (::after is the tooltip).
+   Adjacent icon buttons are spaced so two 44px areas touch but never intersect:
+   the narrowest pair (28px + 28px) needs 16px between them. */
+@media (any-pointer: coarse) {
+  .btn { overflow: visible; }
+  .mobile-menu-btn { position: relative; }
+
+  .btn::before,
+  .btn-icon::before,
+  .theme-toggle::before,
+  .mobile-menu-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+
+  .btn-icon + .btn-icon { margin-inline-start: 16px; }
+}
+
 /* ── Button Group ── */
 .btn-group {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-2);
   padding: var(--spacing-4);
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   background: var(--bg-tag);
   border: 1px solid var(--border-secondary);
 }
@@ -216,7 +276,7 @@
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
-  border-radius: var(--radius-cards);
+  border-radius: var(--radius-xl);
   padding: var(--card-padding);
   position: relative;
   overflow: hidden;
@@ -254,7 +314,7 @@
 }
 
 .card-title {
-  font-family: var(--font-geist);
+  font-family: var(--font-inter);
   font-size: var(--text-subheading);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
@@ -332,7 +392,7 @@
   width: 100%;
   background: var(--bg-input);
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   padding: var(--spacing-10) var(--spacing-14);
   font-size: var(--text-body-sm);
   color: var(--text-primary);
@@ -401,7 +461,8 @@ select option {
   padding: var(--spacing-10) var(--spacing-16) var(--spacing-10) 40px;
   font-size: var(--text-body-sm);
   color: var(--text-primary);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
 }
 
 .search-input:focus {
@@ -451,12 +512,13 @@ select option {
 .checkbox .box {
   width: 17px;
   height: 17px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-hover);
   background: var(--bg-input);
   display: grid;
   place-items: center;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
 }
 
 .checkbox .box svg {
@@ -465,7 +527,8 @@ select option {
   color: #ffffff;
   opacity: 0;
   transform: scale(0.6);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
 }
 
 .checkbox input:checked + .box {
@@ -487,7 +550,7 @@ select option {
   content: '';
   width: 9px;
   height: 2px;
-  border-radius: 1px;
+  border-radius: var(--radius-sm);
   background: #ffffff;
   position: absolute;
 }
@@ -532,7 +595,7 @@ select option {
   left: 3px;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--toggle-knob);
   transition: transform var(--transition-base);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
@@ -567,7 +630,8 @@ select option {
   font-size: var(--text-caption);
   font-weight: var(--font-weight-medium);
   color: var(--text-tertiary);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -640,7 +704,7 @@ select option {
   content: '';
   width: 5px;
   height: 5px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: currentColor;
   box-shadow: 0 0 6px currentColor;
 }
@@ -654,9 +718,10 @@ select option {
   color: var(--text-muted);
   background: transparent;
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   padding: var(--spacing-6) var(--spacing-10);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
 }
 
 .tag:hover {
@@ -669,7 +734,7 @@ select option {
   place-items: center;
   width: 14px;
   height: 14px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   opacity: 0.6;
   transition: opacity var(--transition-fast);
 }
@@ -692,7 +757,8 @@ select option {
   font-size: var(--text-caption);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
 }
 
 .status-banner:hover {
@@ -778,13 +844,18 @@ select option {
   font-size: var(--text-body-sm);
   color: var(--text-secondary);
   text-align: left;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   white-space: nowrap;
 }
 
 .dropdown-item:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.dropdown-item:active {
+  transform: scale(0.98);
 }
 
 .dropdown-item svg {
@@ -844,7 +915,7 @@ select option {
   max-height: calc(100vh - 80px);
   background: var(--bg-modal);
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-cards);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-modal);
   z-index: var(--z-modal);
   display: flex;
@@ -882,7 +953,7 @@ select option {
 }
 
 .modal-title {
-  font-family: var(--font-geist);
+  font-family: var(--font-inter);
   font-size: var(--text-subheading);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
@@ -998,7 +1069,8 @@ select option {
   display: grid;
   place-items: center;
   border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
 }
 
 .toast-close:hover {
@@ -1088,7 +1160,11 @@ select option {
   height: 100%;
   border-radius: var(--radius-pill);
   background: var(--accent-primary);
-  transition: width var(--transition-base);
+  /* The value is an inline --progress ratio (0-1); scaleX keeps the advance
+     on the compositor instead of relaying out on every update. */
+  transform-origin: left center;
+  transform: scaleX(var(--progress, 0));
+  transition: transform var(--transition-base);
   position: relative;
   overflow: hidden;
 }
@@ -1113,7 +1189,7 @@ select option {
 .spinner {
   width: 18px;
   height: 18px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   border: 2px solid var(--border-primary);
   border-top-color: var(--accent-primary);
   animation: spin 0.7s linear infinite;
@@ -1149,7 +1225,8 @@ select option {
   opacity: 0;
   pointer-events: none;
   z-index: var(--z-tooltip);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   box-shadow: var(--shadow-dropdown);
 }
 
@@ -1158,6 +1235,12 @@ select option {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+/* Open delay: sweeping the pointer along a row of controls shows no strobe of
+   hints, and one entered and left at once never flashes. Hiding has no delay
+   (the base state), and keyboard focus opens immediately. */
+[data-tip]:hover::after { transition-delay: var(--tooltip-delay); }
+[data-tip]:focus-visible::after { transition-delay: 0ms; }
 
 /* Placement variants, for controls whose container clips (overflow) above them.
    data-tip-pos="left" opens beside the control; "bottom" opens below it. */
@@ -1311,7 +1394,7 @@ select option {
 .empty-icon svg { width: 26px; height: 26px; }
 
 .empty-title {
-  font-family: var(--font-geist);
+  font-family: var(--font-inter);
   font-size: var(--text-subheading);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
@@ -1334,7 +1417,7 @@ select option {
 
 .skeleton-text { height: 12px; margin-bottom: 8px; }
 .skeleton-title { height: 18px; width: 50%; margin-bottom: 12px; }
-.skeleton-circle { border-radius: 50%; width: 32px; height: 32px; }
+.skeleton-circle { border-radius: var(--radius-pill); width: 32px; height: 32px; }
 .skeleton-card { height: 120px; border-radius: var(--radius-lg); }
 
 /* ══════════════════════════════════════════
@@ -1357,7 +1440,8 @@ select option {
   color: var(--text-tertiary);
   display: grid;
   place-items: center;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1392,7 +1476,8 @@ select option {
   visibility: hidden;
   transform: scale(0.96);
   transform-origin: top left;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
 }
@@ -1417,14 +1502,14 @@ select option {
 .frosted-panel {
   background: var(--bg-frosted);
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-cards);
+  border-radius: var(--radius-xl);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
 .violet-glow {
   position: absolute;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--gradient-radial-spotlight);
   filter: blur(50px);
   pointer-events: none;
@@ -1433,7 +1518,7 @@ select option {
 
 .ripple {
   position: absolute;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.25);
   transform: scale(0);
   animation: ripple 0.6s linear;
@@ -1453,4 +1538,13 @@ select option {
 
 /* router.js: a page is being fetched for a client-side navigation. */
 html.is-navigating,
-html.is-navigating * { cursor: progress; }
+html.is-navigating body { cursor: progress; }
+
+/* router.js: the page that just arrived. Opacity only - .main-area's transform
+   belongs to the sidebar glide - and no fill mode, so if the animation never
+   runs the content is simply visible. Reduced motion lands it at once. */
+main.main-area.is-arriving { animation: pageArrive 180ms ease-out; }
+
+@keyframes pageArrive {
+  from { opacity: 0.35; }
+}

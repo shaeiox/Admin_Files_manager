@@ -113,8 +113,8 @@ The visual system is defined in `design.md` (external reference). Key non-negoti
 | **All primary CTAs use 9999px pill shape** | `--radius-pill: 9999px`, `.btn` uses it |
 | **Weight 500 max for display headlines** | `--font-weight-medium: 500` in `.page-title`, `.hero-title` |
 | **1px hairline borders, no heavy shadows** | `--border-primary` with 12% alpha, `--shadow-subtle` inset only |
-| **Cards: 24px radius; large cards: 40px** | `--radius-cards: 24px`, `--radius-largecards: 40px` |
-| **DM Sans for UI + display, Geist for section headings** | `--font-dm-sans`, `--font-geist` (falls back to Inter) |
+| **Five radius steps; page panels 24px** | `--radius-sm/md/lg/xl/pill` (6/10/16/24/9999px; see REPO_MAP "Frontend token contract") |
+| **DM Sans for UI + display, Inter for section headings** | `--font-dm-sans`, `--font-inter` (self-hosted woff2) |
 | **Hero has only the warm→cool gradient** | `.hero-panel::before` in dashboard.css |
 | **Frosted glass = rgba(212,212,212,0.08) + backdrop-blur** | `--bg-frosted`, `.frosted-panel` |
 
@@ -344,7 +344,7 @@ Modifiers: `.card-hover`, `.card-flush`, `.card-sm`, `.card-accent` (adds violet
 ### 7.3 Forms
 
 - `.field` — vertical stack of label + input + hint
-- `.input`, `.textarea`, `.select` — all use `--radius-ui: 10px`
+- `.input`, `.textarea`, `.select` — all use `--radius-md: 10px`
 - `.search-field` — pill-shaped with icon left, keyboard hint right
 - `.checkbox` — custom, SVG check inside `.box`
 - `.switch` — pill toggle with `.track`
@@ -970,7 +970,7 @@ described, and it was fiction.
 | **Color usage** | Only Layer 2 tokens; violet only in gradients |
 | **Border radius** | 4/6/8/10 for UI, 16 for compact cards, 24 for cards, 40 for hero, 9999 for pills |
 | **Spacing** | Use tokens `--spacing-N` (multiples of 2 up to 80) |
-| **Typography** | DM Sans for UI, Geist for section titles; never bolder than 600 |
+| **Typography** | DM Sans for UI, Inter for section titles (both self-hosted); never bolder than 600 |
 | **Shadows** | Rarely used; prefer `--shadow-subtle` (1px inset) or `--shadow-card` (very soft) |
 | **Focus** | `:focus-visible` with 2px violet outline, 2px offset |
 | **Persistence** | `localStorage` via `AFM.Store` with `afm:` prefix |

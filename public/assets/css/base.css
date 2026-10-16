@@ -69,7 +69,7 @@ body {
 
 /* ── Typography Base ── */
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-geist);
+  font-family: var(--font-inter);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
   line-height: 1.2;
@@ -142,14 +142,14 @@ code, pre {
 code {
   background: var(--bg-frosted);
   padding: var(--spacing-2) var(--spacing-6);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
 }
 
 pre {
   background: var(--bg-secondary);
   padding: var(--spacing-16);
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-primary);
   overflow-x: auto;
 }
@@ -195,7 +195,7 @@ textarea::placeholder {
 :focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
 }
 
 button:focus-visible,
@@ -205,9 +205,11 @@ a:focus-visible {
 }
 
 /* ── Selection ── */
+/* Per-theme tokens (themes.css): white on a violet wash in dark, ink on a
+   lighter wash in light - both clear 4.5:1 (test/frontend/contrast.test.js). */
 ::selection {
-  background-color: rgba(107, 98, 242, 0.3);
-  color: var(--color-snow-white);
+  background-color: var(--selection-bg);
+  color: var(--selection-text);
 }
 
 /* ── Table Base ── */
@@ -364,9 +366,9 @@ hr {
 .p-28 { padding: var(--spacing-28); }
 
 /* ── Utility: Visual ── */
-.rounded-xs { border-radius: var(--radius-xs); }
-.rounded-ui { border-radius: var(--radius-ui); }
-.rounded-card { border-radius: var(--radius-cards); }
+.rounded-xs { border-radius: var(--radius-sm); }
+.rounded-ui { border-radius: var(--radius-md); }
+.rounded-card { border-radius: var(--radius-xl); }
 .rounded-pill { border-radius: var(--radius-pill); }
 
 .opacity-0 { opacity: 0; }
@@ -388,8 +390,12 @@ hr {
 /* ── Transitions ──
    The utilities animate only compositor-friendly properties: opacity,
    transform, background-color and color. A transition on width, height,
+<<<<<<< HEAD
    margin, padding or inset would relayout the document per frame — see
    FRONTEND_MOTION.md for the rule and the sanctioned transform-based bars. */
+=======
+   margin, padding or inset would relayout the document per frame. */
+>>>>>>> Ver2.4.1
 .transition-fast { transition: opacity var(--transition-fast), transform var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast); }
 .transition-base { transition: opacity var(--transition-base), transform var(--transition-base), background-color var(--transition-base), color var(--transition-base); }
 .transition-slow { transition: opacity var(--transition-slow), transform var(--transition-slow), background-color var(--transition-slow), color var(--transition-slow); }
@@ -465,11 +471,6 @@ hr {
   100% { background-position: 200% 0; }
 }
 
-@keyframes progressBar {
-  0% { width: 0%; }
-  100% { width: 100%; }
-}
-
 @keyframes ripple {
   0% {
     transform: scale(0);
@@ -540,4 +541,12 @@ hr {
   }
 
   html { scroll-behavior: auto; }
+<<<<<<< HEAD
+=======
+
+  /* The tooltip open delay is not motion - it stops hints strobing - so it
+     survives the delay reset above; the hint then appears without travel. */
+  [data-tip]:hover::after { transition-delay: var(--tooltip-delay) !important; }
+  [data-tip]:focus-visible::after { transition-delay: 0ms !important; }
+>>>>>>> Ver2.4.1
 }

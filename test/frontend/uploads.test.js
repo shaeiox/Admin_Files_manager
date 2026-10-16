@@ -305,7 +305,8 @@ describe('every interpolated value is escaped', () => {
     item.status = 'uploading';
     item.uploaded = 0;
     page.c.updateItemProgress(item);
-    assert.equal(row.children['.qi-fill'].style.width, '0%');
+    page.c.flushProgress();
+    assert.equal(row.children['.qi-fill'].style.transform, 'scaleX(0)');
     assert.equal(row.children['.qi-pct'].textContent, '0%');
     assert.doesNotMatch(row.children['.qi-meta'].innerHTML, /NaN|Infinity|<img/);
   });
@@ -488,7 +489,8 @@ describe('remaining time is unavailable when speed is unknown', () => {
     const item = page.state().queue[0];
     const row = page.mountRow(item.id);
     page.calls.upload[0].onProgress(600, 1200);
-    assert.equal(row.children['.qi-fill'].style.width, '50%');
+    page.c.flushProgress();
+    assert.equal(row.children['.qi-fill'].style.transform, 'scaleX(0.5)');
     assert.equal(row.children['.qi-pct'].textContent, '50%');
     assert.match(row.children['.qi-meta'].innerHTML, new RegExp(`${UNAVAILABLE} left`));
   });
@@ -1167,5 +1169,43 @@ describe('accessibility', () => {
     const { pure } = loadUploads();
     const out = pure.renderItemHTML({ id: 'u', name: 'a.txt', size: 10, uploaded: 0, status: 'queued', destination: '/' });
     for (const svg of out.match(/<svg[^>]*>/g) || []) assert.match(svg, /aria-hidden="true"/);
+  });
+});
+
+describe('upload progress cadence (frontend-interaction-quality 3.8)', () => {
+  const UPLOADS_CSS = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'assets', 'css', 'uploads.css'), 'utf8');
+
+  test('progress events share one cadence: no timer per queue item, nothing painted until the beat', async () => {
+    const page = await booted();
+    page.c.addFiles([fakeFile('a.bin', 1000), fakeFile('b.bin', 1000), fakeFile('c.bin', 1000)]);
+    const rows = page.state().queue.map(item => page.mountRow(item.id));
+    const before = page.intervals.filter(t => t.ms === page.c.PROGRESS_CADENCE_MS).length;
+    for (const call of page.calls.upload) { call.onProgress(300, 1000); call.onProgress(600, 1000); }
+    const cadence = page.intervals.filter(t => t.ms === page.c.PROGRESS_CADENCE_MS);
+    assert.equal(cadence.length - before, before === 0 ? 1 : 0, 'exactly one shared interval');
+    assert.ok(page.c.PROGRESS_CADENCE_MS < 1000, 'sub-second');
+    cadence[cadence.length - 1].fn();
+    for (const row of rows.slice(0, page.calls.upload.length)) {
+      assert.match(row.children['.qi-fill'].style.transform, /^scaleX\(0\.\d+\)$/);
+      assert.equal(row.children['.qi-fill'].style.width, undefined, 'never a layout property');
+    }
+  });
+
+  test('the cadence stops itself once nothing is dirty', async () => {
+    const page = await booted();
+    page.c.addFiles([fakeFile('a.bin', 1000)]);
+    page.calls.upload[0].onProgress(500, 1000);
+    const timer = page.intervals.find(t => t.ms === page.c.PROGRESS_CADENCE_MS);
+    timer.fn(); // paints
+    timer.fn(); // idle beat
+    assert.equal(timer.cancelled, true);
+  });
+
+  test('the fill glides for exactly one beat, on transform only, so it never stalls between values', () => {
+    const rule = UPLOADS_CSS.match(/\.qi-fill \{([^}]*)\}/)[1];
+    const m = rule.match(/transition:\s*transform (\d+)ms linear/);
+    assert.ok(m, 'a linear transform transition');
+    assert.equal(Number(m[1]), loadUploads().Uploads._controller.PROGRESS_CADENCE_MS);
+    assert.doesNotMatch(rule, /transition:[^;]*\bwidth\b/);
   });
 });

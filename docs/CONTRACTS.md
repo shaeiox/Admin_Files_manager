@@ -1255,6 +1255,14 @@ again on return. Shared chrome (`app.js`, `sidebar.js`, `theme.js`) is evaluated
 and must keep using delegated `document` listeners for controls that live in the swapped topbar.
 `AFM.refreshChrome()` re-hydrates icons, the active nav entry and keyboard hints after a swap.
 
+The router keeps `html.is-navigating` (progress cursor) on until the new page is swapped in **and**
+its `init()` has run, clears it on the full-load fallback, resets scroll with `behavior: 'instant'`,
+and marks the arriving `<main>` with `.is-arriving` (a 180ms opacity-only fade that rests visible).
+`AFM.Modal` owns the keyboard while a dialog is open: Tab cycles inside the topmost dialog, Escape
+closes only that dialog, and focus returns to the control that opened it (or to the dialog below).
+Page modules defer their own Escape while a `.modal-backdrop.is-open` exists. Reduced motion is
+honoured globally (`base.css`), including on pages reached by client-side navigation.
+
 ### Known gaps: frontend calls without a backend
 
 **This list is empty.** Every call a frontend module makes today resolves against a documented

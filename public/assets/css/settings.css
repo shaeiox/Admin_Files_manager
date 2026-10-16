@@ -37,11 +37,12 @@
   align-items: center;
   gap: var(--spacing-10);
   padding: var(--spacing-10) var(--spacing-12);
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   font-size: var(--text-body-sm);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   position: relative;
   text-align: left;
   width: 100%;
@@ -105,7 +106,7 @@
    ══════════════════════════════════════════ */
 
 .settings-group {
-  border-radius: var(--radius-cards);
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border-card);
   background: var(--bg-card);
   overflow: hidden;
@@ -134,7 +135,7 @@
 }
 
 .sg-title {
-  font-family: var(--font-geist);
+  font-family: var(--font-inter);
   font-size: var(--text-subheading);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
@@ -259,7 +260,8 @@
   border: 1px solid var(--border-card);
   background: var(--bg-tag);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   position: relative;
   text-align: left;
 }
@@ -281,7 +283,7 @@
   right: var(--spacing-10);
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--accent-primary);
   box-shadow: 0 0 10px rgba(107, 98, 242, 0.6);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
@@ -320,12 +322,12 @@
 
 .tp-line {
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .tp-block {
   flex: 1;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 /* Dark preview */
@@ -398,76 +400,6 @@
   gap: var(--spacing-16);
 }
 
-.quota-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--spacing-16);
-  flex-wrap: wrap;
-}
-
-.quota-used {
-  font-family: var(--font-dm-sans);
-  font-size: 30px;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: -0.03em;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.quota-used .of {
-  font-size: 15px;
-  color: var(--text-tertiary);
-  letter-spacing: 0;
-}
-
-.quota-bar {
-  height: 12px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-progress-track);
-  overflow: hidden;
-  display: flex;
-  gap: 2px;
-}
-
-.quota-seg {
-  height: 100%;
-  transition: width var(--transition-slow) cubic-bezier(0.22, 1, 0.36, 1);
-  position: relative;
-}
-
-.quota-seg:first-child { border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
-.quota-seg:last-of-type { border-radius: 0 var(--radius-pill) var(--radius-pill) 0; }
-
-.quota-legend {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-20);
-  flex-wrap: wrap;
-}
-
-.ql-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-8);
-  font-size: var(--text-caption);
-}
-
-.ql-swatch {
-  width: 9px;
-  height: 9px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.ql-name { color: var(--text-tertiary); }
-
-.ql-val {
-  color: var(--text-primary);
-  font-weight: var(--font-weight-medium);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ══════════════════════════════════════════
    API KEYS / TOKEN LIST
    ══════════════════════════════════════════ */
@@ -534,7 +466,7 @@
    ══════════════════════════════════════════ */
 
 .danger-zone {
-  border-radius: var(--radius-cards);
+  border-radius: var(--radius-xl);
   border: 1px solid var(--color-error-border);
   background: var(--color-error-bg);
   overflow: hidden;
@@ -585,7 +517,8 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-card);
   background: var(--bg-tag);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
 }
 
 .integration-card:hover { border-color: var(--border-hover); }
@@ -624,7 +557,7 @@
 .integration-status .dot {
   width: 5px;
   height: 5px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--text-tertiary);
 }
 
@@ -656,7 +589,8 @@
   opacity: 0;
   transform: translateY(16px);
   visibility: hidden;
-  transition: all var(--transition-base);
+  transition: background-color var(--transition-base), border-color var(--transition-base), color var(--transition-base),
+    opacity var(--transition-base), transform var(--transition-base), box-shadow var(--transition-base), visibility var(--transition-base);
 }
 
 .save-bar.is-visible {
@@ -676,7 +610,7 @@
 .save-bar-text .dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--color-warning);
   box-shadow: 0 0 8px var(--color-warning);
   animation: pulse 1.8s ease-in-out infinite;

@@ -808,7 +808,7 @@ const Dashboard = (() => {
           </div>
           <div class="rank-bar-wrap">
             <div class="progress progress-sm">
-              <div class="progress-bar" style="width:${toProportion(downloads, max).toFixed(1)}%"></div>
+              <div class="progress-bar" style="--progress:${(toProportion(downloads, max) / 100).toFixed(3)}"></div>
             </div>
           </div>
           <div class="rank-count">${escapeHtml(Format.number(downloads))}</div>
@@ -924,7 +924,7 @@ const Dashboard = (() => {
         </div>
         ${view.bar ? `
           <div class="progress progress-sm">
-            <div class="progress-bar" style="width:${view.barWidth}%"></div>
+            <div class="progress-bar" style="--progress:${view.barWidth / 100}"></div>
           </div>
         ` : ''}
       </div>

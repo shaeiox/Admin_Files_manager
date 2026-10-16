@@ -158,11 +158,9 @@ describe('the deliberate gap in style-src is recorded, not hidden', () => {
             + 'templates were cleaned up and style-src should be tightened');
     });
 
-    test('the CDN the fonts actually come from is allowed', async () => {
+    test('fonts are self-hosted, so no font or stylesheet host is allowed', async () => {
         const csp = (await request('/')).headers['content-security-policy'];
-        assert.match(csp, /style-src[^;]*https:\/\/fonts\.googleapis\.com/,
-            'tokens.css @imports Google Fonts');
-        assert.match(csp, /font-src[^;]*https:\/\/fonts\.gstatic\.com/,
-            'the webfonts themselves are served from gstatic');
+        assert.match(csp, /font-src 'self'(;|$)/, 'DM Sans and Inter are served from /assets/fonts');
+        assert.doesNotMatch(csp, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
     });
 });

@@ -50,9 +50,16 @@
   display: flex;
   flex-direction: column;
   z-index: var(--z-sidebar);
+<<<<<<< HEAD
   /* The width snaps to the new rail (it cannot be animated without
      relayout); the transform on the main-area carries the perceived motion. */
   transition: transform var(--transition-sidebar),
+=======
+  /* Collapse never transitions width: sidebar.js glides it by transform and
+     clip-path (see glide()). */
+  transition: transform var(--transition-sidebar),
+    clip-path var(--transition-sidebar),
+>>>>>>> Ver2.4.1
     background-color var(--transition-slow);
   overflow: visible;
 }
@@ -115,7 +122,7 @@
   width: 34px;
   height: 34px;
   min-width: 34px;
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   background: linear-gradient(135deg, #f59e0b 0%, #7c3aed 55%, #2563eb 100%);
   display: grid;
   place-items: center;
@@ -147,8 +154,7 @@
   min-width: 0;
   opacity: 1;
   max-width: 160px;
-  transition: opacity var(--transition-sidebar),
-    max-width var(--transition-sidebar);
+  transition: opacity var(--transition-sidebar);
 }
 
 .brand-name {
@@ -175,7 +181,7 @@
   margin-left: 4px;
   padding: 0 5px;
   border: 1px solid var(--border-primary);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
   font-size: 10px;
   letter-spacing: 0;
@@ -238,10 +244,7 @@
   opacity: 1;
   max-height: 30px;
 
-  transition: opacity var(--transition-sidebar),
-    max-height var(--transition-sidebar),
-    padding var(--transition-sidebar),
-    margin var(--transition-sidebar);
+  transition: opacity var(--transition-sidebar);
 }
 
 .sidebar.is-collapsed .nav-group-label {
@@ -265,7 +268,7 @@
   align-items: center;
   gap: var(--spacing-12);
   padding: var(--spacing-10) var(--spacing-12);
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-size: var(--text-body-sm);
   font-weight: var(--font-weight-medium);
@@ -311,8 +314,7 @@
 
   opacity: 1;
   max-width: 200px;
-  transition: opacity var(--transition-sidebar),
-    max-width var(--transition-sidebar);
+  transition: opacity var(--transition-sidebar);
 }
 
 /* Active nav item */
@@ -352,9 +354,7 @@
   opacity: 1;
   max-width: 80px;
 
-  transition: opacity var(--transition-sidebar),
-    max-width var(--transition-sidebar),
-    padding var(--transition-sidebar);
+  transition: opacity var(--transition-sidebar);
 }
 
 .nav-badge.is-neutral {
@@ -446,9 +446,9 @@
   white-space: nowrap;
 }
 
-/* text-secondary, not text-tertiary: at this card's 12-13px size,
-   text-tertiary (#686868 on dark) falls under WCAG AA's 4.5:1 body-text
-   contrast minimum - text-secondary clears it with headroom in both themes. */
+/* text-secondary for emphasis over the card's tertiary meta line. Every text
+   token, text-tertiary included, clears WCAG AA 4.5:1 on every surface in both
+   themes (measured by test/frontend/contrast.test.js). */
 .storage-pct {
   font-size: var(--text-caption);
   font-weight: var(--font-weight-medium);
@@ -471,11 +471,19 @@
   /* Default (no reading yet / severity not applied): the brand accent, not
      a decorative rainbow unrelated to the actual number. */
   background: var(--accent-primary);
+<<<<<<< HEAD
   /* The fill value is carried by an inline --storage-fill ratio and rendered
      as a composited scaleX; only colours transition here. */
   transform-origin: left center;
   transform: scaleX(var(--storage-fill, 0));
   transition: background-color var(--transition-base);
+=======
+  /* The fill value is an inline --storage-fill ratio (0-1), rendered as a
+     composited scaleX so a new reading glides without relayout. */
+  transform-origin: left center;
+  transform: scaleX(var(--storage-fill, 0));
+  transition: transform var(--transition-slow), background-color var(--transition-base);
+>>>>>>> Ver2.4.1
   position: relative;
 }
 
@@ -546,7 +554,7 @@
   align-items: center;
   gap: var(--spacing-10);
   padding: var(--spacing-8);
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background-color var(--transition-fast);
   min-width: 0;
@@ -579,8 +587,7 @@
   opacity: 1;
   max-width: 140px;
 
-  transition: opacity var(--transition-sidebar),
-    max-width var(--transition-sidebar);
+  transition: opacity var(--transition-sidebar);
 }
 
 .user-name {
@@ -637,7 +644,8 @@
      height at this same edge and would otherwise swallow clicks/hover meant
      for this button where the two overlap. */
   z-index: 3;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   box-shadow: var(--shadow-card);
 }
 
@@ -678,7 +686,7 @@
   left: 50%;
   width: 2px;
   margin-left: -1px;
-  border-radius: 1px;
+  border-radius: var(--radius-sm);
   background: var(--border-hover);
   opacity: 0;
   transition: opacity var(--transition-fast), background-color var(--transition-fast);
@@ -705,6 +713,11 @@
   margin-left: var(--sidebar-width);
   display: flex;
   flex-direction: column;
+<<<<<<< HEAD
+=======
+  /* margin-left snaps; sidebar.js offsets it with a translateX and releases it. */
+  transition: transform var(--transition-sidebar);
+>>>>>>> Ver2.4.1
 }
 
 .sidebar.is-collapsed~.main-area {
@@ -757,12 +770,13 @@
   display: none;
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
   border: 1px solid var(--border-primary);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
 }
 
 .mobile-menu-btn:hover {
@@ -785,7 +799,8 @@
   white-space: nowrap;
   padding: var(--spacing-4) var(--spacing-8);
   border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   cursor: pointer;
 }
 
@@ -863,7 +878,7 @@
 .page-eyebrow .dot {
   width: 5px;
   height: 5px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--accent-primary);
   box-shadow: 0 0 8px var(--accent-primary);
 }
@@ -905,7 +920,7 @@
 }
 
 .section-title {
-  font-family: var(--font-geist);
+  font-family: var(--font-inter);
   font-size: var(--text-heading-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);

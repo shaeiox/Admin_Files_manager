@@ -74,7 +74,8 @@ body[data-page="files"] {
   font-weight: var(--font-weight-medium);
   color: var(--text-tertiary);
   white-space: nowrap;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
 }
 
 .filter-chip:hover {
@@ -170,7 +171,7 @@ body[data-page="files"] {
    element sticks to its nearest scrolling ancestor, and a page-level sticky
    header would otherwise slide under the sticky toolbar. */
 .files-table-wrap {
-  border-radius: var(--radius-cards) var(--radius-cards) 0 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   border: 1px solid var(--border-card);
   background: var(--bg-card);
   overflow: auto;
@@ -233,7 +234,7 @@ body[data-page="files"] {
   bottom: 22%;
   right: 4px;
   width: 2px;
-  border-radius: 1px;
+  border-radius: var(--radius-sm);
   background: var(--border-hover);
   opacity: 0;
   transition: opacity var(--transition-fast), background-color var(--transition-fast);
@@ -437,7 +438,8 @@ tr:focus-within .row-actions { opacity: 1; }
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: background-color var(--transition-base), border-color var(--transition-base), color var(--transition-base),
+    opacity var(--transition-base), transform var(--transition-base), box-shadow var(--transition-base), visibility var(--transition-base);
   overflow: hidden;
   animation: fadeInUp 0.35s ease-out backwards;
 }
@@ -551,7 +553,7 @@ tr:focus-within .row-actions { opacity: 1; }
 .file-thumb .ftype-icon {
   width: 46px;
   height: 46px;
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
 }
 
 .file-thumb .ftype-icon svg { width: 22px; height: 22px; }
@@ -565,7 +567,7 @@ tr:focus-within .row-actions { opacity: 1; }
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 2px var(--spacing-6);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
   -webkit-backdrop-filter: blur(4px);
@@ -599,7 +601,7 @@ tr:focus-within .row-actions { opacity: 1; }
 .file-card-meta .sep {
   width: 2px;
   height: 2px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: currentColor;
   opacity: 0.6;
 }
@@ -610,7 +612,7 @@ tr:focus-within .row-actions { opacity: 1; }
 
 .tree-panel {
   padding: var(--spacing-16);
-  border-radius: var(--radius-cards);
+  border-radius: var(--radius-xl);
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   position: sticky;
@@ -654,7 +656,8 @@ tr:focus-within .row-actions { opacity: 1; }
   font-size: var(--text-caption);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   user-select: none;
 }
 
@@ -804,7 +807,7 @@ tr:focus-within .row-actions { opacity: 1; }
 
 .drawer-title {
   margin: 0;
-  font-family: var(--font-geist);
+  font-family: var(--font-inter);
   font-size: var(--text-body);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
@@ -919,7 +922,7 @@ tr:focus-within .row-actions { opacity: 1; }
   align-items: center;
   gap: var(--spacing-8);
   padding: var(--spacing-8) var(--spacing-8) var(--spacing-8) var(--spacing-12);
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   background: var(--bg-input);
   border: 1px solid var(--border-primary);
 }
@@ -960,7 +963,8 @@ tr:focus-within .row-actions { opacity: 1; }
   backdrop-filter: blur(8px);
   opacity: 0;
   visibility: hidden;
-  transition: all var(--transition-base);
+  transition: background-color var(--transition-base), border-color var(--transition-base), color var(--transition-base),
+    opacity var(--transition-base), transform var(--transition-base), box-shadow var(--transition-base), visibility var(--transition-base);
 }
 
 [data-theme="light"] .drop-overlay {
@@ -971,7 +975,7 @@ tr:focus-within .row-actions { opacity: 1; }
 
 .drop-inner {
   padding: var(--spacing-48) var(--spacing-56);
-  border-radius: var(--radius-largecards);
+  border-radius: var(--radius-xl);
   border: 2px dashed var(--accent-primary);
   background: var(--accent-subtle);
   text-align: center;
@@ -990,7 +994,7 @@ tr:focus-within .row-actions { opacity: 1; }
 }
 
 .drop-title {
-  font-family: var(--font-geist);
+  font-family: var(--font-inter);
   font-size: var(--text-heading-sm);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
@@ -1010,7 +1014,7 @@ tr:focus-within .row-actions { opacity: 1; }
   padding: var(--spacing-12) var(--spacing-16);
   border: 1px solid var(--border-card);
   border-top-color: var(--border-secondary);
-  border-radius: 0 0 var(--radius-cards) var(--radius-cards);
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
   background: var(--bg-card);
   flex-wrap: wrap;
 }
@@ -1018,7 +1022,7 @@ tr:focus-within .row-actions { opacity: 1; }
 .grid-files + .table-footer {
   margin-top: var(--spacing-16);
   border-top-color: var(--border-card);
-  border-radius: var(--radius-cards);
+  border-radius: var(--radius-xl);
 }
 
 .page-gap {
@@ -1074,7 +1078,7 @@ tr:focus-within .row-actions { opacity: 1; }
   left: 50%;
   width: 2px;
   margin-left: -1px;
-  border-radius: 1px;
+  border-radius: var(--radius-sm);
   background: var(--border-hover);
   opacity: 0;
   transition: opacity var(--transition-fast), background-color var(--transition-fast);
