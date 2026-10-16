@@ -224,12 +224,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .admin-table tbody tr {
-    transition: none;
-  }
-}
-
 /* ── File portal pane ── */
 
 .portal-grid {
@@ -490,9 +484,6 @@
   .portal-actions-note { flex-basis: 100%; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .log-row { transition: none; }
-}
 
 /* Groups: member checkboxes and member badges. */
 .admin-member-list {
@@ -706,10 +697,6 @@
   .policy-switches { grid-template-columns: 1fr; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .policy-mode { transition: none; }
-  .policy-mode:active { transform: none; }
-}
 
 /* ══════════════════════════════════════════
    GOVERNED FILES + PERMISSIONS

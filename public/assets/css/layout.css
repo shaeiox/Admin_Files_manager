@@ -50,8 +50,9 @@
   display: flex;
   flex-direction: column;
   z-index: var(--z-sidebar);
-  transition: width var(--transition-sidebar),
-    transform var(--transition-sidebar),
+  /* The width snaps to the new rail (it cannot be animated without
+     relayout); the transform on the main-area carries the perceived motion. */
+  transition: transform var(--transition-sidebar),
     background-color var(--transition-slow);
   overflow: visible;
 }
@@ -272,9 +273,7 @@
   white-space: nowrap;
 
   transition: background-color var(--transition-fast),
-    color var(--transition-fast),
-    padding var(--transition-sidebar),
-    gap var(--transition-sidebar);
+    color var(--transition-fast);
 
   cursor: pointer;
   user-select: none;
@@ -418,7 +417,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-12);
-  transition: opacity var(--transition-fast), padding var(--transition-sidebar);
+  transition: opacity var(--transition-fast);
   position: relative;
   overflow: hidden;
 }
@@ -467,11 +466,16 @@
 
 .storage-fill {
   height: 100%;
+  width: 100% !important;
   border-radius: var(--radius-pill);
   /* Default (no reading yet / severity not applied): the brand accent, not
      a decorative rainbow unrelated to the actual number. */
   background: var(--accent-primary);
-  transition: width var(--transition-slow), background-color var(--transition-base);
+  /* The fill value is carried by an inline --storage-fill ratio and rendered
+     as a composited scaleX; only colours transition here. */
+  transform-origin: left center;
+  transform: scaleX(var(--storage-fill, 0));
+  transition: background-color var(--transition-base);
   position: relative;
 }
 
@@ -503,15 +507,6 @@
   animation: shimmer 2.4s ease-in-out infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .storage-fill::after {
-    animation: none;
-  }
-
-  .storage-fill {
-    transition: none;
-  }
-}
 
 .storage-meta {
   font-size: var(--text-caption);
@@ -710,7 +705,6 @@
   margin-left: var(--sidebar-width);
   display: flex;
   flex-direction: column;
-  transition: margin-left var(--transition-sidebar);
 }
 
 .sidebar.is-collapsed~.main-area {
