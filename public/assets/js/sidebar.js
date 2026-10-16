@@ -28,6 +28,12 @@ const Sidebar = (() => {
   let resizeDrag = null;
   let listeners = [];
 
+  // Texts that fade when the sidebar folds, staggered top to bottom by --sb-i
+  // (layout.css "Collapse / expand texts"). The fold itself is the sidebar's
+  // width and the page's margin transitioning together (layout.css .sidebar).
+  const TEXT_SEL = '.brand-text, .nav-group-label, .nav-label, .nav-badge, ' +
+    '.storage-head, .storage-meta, .user-info, .chev';
+
   /* ── Private ── */
 
   function isMobile() {
@@ -50,9 +56,7 @@ const Sidebar = (() => {
       });
     }
 
-    const before = animate && !isMobile() ? sidebarEl.getBoundingClientRect().width : null;
     sidebarEl.classList.toggle('is-collapsed', collapsed);
-    if (before != null) glide(before);
 
     // Update collapse button tooltip
     if (collapseBtn) {
@@ -72,39 +76,6 @@ const Sidebar = (() => {
     listeners.forEach(fn => {
       try { fn({ collapsed, mobile: isMobile() }); } catch (e) { console.error('[Sidebar]', e); }
     });
-  }
-
-  /**
-   * Collapse and expand move by transform alone (frontend-motion spec): the new
-   * widths apply at once, the content is put back where it was with one
-   * translateX, then released so it glides into place on the compositor.
-   * Expanding also reveals the wider sidebar from its old edge with clip-path.
-   * Under reduced motion the global 0.001ms transition makes this a jump.
-   */
-  function glide(before) {
-    const delta = before - sidebarEl.getBoundingClientRect().width;
-    if (!delta || !mainArea?.style) return;
-    mainArea.style.transition = 'none';
-    mainArea.style.transform = `translateX(${delta}px)`;
-    if (delta < 0) {
-      sidebarEl.style.transition = 'none';
-      sidebarEl.style.clipPath = `inset(0 ${-delta}px 0 0)`;
-    }
-    void mainArea.offsetWidth; // commit the start position before releasing it
-    mainArea.style.transition = '';
-    mainArea.style.transform = '';
-    if (delta < 0) {
-      sidebarEl.style.transition = '';
-      // inset() -> none is not interpolable, so release to inset(0) and drop the
-      // clip once revealed (it would cut off the edge button and nav tooltips).
-      sidebarEl.style.clipPath = 'inset(0 0 0 0)';
-      const unclip = e => {
-        if (e.target !== sidebarEl || e.propertyName !== 'clip-path') return;
-        sidebarEl.removeEventListener('transitionend', unclip);
-        sidebarEl.style.clipPath = '';
-      };
-      sidebarEl.addEventListener('transitionend', unclip);
-    }
   }
 
   function updateTooltips(collapsed) {
@@ -296,6 +267,8 @@ const Sidebar = (() => {
       console.warn('[Sidebar] .sidebar element not found');
       return;
     }
+    // Stagger order for the soft collapse/expand fades, top to bottom.
+    sidebarEl.querySelectorAll(TEXT_SEL).forEach((n, i) => n.style.setProperty('--sb-i', String(Math.min(i, 16))));
 
     // Create collapse button if not present
     collapseBtn = sidebarEl.querySelector('.sidebar-collapse-btn');

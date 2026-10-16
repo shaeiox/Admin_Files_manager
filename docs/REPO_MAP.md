@@ -455,8 +455,7 @@ Rules worth knowing before you touch this path:
   apply instantly (so press feedback still shows). No other stylesheet may declare its own block.
 - **Motion stays on the compositor**: no `transition: all`, and no transition or keyframe names a layout
   property (`test/frontend/motion.test.js`). Bars are `scaleX`/`scaleY` of an inline ratio
-  (`--progress`, `--storage-fill`, or an inline `transform`); the sidebar collapse is a translateX glide
-  in `sidebar.js`. Upload rows paint on one shared 250ms cadence (`PROGRESS_CADENCE_MS` = the
+  (`--progress`, `--storage-fill`, or an inline `transform`); the one exception is the sidebar collapse, a deliberate layout animation: `.sidebar` `width` and `.main-area` `margin-left` share `--transition-sidebar` (640ms `--ease-soft`), so the edge, topbar, centred page and cards reflow as one; icons keep their x in both states (`--rail-inset`), only texts fade. Upload rows paint on one shared 250ms cadence (`PROGRESS_CADENCE_MS` = the
   `.qi-fill` transition). Touch hit areas (`any-pointer: coarse`) are a transparent 44px `::before`.
 
 ## Request Lifecycle (typical mutation)

@@ -171,7 +171,11 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-sidebar: 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* The sidebar's collapse/expand: long and decelerating, so the panel settles
+     rather than stops. --sidebar-text is how fast its labels fade inside it. */
+  --ease-soft: cubic-bezier(0.45, 0, 0.15, 1);
+  --transition-sidebar: 640ms var(--ease-soft);
+  --sidebar-text: 360ms;
   /* Pointer hover waits this long before a [data-tip] hint opens; focus does not. */
   --tooltip-delay: 400ms;
 

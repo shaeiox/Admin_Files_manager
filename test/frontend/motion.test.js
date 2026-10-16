@@ -99,13 +99,23 @@ describe('animated properties stay on the compositor (3.5, 3.6, 3.7)', () => {
         }
     });
 
-    test('no transition names a layout property', () => {
+    // The one deliberate exception: the sidebar collapse is a layout animation
+    // (sidebar width + page margin on one curve) so the page reflows with the
+    // edge instead of sliding and snapping - an owner decision recorded in the
+    // change's tasks.md. Only the sidebar's own rules in layout.css may use it.
+    const RESIZE_EXCEPTION = /^(\.sidebar\b|\.main-area\b|\.storage-(card|bar)\b)/;
+
+    test('no transition names a layout property (outside the sidebar resize)', () => {
         const bad = [];
         for (const [file, css] of Object.entries(CSS)) {
-            for (const m of css.matchAll(/transition(?:-property)?\s*:([^;}]*)/g)) {
-                for (const part of m[1].replace(/var\([^)]*\)|cubic-bezier\([^)]*\)/g, '').split(',')) {
-                    const prop = part.trim().split(/\s+/)[0];
-                    if (LAYOUT_PROP.test(prop)) bad.push(`${file}: ${prop}`);
+            for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+                const selector = rule[1].trim();
+                if (file === 'layout.css' && RESIZE_EXCEPTION.test(selector)) continue;
+                for (const m of rule[2].matchAll(/transition(?:-property)?\s*:([^;}]*)/g)) {
+                    for (const part of m[1].replace(/var\([^)]*\)|cubic-bezier\([^)]*\)/g, '').split(',')) {
+                        const prop = part.trim().split(/\s+/)[0];
+                        if (LAYOUT_PROP.test(prop)) bad.push(`${file} ${selector}: ${prop}`);
+                    }
                 }
             }
         }
@@ -123,11 +133,33 @@ describe('animated properties stay on the compositor (3.5, 3.6, 3.7)', () => {
         assert.deepEqual(bad, []);
     });
 
-    test('the sidebar collapse is a translateX glide on the content, not a width or margin transition', () => {
-        const sidebar = js('sidebar.js');
-        assert.match(sidebar, /function glide\(before\)/);
-        assert.match(sidebar, /mainArea\.style\.transform = `translateX\(\$\{delta\}px\)`/);
-        assert.match(CSS['layout.css'], /\.main-area \{[^}]*transition: transform var\(--transition-sidebar\)/);
+    test('the sidebar width and the page margin share one curve, so everything moves as one', () => {
+        const sidebar = block(CSS['layout.css'], '\n.sidebar {');
+        assert.match(sidebar, /transition:\s*width var\(--transition-sidebar\)/);
+        assert.match(CSS['layout.css'], /\.main-area \{[^}]*transition: margin-left var\(--transition-sidebar\)/);
+        assert.match(CSS['tokens.css'], /--transition-sidebar:\s*\d+ms var\(--ease-soft\)/);
+        assert.doesNotMatch(js('sidebar.js'), /translateX|clipPath|flipIcons/, 'no transform choreography left to drift out of sync');
+    });
+
+    test('icons and the active pill keep their x in both states, so nothing jumps', () => {
+        const css = CSS['layout.css'];
+        assert.match(block(css, '\n.nav-item {'), /padding:\s*var\(--spacing-10\) var\(--rail-inset\)/);
+        assert.match(block(css, '\n.sidebar-header {'), /padding:\s*0 calc\(\(var\(--sidebar-collapsed-width\) - 34px\) \/ 2\)/);
+        for (const gone of ['.sidebar.is-collapsed .nav-item {', '.sidebar.is-collapsed .sidebar-header {', '.sidebar.is-collapsed .sidebar-user {']) {
+            const at = css.indexOf(gone);
+            // Only the mobile drawer (which never shows the rail) may still name these.
+            assert.ok(at === -1 || at > css.indexOf('@media (max-width: 860px)'), `${gone} no longer re-centres in the rail`);
+        }
+    });
+
+    test('texts fade ahead of the narrowing edge and back in once there is room', () => {
+        const css = CSS['layout.css'];
+        const out = block(css, '.sidebar.is-collapsed :is(.brand-text');
+        assert.match(out, /opacity:\s*0/);
+        assert.match(out, /transition: opacity 160ms/);
+        const back = block(css, '.sidebar :is(.brand-text');
+        assert.match(back, /calc\(160ms \+ var\(--sb-i, 0\) \* 18ms\)/, 'expand waits for room, then staggers');
+        assert.match(js('sidebar.js'), /setProperty\('--sb-i'/);
     });
 
     test('the removed dashboard chart left no height-animated bars behind', () => {

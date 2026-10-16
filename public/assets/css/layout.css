@@ -50,13 +50,19 @@
   display: flex;
   flex-direction: column;
   z-index: var(--z-sidebar);
-  /* Collapse never transitions width: sidebar.js glides it by transform and
-     clip-path (see glide()). */
-  transition: transform var(--transition-sidebar),
-    clip-path var(--transition-sidebar),
+  /* Collapse and expand are one layout animation (a deliberate exception to
+     the compositor-only motion rule, chosen so the page reflows with the edge
+     instead of sliding and snapping): this width and .main-area's margin-left
+     run on the same curve, so the edge, the topbar, the centred page and every
+     card move as one. transform is the mobile drawer. Icons keep the same x in
+     both states (--rail-inset), so nothing inside jumps. */
+  --rail-inset: calc((var(--sidebar-collapsed-width) - 2 * var(--spacing-12) - 18px) / 2);
+  transition: width var(--transition-sidebar),
+    transform var(--transition-sidebar),
     background-color var(--transition-slow);
   overflow: visible;
 }
+
 
 /* Sidebar top accent wash */
 .sidebar::before {
@@ -98,7 +104,8 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-12);
-  padding: 0 var(--spacing-16);
+  /* (rail - brand mark) / 2: the mark never moves when the sidebar folds. */
+  padding: 0 calc((var(--sidebar-collapsed-width) - 34px) / 2);
   position: relative;
   z-index: 1;
   border-bottom: 1px solid var(--border-secondary);
@@ -146,9 +153,9 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  overflow: hidden;
   opacity: 1;
   max-width: 160px;
-  transition: opacity var(--transition-sidebar);
 }
 
 .brand-name {
@@ -185,22 +192,6 @@
 
 .app-version[hidden] { display: none; }
 
-.sidebar.is-collapsed .brand-text {
-  opacity: 0;
-  max-width: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.sidebar.is-collapsed .sidebar-header {
-  padding: 0;
-  justify-content: center;
-}
-
-.sidebar.is-collapsed .brand {
-  flex: 0;
-  justify-content: center;
-}
 
 /* ── Sidebar Scroll Area ── */
 .sidebar-body {
@@ -213,10 +204,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-24);
+  transition: gap var(--transition-sidebar);
 }
 
 .sidebar.is-collapsed .sidebar-body {
-  padding: var(--spacing-16);
   gap: var(--spacing-8);
 }
 
@@ -235,19 +226,15 @@
   color: var(--text-tertiary);
   padding: var(--spacing-8) var(--spacing-12) var(--spacing-6);
   white-space: nowrap;
+  overflow: hidden;
   opacity: 1;
   max-height: 30px;
-
-  transition: opacity var(--transition-sidebar);
 }
 
 .sidebar.is-collapsed .nav-group-label {
-  opacity: 0;
   max-height: 0;
   padding-top: 0;
   padding-bottom: 0;
-  margin: 0;
-  overflow: hidden;
 }
 
 .sidebar.is-collapsed .nav-item.is-active::before {
@@ -261,7 +248,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-12);
-  padding: var(--spacing-10) var(--spacing-12);
+  padding: var(--spacing-10) var(--rail-inset);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-size: var(--text-body-sm);
@@ -308,7 +295,6 @@
 
   opacity: 1;
   max-width: 200px;
-  transition: opacity var(--transition-sidebar);
 }
 
 /* Active nav item */
@@ -347,32 +333,11 @@
   white-space: nowrap;
   opacity: 1;
   max-width: 80px;
-
-  transition: opacity var(--transition-sidebar);
 }
 
 .nav-badge.is-neutral {
   background: var(--bg-tag);
   color: var(--text-tertiary);
-}
-
-/* Collapsed nav */
-.sidebar.is-collapsed .nav-item {
-  justify-content: center;
-  align-items: center;
-  padding: var(--spacing-10);
-  gap: 0;
-  width: 100%;
-}
-
-.sidebar.is-collapsed .nav-label,
-.sidebar.is-collapsed .nav-badge {
-  opacity: 0;
-  max-width: 0;
-  padding-left: 0;
-  padding-right: 0;
-  margin: 0;
-  pointer-events: none;
 }
 
 /* Tooltip on collapsed nav */
@@ -411,7 +376,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-12);
-  transition: opacity var(--transition-fast);
+  transition: opacity var(--transition-fast),
+    padding var(--transition-sidebar),
+    gap var(--transition-sidebar);
   position: relative;
   overflow: hidden;
 }
@@ -431,6 +398,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-8);
+  max-height: 40px;
 }
 
 .storage-title {
@@ -456,6 +424,7 @@
   background: var(--bg-progress-track);
   overflow: hidden;
   position: relative;
+  transition: height var(--transition-sidebar);
 }
 
 .storage-fill {
@@ -506,20 +475,21 @@
   color: var(--text-secondary);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  max-height: 40px;
+  overflow: hidden;
 }
 
 .sidebar.is-collapsed .storage-card {
   padding: var(--spacing-8);
-  align-items: center;
+  gap: 0;
 }
 
 .sidebar.is-collapsed .storage-head,
 .sidebar.is-collapsed .storage-meta {
-  display: none;
+  max-height: 0;
 }
 
 .sidebar.is-collapsed .storage-bar {
-  width: 100%;
   height: 4px;
 }
 
@@ -571,8 +541,6 @@
   flex: 1;
   opacity: 1;
   max-width: 140px;
-
-  transition: opacity var(--transition-sidebar);
 }
 
 .user-name {
@@ -594,23 +562,9 @@
 
 .sidebar-user .chev {
   opacity: 1;
-  transition: opacity var(--transition-sidebar);
 }
 
-.sidebar.is-collapsed .sidebar-user .chev {
-  opacity: 0;
-}
-
-.sidebar.is-collapsed .user-info,
-.sidebar.is-collapsed .sidebar-user .chev {
-  opacity: 0;
-  width: 0;
-  overflow: hidden;
-}
-
-.sidebar.is-collapsed .sidebar-user {
-  justify-content: center;
-}
+.user-info { overflow: hidden; }
 
 /* ── Collapse Toggle Button ── */
 .sidebar-collapse-btn {
@@ -649,6 +603,55 @@
 
 .sidebar.is-collapsed .sidebar-collapse-btn svg {
   transform: rotate(180deg);
+}
+
+/* ── Collapse / expand texts ──
+   The width does the moving; texts only fade. In the rail they fade out fast,
+   ahead of the narrowing edge (nothing is ever cut mid-word). On expand they
+   wait until there is room, then fade in top to bottom (--sb-i is each
+   text's order, set by sidebar.js). The labels stay in the accessibility
+   tree in the rail - they name the icon links. */
+.sidebar :is(.brand-text, .nav-group-label, .nav-label, .nav-badge,
+  .storage-head, .storage-meta, .user-info, .chev) {
+  transition: opacity var(--sidebar-text) var(--ease-soft) calc(160ms + var(--sb-i, 0) * 18ms),
+    transform var(--sidebar-text) var(--ease-soft) calc(160ms + var(--sb-i, 0) * 18ms);
+}
+
+.sidebar.is-collapsed :is(.brand-text, .nav-group-label, .nav-label, .nav-badge,
+  .storage-head, .storage-meta, .user-info, .chev) {
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  transition: opacity 160ms var(--ease-soft) calc(var(--sb-i, 0) * 4ms),
+    transform 160ms var(--ease-soft) calc(var(--sb-i, 0) * 4ms);
+}
+
+/* These also fold their height on the sidebar's own curve. */
+.sidebar :is(.nav-group-label, .storage-head, .storage-meta) {
+  transition: opacity var(--sidebar-text) var(--ease-soft) calc(160ms + var(--sb-i, 0) * 18ms),
+    transform var(--sidebar-text) var(--ease-soft) calc(160ms + var(--sb-i, 0) * 18ms),
+    max-height var(--transition-sidebar),
+    padding var(--transition-sidebar);
+}
+
+.sidebar.is-collapsed :is(.nav-group-label, .storage-head, .storage-meta) {
+  transition: opacity 160ms var(--ease-soft) calc(var(--sb-i, 0) * 4ms),
+    transform 160ms var(--ease-soft) calc(var(--sb-i, 0) * 4ms),
+    max-height var(--transition-sidebar),
+    padding var(--transition-sidebar);
+}
+
+/* No room for the logout control in the rail: it fades, then leaves the tab
+   order (visibility flips at the end of the fade; on expand, at the start). */
+.sidebar-user .btn-icon {
+  transition: background-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--sidebar-text) var(--ease-soft), visibility var(--sidebar-text);
+}
+
+.sidebar.is-collapsed .sidebar-user .btn-icon {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 160ms var(--ease-soft), visibility 160ms;
 }
 
 /* ── Drag-to-resize handle (right edge) ── */
@@ -698,8 +701,8 @@
   margin-left: var(--sidebar-width);
   display: flex;
   flex-direction: column;
-  /* margin-left snaps; sidebar.js offsets it with a translateX and releases it. */
-  transition: transform var(--transition-sidebar);
+  /* Follows .sidebar's width on the same curve: the page reflows with the edge. */
+  transition: margin-left var(--transition-sidebar);
 }
 
 .sidebar.is-collapsed~.main-area {
