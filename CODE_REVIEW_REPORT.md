@@ -1,7 +1,5 @@
 # Implementation Report: Frontend Interaction Quality
 
-<<<<<<< HEAD
-=======
 ## Fix Round 1
 
 **Date:** 2026-10-16
@@ -87,7 +85,6 @@ $ npm run test -- test/frontend/modal.test.js
 - Sidebar collapse now snaps instantly (layout transition restored). This is a visible UX regression from the prior snap state, but matches the original spec before transform rewrite. Documented as accepted deviation.
 - Remaining `transition: all` instances in `components.css`, `dashboard.css`, `files.css`, `uploads.css`, `settings.css` are still present. No test guards them yet.
 
->>>>>>> Ver2.4.1
 **Date:** 2026-10-16
 **Implemented by:** Claude Code
 

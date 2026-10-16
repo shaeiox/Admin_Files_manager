@@ -50,16 +50,10 @@
   display: flex;
   flex-direction: column;
   z-index: var(--z-sidebar);
-<<<<<<< HEAD
-  /* The width snaps to the new rail (it cannot be animated without
-     relayout); the transform on the main-area carries the perceived motion. */
-  transition: transform var(--transition-sidebar),
-=======
   /* Collapse never transitions width: sidebar.js glides it by transform and
      clip-path (see glide()). */
   transition: transform var(--transition-sidebar),
     clip-path var(--transition-sidebar),
->>>>>>> Ver2.4.1
     background-color var(--transition-slow);
   overflow: visible;
 }
@@ -466,24 +460,15 @@
 
 .storage-fill {
   height: 100%;
-  width: 100% !important;
   border-radius: var(--radius-pill);
   /* Default (no reading yet / severity not applied): the brand accent, not
      a decorative rainbow unrelated to the actual number. */
   background: var(--accent-primary);
-<<<<<<< HEAD
-  /* The fill value is carried by an inline --storage-fill ratio and rendered
-     as a composited scaleX; only colours transition here. */
-  transform-origin: left center;
-  transform: scaleX(var(--storage-fill, 0));
-  transition: background-color var(--transition-base);
-=======
   /* The fill value is an inline --storage-fill ratio (0-1), rendered as a
      composited scaleX so a new reading glides without relayout. */
   transform-origin: left center;
   transform: scaleX(var(--storage-fill, 0));
   transition: transform var(--transition-slow), background-color var(--transition-base);
->>>>>>> Ver2.4.1
   position: relative;
 }
 
@@ -713,11 +698,8 @@
   margin-left: var(--sidebar-width);
   display: flex;
   flex-direction: column;
-<<<<<<< HEAD
-=======
   /* margin-left snaps; sidebar.js offsets it with a translateX and releases it. */
   transition: transform var(--transition-sidebar);
->>>>>>> Ver2.4.1
 }
 
 .sidebar.is-collapsed~.main-area {

@@ -465,27 +465,6 @@ const Modal = (() => {
   // a `.modal-backdrop.is-open` exists), so the two layers compose rather than
   // redefining each other.
   const openStack = [];
-<<<<<<< HEAD
-
-  // What a dialog may hand focus to, in document order. One constant, so the
-  // initial-focus pick and the Tab cycle cannot drift apart. The negative
-  // tabindex form is deliberate: a container made programmatically focusable
-  // (the backdrop below) must not become a tab stop of its own.
-  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), ' +
-    'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-  let idSeq = 0;
-
-  const topEntry = () => openStack[openStack.length - 1] || null;
-
-  /** Ids for aria-labelledby / aria-describedby, unique per dialog instance. */
-  const nextId = prefix => `${prefix}-${++idSeq}`;
-
-  function focusableIn(backdrop) {
-    return backdrop ? $$(FOCUSABLE, backdrop) : [];
-  }
-=======
->>>>>>> Ver2.4.1
 
   // What a dialog may hand focus to, in document order. One constant, so the
   // initial-focus pick and the Tab cycle cannot drift apart. The negative
@@ -516,11 +495,7 @@ const Modal = (() => {
     // Captured before anything is focused, so it is the element the user came
     // from - the trigger - and not the dialog's own first control.
     const restoreTo = document.activeElement || null;
-<<<<<<< HEAD
-    openStack.push({ backdrop, restoreTo });
-=======
     openStack.push({ backdrop, restoreTo, onDismiss });
->>>>>>> Ver2.4.1
     backdrop.classList.add('is-open');
     // The backdrop is focusable only programmatically; with it, a dialog that
     // contains no control of its own still keeps focus while it is open.
@@ -579,12 +554,8 @@ const Modal = (() => {
 
     if (e.key === 'Escape') {
       e.preventDefault();
-<<<<<<< HEAD
-      close(top.backdrop);
-=======
       if (top.onDismiss) top.onDismiss();
       else close(top.backdrop);
->>>>>>> Ver2.4.1
       return;
     }
     if (e.key !== 'Tab') return;
@@ -1224,16 +1195,9 @@ function updateStorageUI(storage) {
   if (!pctEl || !fillEl || !metaEl) return;
 
   pctEl.textContent = view.pctText;
-<<<<<<< HEAD
-  fillEl.style.width = view.fillWidth;
-  if (view.available && typeof fillEl.style.setProperty === 'function') {
-    fillEl.style.setProperty('--storage-fill', String(view.pctValue / 100));
-  }
-=======
   // A ratio for the composited scaleX in layout.css. Unavailable resets to an
   // empty bar, so a previous reading never lingers behind the outline state.
   fillEl.style.setProperty('--storage-fill', view.available ? String(view.pctValue / 100) : '0');
->>>>>>> Ver2.4.1
   fillEl.setAttribute('data-state', view.state);
   // 'ok'/'warning'/'critical' or removed entirely when unavailable - CSS
   // keys the fill color off this attribute; a missing attribute keeps the
