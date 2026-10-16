@@ -16,6 +16,11 @@ html {
   -webkit-text-size-adjust: 100%;
   -moz-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Reserve the document scrollbar's space whether or not one is showing, so a
+     dialog's `body { overflow: hidden }` cannot shift the page sideways. The
+     scroll lock still prevents scrolling; it no longer depends on the scrollbar
+     disappearing. */
+  scrollbar-gutter: stable;
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -380,10 +385,14 @@ hr {
 .overflow-auto { overflow: auto; }
 .overflow-y-auto { overflow-y: auto; }
 
-/* ── Transitions ── */
-.transition-fast { transition: all var(--transition-fast); }
-.transition-base { transition: all var(--transition-base); }
-.transition-slow { transition: all var(--transition-slow); }
+/* ── Transitions ──
+   The utilities animate only compositor-friendly properties: opacity,
+   transform, background-color and color. A transition on width, height,
+   margin, padding or inset would relayout the document per frame — see
+   FRONTEND_MOTION.md for the rule and the sanctioned transform-based bars. */
+.transition-fast { transition: opacity var(--transition-fast), transform var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast); }
+.transition-base { transition: opacity var(--transition-base), transform var(--transition-base), background-color var(--transition-base), color var(--transition-base); }
+.transition-slow { transition: opacity var(--transition-slow), transform var(--transition-slow), background-color var(--transition-slow), color var(--transition-slow); }
 
 /* ── Backdrop ── */
 .backdrop-blur {
@@ -507,4 +516,28 @@ hr {
     --text-body: 15px;
     --card-padding: 20px;
   }
+}
+
+/* ══════════════════════════════════════════
+   REDUCED MOTION — one policy for the whole UI
+   ══════════════════════════════════════════
+   Every animation and every transition in the interface is neutralised here,
+   in a single block, rather than in per-file blocks. New animations are
+   covered by default. Entrance animations resolve to their finished state
+   (never a blank, transparent or scaled-down panel): iteration count 1 with
+   a 0.001ms duration lands on the `to` keyframe. Decorative loops come to
+   rest. Press feedback (3.4) is not disabled by this block — the
+   0.001ms transition means the change is applied instantly instead. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  html { scroll-behavior: auto; }
 }

@@ -444,35 +444,132 @@ const Toast = (() => {
    ══════════════════════════════════════════ */
 
 const Modal = (() => {
-  let activeBackdrop = null;
+  // Every open dialog, oldest first. The last entry is the topmost layer and
+  // owns the keyboard while it is open: Tab cycles inside it, Escape closes it,
+  // and focus cannot reach the page behind it. A drawer or menu underneath is
+  // untouched by the same key press (files.js's own Escape handler defers while
+  // a `.modal-backdrop.is-open` exists), so the two layers compose rather than
+  // redefining each other.
+  const openStack = [];
+
+  // What a dialog may hand focus to, in document order. One constant, so the
+  // initial-focus pick and the Tab cycle cannot drift apart. The negative
+  // tabindex form is deliberate: a container made programmatically focusable
+  // (the backdrop below) must not become a tab stop of its own.
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), ' +
+    'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  let idSeq = 0;
+
+  const topEntry = () => openStack[openStack.length - 1] || null;
+
+  /** Ids for aria-labelledby / aria-describedby, unique per dialog instance. */
+  const nextId = prefix => `${prefix}-${++idSeq}`;
+
+  function focusableIn(backdrop) {
+    return backdrop ? $$(FOCUSABLE, backdrop) : [];
+  }
 
   function open(id) {
     const backdrop = typeof id === 'string' ? document.getElementById(id) : id;
-    if (!backdrop) return;
+    if (!backdrop || openStack.some(entry => entry.backdrop === backdrop)) return;
+    // Captured before anything is focused, so it is the element the user came
+    // from - the trigger - and not the dialog's own first control.
+    const restoreTo = document.activeElement || null;
+    openStack.push({ backdrop, restoreTo });
     backdrop.classList.add('is-open');
+    // The backdrop is focusable only programmatically; with it, a dialog that
+    // contains no control of its own still keeps focus while it is open.
+    if (!backdrop.hasAttribute('tabindex')) backdrop.setAttribute('tabindex', '-1');
+    // Scrolling behind the dialog is prevented by this, not by the scrollbar's
+    // disappearance: `scrollbar-gutter: stable` on :root reserves that space, so
+    // the document does not shift when it goes.
     document.body.style.overflow = 'hidden';
-    activeBackdrop = backdrop;
     const focusTarget = backdrop.querySelector('[autofocus], input, button');
-    setTimeout(() => focusTarget?.focus(), 120);
+    setTimeout(() => {
+      const target = focusTarget || focusableIn(backdrop)[0] || backdrop;
+      if (target && typeof target.focus === 'function') target.focus();
+    }, 120);
   }
 
   function close(id) {
     const backdrop = id
       ? (typeof id === 'string' ? document.getElementById(id) : id)
-      : activeBackdrop;
+      : topEntry()?.backdrop;
     if (!backdrop) return;
+    const at = openStack.findIndex(entry => entry.backdrop === backdrop);
+    if (at === -1) {
+      // A layer this module never opened (or already closed): hide it anyway.
+      backdrop.classList.remove('is-open');
+      return;
+    }
+    const [entry] = openStack.splice(at, 1);
     backdrop.classList.remove('is-open');
-    document.body.style.overflow = '';
-    if (activeBackdrop === backdrop) activeBackdrop = null;
+    // Nested dialogs share one scroll lock, so it is released only by the last.
+    if (!openStack.length) document.body.style.overflow = '';
+
+    // Focus goes to the layer that is now topmost - Escape walks back down a
+    // stack of dialogs instead of dumping focus onto the page - and to the
+    // trigger when this was the last one.
+    const below = topEntry();
+    const target = below
+      ? (focusableIn(below.backdrop)[0] || below.backdrop)
+      : entry.restoreTo;
+    if (target && typeof target.focus === 'function') target.focus();
   }
 
   function closeAll() {
+    openStack.splice(0, openStack.length);
     $$('.modal-backdrop.is-open').forEach(b => b.classList.remove('is-open'));
     document.body.style.overflow = '';
-    activeBackdrop = null;
   }
 
-  /** Programmatic confirm dialog. Returns a Promise<boolean>. */
+  /**
+   * Escape and the Tab cycle, scoped to the topmost dialog. Registered once, at
+   * module load, and inert whenever no dialog is open - so the page's own Escape
+   * behaviour (drawer, menus, clipboard) is exactly what it was.
+   */
+  function onKeydown(e) {
+    const top = topEntry();
+    if (!top) return;
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      close(top.backdrop);
+      return;
+    }
+    if (e.key !== 'Tab') return;
+
+    const items = focusableIn(top.backdrop);
+    if (!items.length) {
+      // Nothing inside can take focus, so Tab must not walk out into the page.
+      e.preventDefault();
+      if (typeof top.backdrop.focus === 'function') top.backdrop.focus();
+      return;
+    }
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    const inside = typeof top.backdrop.contains === 'function'
+      ? top.backdrop.contains(active)
+      : true;
+    if (e.shiftKey) {
+      if (!inside || active === first) { e.preventDefault(); last.focus(); }
+    } else if (!inside || active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  document.addEventListener('keydown', onKeydown);
+
+  /**
+    * Programmatic confirm dialog. Returns a Promise<boolean>.
+    *
+    * Every string here is caller-supplied and may carry a file or folder name, so
+    * each one is escaped before it reaches the markup: a name containing `<` or
+    * `"` is displayed as those characters, never as markup.
+     */
   function confirm({
     title = 'Are you sure?',
     message = '',
@@ -482,22 +579,28 @@ const Modal = (() => {
     iconName = danger ? 'alert' : 'helpCircle',
   } = {}) {
     return new Promise(resolve => {
+      // The accessible name and description are the very nodes rendered, so they
+      // cannot disagree with what a sighted user reads. No description id is
+      // emitted when there is no body text to describe.
+      const titleId = nextId('modal-title');
+      const descId = nextId('modal-desc');
+      const describedBy = message ? ` aria-describedby="${descId}"` : '';
       const backdrop = el('div', { class: 'modal-backdrop' }, `
-        <div class="modal modal-sm" role="dialog" aria-modal="true">
+        <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="${titleId}"${describedBy}>
           <div class="modal-header">
             <div style="display:flex;gap:12px;align-items:flex-start;">
               <div class="toast-icon" style="background:${danger ? 'var(--color-error-bg)' : 'var(--bg-badge)'};color:${danger ? 'var(--color-error)' : 'var(--accent-primary)'};">
                 ${icon(iconName, 15)}
               </div>
               <div>
-                <div class="modal-title">${title}</div>
-                ${message ? `<div class="modal-subtitle">${message}</div>` : ''}
+                <div class="modal-title" id="${titleId}">${escapeHtml(title)}</div>
+                ${message ? `<div class="modal-subtitle" id="${descId}">${escapeHtml(message)}</div>` : ''}
               </div>
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-ghost btn-sm" data-act="cancel">${cancelText}</button>
-            <button class="btn ${danger ? 'btn-danger' : 'btn-primary'} btn-sm" data-act="ok">${confirmText}</button>
+            <button class="btn btn-ghost btn-sm" data-act="cancel">${escapeHtml(cancelText)}</button>
+            <button class="btn ${danger ? 'btn-danger' : 'btn-primary'} btn-sm" data-act="ok">${escapeHtml(confirmText)}</button>
           </div>
         </div>
       `);
@@ -517,7 +620,13 @@ const Modal = (() => {
     });
   }
 
-  /** Programmatic prompt dialog. Returns Promise<string|null>. */
+  /**
+   * Programmatic prompt dialog. Returns Promise<string|null>.
+   *
+   * Same escaping contract as confirm(): the title, hint, label, current value
+   * and placeholder are all caller-supplied, and the value is written as an
+   * attribute value, so quote characters are escaped too.
+   */
   function prompt({
     title = 'Enter value',
     label = '',
@@ -527,24 +636,27 @@ const Modal = (() => {
     hint = '',
   } = {}) {
     return new Promise(resolve => {
+      const titleId = nextId('modal-title');
+      const descId = nextId('modal-desc');
+      const describedBy = hint ? ` aria-describedby="${descId}"` : '';
       const backdrop = el('div', { class: 'modal-backdrop' }, `
-        <div class="modal modal-sm" role="dialog" aria-modal="true">
+        <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="${titleId}"${describedBy}>
           <div class="modal-header">
             <div>
-              <div class="modal-title">${title}</div>
-              ${hint ? `<div class="modal-subtitle">${hint}</div>` : ''}
+              <div class="modal-title" id="${titleId}">${escapeHtml(title)}</div>
+              ${hint ? `<div class="modal-subtitle" id="${descId}">${escapeHtml(hint)}</div>` : ''}
             </div>
             <button class="btn-icon btn-icon-sm" data-act="cancel">${icon('x', 15)}</button>
           </div>
           <div class="modal-body">
             <div class="field">
-              ${label ? `<label class="field-label">${label}</label>` : ''}
-              <input class="input" type="text" value="${value}" placeholder="${placeholder}" autofocus>
+              ${label ? `<label class="field-label">${escapeHtml(label)}</label>` : ''}
+              <input class="input" type="text" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" autofocus>
             </div>
           </div>
           <div class="modal-footer">
             <button class="btn btn-ghost btn-sm" data-act="cancel">Cancel</button>
-            <button class="btn btn-primary btn-sm" data-act="ok">${confirmText}</button>
+            <button class="btn btn-primary btn-sm" data-act="ok">${escapeHtml(confirmText)}</button>
           </div>
         </div>
       `);
@@ -841,9 +953,10 @@ function initShortcuts() {
       return;
     }
 
-    // Escape → close overlays
+    // Escape → close the overlays this module owns. A programmatic dialog is
+    // not in this list on purpose: Modal handles its own Escape, so only the
+    // topmost dialog closes and a second one beneath it stays open.
     if (e.key === 'Escape') {
-      Modal.closeAll();
       Dropdown.closeAll();
       ContextMenu.hide();
     }
@@ -1063,6 +1176,9 @@ function updateStorageUI(storage) {
 
   pctEl.textContent = view.pctText;
   fillEl.style.width = view.fillWidth;
+  if (view.available && typeof fillEl.style.setProperty === 'function') {
+    fillEl.style.setProperty('--storage-fill', String(view.pctValue / 100));
+  }
   fillEl.setAttribute('data-state', view.state);
   // 'ok'/'warning'/'critical' or removed entirely when unavailable - CSS
   // keys the fill color off this attribute; a missing attribute keeps the

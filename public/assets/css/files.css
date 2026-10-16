@@ -699,9 +699,6 @@ tr:focus-within .row-actions { opacity: 1; }
   animation: spin 0.8s linear infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .tree-caret.is-loading { animation: none; }
-}
 
 .tree-ico {
   width: 15px;
