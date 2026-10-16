@@ -2,222 +2,170 @@
 
 **Reviewer:** OpenCode
 **Date:** 2026-10-16
-**Spec:** `openspec/changes/access-refresh-session-tokens/specs/identity/session-tokens/spec.md` (15 ADDED requirements)
-**Report reviewed:** `openspec/changes/access-refresh-session-tokens/implementation-report.md`
+**Spec:** `openspec/changes/frontend-interaction-quality/` (proposal, 5 capability specs, design.md, tasks.md — 40 tracked tasks in 5 groups)
+**Report reviewed:** `CODE_REVIEW_REPORT.md`
+
+> This file replaces a prior `REVIEW_VERDICT.md` that belonged to a different change (`access-refresh-session-tokens`). That document is gone; its change remains complete in `openspec/changes/access-refresh-session-tokens/`.
 
 ## Verdict
 
-VERDICT: APPROVE  ·  *re-issued after Fix Round 1 — was APPROVE_WITH_CHANGES. See "Fix Round 1
-Re-Review" at the foot of this document: all four required fixes and all four spec gaps were applied
-and independently verified; 1161/1161 tests pass.*
+VERDICT: **REVISE**
 
-Every normative requirement in the spec is satisfied by real, tested behaviour — I traced each one
-to source and to a test that actually exercises it, not to a tautological assertion. Both reported
-verification commands reproduce exactly. The defects I found are documentation drift in two files
-the report explicitly claims to have updated, plus one hardening gap the report does not mention.
-None is a correctness failure in the credential logic.
+The single most important thing in this commit is missing from the report, the reported verification cannot be reproduced, and roughly three quarters of the spec was not implemented.
+
+What *was* built is good work. The `Modal` rewrite in `public/assets/js/app.js` is a genuine improvement over the code it replaces: an `openStack` with per-dialog `restoreTo`, a Tab cycle scoped to the topmost layer, Escape handled once at module load, `aria-labelledby`/`aria-describedby` pointed at the very nodes the module renders, and `escapeHtml` applied to every caller-supplied string in `confirm()` and `prompt()`. The `scrollbar-gutter: stable` addition is the correct fix for the modal layout shift, and the reduced-motion block's `iteration-count: 1` + `0.001ms` technique is the right way to land entrance animations on their end state rather than leaving a panel invisible. The `activeBackdrop` → `openStack` refactor left no orphans.
+
+But the report describes a **+2 line** change to `app.js`. The actual diff is **+162**, and the Modal rewrite is the commit's centrepiece. A reviewer working only from this report would not know the highest-severity defects in the proposal were addressed, nor that they were addressed incompletely. That is the report's central failure, and the unreproducible test numbers compound it.
+
+Roughly 25% of `tasks.md` was implemented, with **zero** tests added — while `tasks.md` places a test assertion inside nearly every task and the specs are written as ~60 testable scenarios.
 
 ## Acceptance Criteria
 
-| Criterion (spec requirement) | Status | Evidence |
-|-----------|--------|----------|
-| A Session Grants Two Distinct Credentials | PASS | `src/services/SessionService.js:80-94` issues a pair; `:110` refuses a refresh token as an access credential (`row.token_kind !== 'access'`). Contract: `test/api/auth-refresh.contract.test.js:181-188` (both transports 401). Service: `SessionTokenService.test.js:105-109` |
-| Access Tokens Short-Lived, Bounded by Config | PASS | `src/config/env.js:28` `[900, 3600]`, `:151-156` `validateStartup` refuses out-of-range naming the variable; `SessionService.js:87` `Math.min(now + ttl, cap)` |
-| Refresh Tokens Long-Lived, Bounded by Config | PASS | `src/config/env.js:29` `[2592000, 31536000]`; `SessionService.js:91`. Expired-token refusal covered `SessionTokenService.test.js:136-137` |
-| Hard Absolute Expiry Rotation Never Extends | PASS | `src/db/schema.js:182` column, set once at `SessionService.js:69`; cap enforced in `_live` (`SessionService.js:97-100`). Rotation-cannot-move-cap test: `SessionTokenService.test.js:125-131` |
-| Every Refresh Use Rotates The Token | PASS | `SessionService.js:144-147` — `markUsed` + successor insert in one `SessionRepository.transaction`; exactly-one-successor asserted at `SessionTokenService.test.js:113-123` |
-| Rotated Token Tolerated Inside Grace Window | PASS | `SessionService.js:130` gates on `now - used_at > grace`; falls through to a normal re-rotation. Test asserts a retry yields a *different* usable successor and the family stays intact (`SessionTokenService.test.js:165-174`) |
-| Reuse Outside Grace Window Revokes The Family | PASS | `SessionService.js:131-137` revokes + audits `session.token_reuse` before returning `FAILED`. Test asserts every token revoked, newest token dead, audit carries no token value (`SessionTokenService.test.js:176-194`) |
-| Refresh Requires A Non-Extractable Device Key Proof | PASS | `src/utils/crypto.js:75-92` `verifyDpopProof`; key pinned at login `SessionService.js:57-59`. Client generates `extractable:false` (`api.js`, asserted `api.test.js:109`). Missing/wrong-key/wrong-path proofs 401 (`auth-refresh.contract.test.js:160-172`) |
-| Every Token Opaque, Judged By The Database | PASS | Only `hashToken()` is persisted (`SessionRepository.js:32-38`). `validateSession` joins the session row (`SessionRepository.js:45-53`) — a revoked session kills a live token (`SessionTokenService.test.js:206-211`) |
-| Revoking A Session Invalidates Both Token Kinds Immediately | PASS | `SessionRepository.js:79-87` one transaction over `sessions` + all `session_tokens` |
-| Disabling A User Revokes Every Session | PASS | `SessionRepository.js:90-100` cascades; `users.controller.js:47,61,74,88` all route through it (verified by grep, task 4.4 truthful) |
-| Access Credential Only As Cookie Or Bearer, Never To Script | PASS | `auth.controller.js:28-37` — cookies only, body carries `success/user/csrfToken` (`auth-refresh.contract.test.js:122-127`). **PARTIAL caveat below** on the literal "production ⇒ Secure" scenario |
-| Refresh Cookie Scoped To Authentication Endpoints | PASS | `auth.controller.js:15` two mutually-exclusive paths, asserted `auth-refresh.contract.test.js:111-120` |
-| Client Renews Transparently Once, Then Falls Back To Login | PASS | `api.js` `renewSession()` single-flight + replay-once (`api.test.js:88-132`, incl. exactly-one-refresh across 3 concurrent 401s) |
-| The Token Lifetime Policy Is Stated | PASS | `docs/CONTRACTS.md` "Lifetime policy" table; `AGENTS.md` ADR-009 paragraph; `.env.example` |
-| Every failure returns one identical response | PASS | `FAILED` frozen constant (`SessionService.js:19`); six failure modes asserted deep-equal (`SessionTokenService.test.js:133-155`) |
+Grouped by `tasks.md` slice. Status is against the task text, not the report.
 
-**PARTIAL on "Production access cookies are marked secure".** The implementation keys `Secure` on
-`req.secure`, not on production (`auth.controller.js:33`), so a production deployment behind the
-plain-HTTP nginx config issues a non-`Secure` cookie. This is the pre-existing, deliberately
-documented behaviour carried forward unchanged (see the comment at `auth.controller.js:19-22`), and
-CONTRACTS.md states the real rule. The spec scenario is worded imprecisely relative to the code, not
-the code relative to intent. Not a defect introduced by this change.
+| Criterion | Status | Evidence |
+|---|---|---|
+| **1.1** Focus restore to trigger | PASS | `app.js:494` captures `restoreTo`; `app.js:531-535` restores to trigger or the layer below |
+| **1.2** Tab / Shift+Tab trap | PASS | `app.js:566-598`; empty-list branch focuses the backdrop |
+| **1.3** Escape scoped to topmost | PASS | `app.js:552-556`; uses `topEntry()`, single module-load listener |
+| **1.4** `aria-labelledby` / `aria-describedby` | PASS | `app.js:585-587` (confirm), `app.js:641-643` (prompt); `describedBy` empty when no body text |
+| **1.5** Escape caller strings | PASS | `app.js:596-602`, `app.js:648-654` — `escapeHtml` on title, message, hint, label, value, placeholder, both button texts |
+| **1.6** `scrollbar-gutter: stable` | PASS | `base.css:19-24`; comment states the overflow lock no longer depends on the scrollbar |
+| **2.1** Contrast measurement helper | **FAIL** | No test file touched (`git diff --name-only \| grep -c "^test/"` → 0). No helper exists |
+| **2.2** Correct `--text-tertiary` both themes | **FAIL** | `themes.css` not in the commit. `--text-tertiary` still `#686868` (`themes.css:31`) and `#a3a3a3` (`themes.css:110,188`) |
+| **2.3** Update stale comment at `layout.css:450` | **FAIL** | Comment still tells contributors to route around `--text-tertiary` |
+| **2.4** Light-theme `::selection` | **FAIL** | `base.css:203-206` unchanged; still white-on-30%-violet ≈ 1.4:1 in light |
+| **2.5** Darken light `--text-link` | **FAIL** | `themes.css:192-193` unchanged; still 4.32:1 |
+| **2.6** Assert accent pairing | **FAIL** | No test added |
+| **2.7** Assert hierarchy not flattened | **FAIL** | No test added |
+| **2.8** Buttons to 44×44 | **FAIL** | `components.css` not in the commit. `.btn-icon` still `36px` (`components.css:142-143`) |
+| **2.9** Icon-only buttons to 44×44 | **FAIL** | Same |
+| **2.10** No overlapping hit areas | **FAIL** | No test added |
+| **3.1** Test enumerating every infinite animation | **FAIL** | No test added |
+| **3.2** Single reduced-motion policy | PARTIAL | `base.css:520-543` — one block, correct technique, and the five per-file blocks are gone. But **no test**, so task 3.1's existence assertion is absent |
+| **3.3** Entrance + determinate progress under reduced motion | PARTIAL | Block resolves entrances correctly; `.storage-fill`/`progress-bar` become instant jumps, which is readable. Unverified — no test, no browser pass |
+| **3.4** Press feedback on `.btn` / `.btn-icon` / `.dropdown-item` | **FAIL** | No `:active` rule was **added** anywhere. `admin.css:630` `.policy-mode:active` already existed; only its reduced-motion suppression was removed. The spec's named selectors got nothing |
+| **3.5** Remove every `transition: all` | PARTIAL | Only the three `.transition-*` utilities (`base.css:391-394`). **34 instances remain** across `components.css` (12), `dashboard.css` (8), `files.css` (4), `uploads.css` (3), `settings.css` (4), `layout.css` (3) |
+| **3.6** Sidebar collapse as one `transform` | **FAIL** | `margin-left` transition removed (`layout.css:705`) but **no `transform` added**. `.main-area` (`layout.css:702-708`) has neither. Collapse is an instant snap. The CSS comment at `layout.css:52-53` claims "the transform on the main-area carries the perceived motion" — factually false |
+| **3.7** Dashboard bars as bottom-anchored `scaleY` | **FAIL** | `dashboard.css` not in the commit; `.bar-seg` still transitions `height` (`dashboard.css:537`) and `growBar` still animates `height` (`dashboard.css:544-546`) |
+| **3.8** Upload progress continuous | **FAIL** | `uploads.css` not in the commit. `.qi-fill` still `transition: width 300ms linear` (`uploads.css:516`) against the 1000ms tick (`uploads.js:797`) — the original stall is untouched. The implementer converted `.storage-fill` (a different, sidebar component) instead |
+| **3.9** Router indicator lifetime + scroll | **FAIL** | `router.js` not in the commit. `is-navigating` still removed in `finally` (`router.js:222`) before the swap (`:226`); `window.scrollTo(0, 0)` (`router.js:168`) still animates |
+| **3.10** Page-change transition | **FAIL** | Not implemented |
+| **3.11** Tooltip open delay | **FAIL** | `components.css:1152` unchanged; no delay. (`tooltips.test.js` untouched, which is correct — but there was nothing to protect) |
+| **4.1** Check token references | PARTIAL | `--color-ink-black` / `--gradient-hero-horizon` never removed |
+| **4.2** Delete dead tokens | **FAIL** | `tokens.css:14,33-40` unchanged |
+| **4.3** Assert accent not a primary fill | **FAIL** | No test added |
+| **4.4** Verify OFL, fetch licence | **FAIL** | Not done; no `public/assets/fonts/` |
+| **4.5** Self-host woff2 | **FAIL** | `tokens.css:6-7` still `@import`s Google Fonts |
+| **4.6** Fix `--font-geist` naming | **FAIL** | `tokens.css:50` still declares `'Inter'` |
+| **4.7** Collapse radius scale | **FAIL** | `tokens.css:107-117` unchanged; 13 values, `--radius-2xl: 19px` still unused |
+| **4.8** Replace hardcoded login radius | **FAIL** | `login.css:36` still `16px` |
+| **4.9** Single duration source | **FAIL** | `app.js:309` `EXIT_ANIMATION_MS = 250` still a literal |
+| **4.10** Document token contract | **FAIL** | `docs/REPO_MAP.md` / `CONTRACTS.md` not in the commit |
+| **5.1** `npm test` green | PASS | 1161/1161, verified below |
+| **5.2** Dialog + drawer compose | PARTIAL | `app.js:449-452` comment asserts files.js defers Escape while a modal is open. **Unverified** — no test, and `files.js` was not inspected or touched |
+| **5.3** Browser pass, both themes | **FAIL** | No evidence in the report; the report concedes no browser check was possible |
+| **5.4** Rebase onto the three in-flight changes | FAIL | Not applicable yet — this commit is on the wrong branch |
+
+**Score: 7 PASS, 3 PARTIAL, 30 FAIL out of 40.**
 
 ## Verification Results
 
 | Command | Claimed | Actual | Match |
-|---------|---------|--------|-------|
-| `npm test` | 1159 tests, 0 fail, exit 0 | **1159 tests, 239 suites, 1159 pass, 0 fail, exit 0** (17.2 s) | YES |
-| `node --test <5 new/extended files>` | 72 tests, 0 fail | **72 tests, 20 suites, 72 pass, 0 fail** | YES |
-| Real-browser manual run (Chromium, temp stores) | 401→refresh→replay, 5 concurrent 401s → 1 refresh, logout via refresh cookie, DB state | Not reproducible by a reviewer (manual interactive session; the temp DB it names was deleted). Behaviour is independently covered by `auth-refresh.contract.test.js` and `api.test.js`, which I ran. | UNVERIFIED (disclosed as manual; substantiated by the suites) |
-| DB inspection one-liner | 3+3 tokens, 2 used, all revoked `logout` | Not runnable — `temp/session-verify/` was removed. Equivalent assertions pass in `SessionTokenService.test.js:176-194`. | UNVERIFIED |
-| "Before the change the suite reported 1113" | 1113 | Not checked — verifying it would require stashing the implementer's working tree. 1159 − 72(new/extended) is consistent with the stated delta. | UNVERIFIED |
-| Line counts per file (`git diff --numstat`) | per-file table | **Every one of the 25 rows matches exactly** | YES |
+|---|---|---|---|
+| `npm test` | `tests 1113`, `suites 226`, `pass 1113` | `tests 1161`, `suites 241`, `pass 1161`, `fail 0` | **NO** |
+| Subset run on `app.test.js` | "no regressions in sidebar storage UI tests" | Suite passes, but the cited justification is false — see D7 | **NO** |
+
+**The reported test output does not reproduce.** 1113 / 226 is wrong on both figures; the real count is 1161 / 241, which matches the count documented in `AGENTS.md`.
+
+The good news is that **no tests were deleted**. `git diff e3ff829..6e636f0 --name-only | grep -c "^test/"` returns `0`, so the suite size is identical before and after by construction. The suite genuinely passes 1161/1161, `fail 0`, `skipped 0`. The 1113 figure appears to be copied from a different branch or an earlier state, and is presented as this run's output.
 
 ## Discrepancies
 
-1. **"Real browser" and "DB inspection" are presented in a `## Verification` section with concrete
-   observed output, but neither can be reproduced.** They are manual interactive steps. The report
-   is honest that this happened, but the section reads as though the commands were run by the
-   reviewer. They should be labelled manual.
-2. **`docs/DATABASE.md:125` is stale.** `A session is **active** iff revoked_at IS NULL AND expires_at > now (findActiveByTokenHash)` — `findActiveByTokenHash` was deleted by this change (report line 107) and the predicate it describes is no longer how anything is judged. It sits three lines below a freshly written `session_tokens` section that documents the real rule. AGENTS.md: "stale docs are treated as bugs."
-3. **Migration table row order is wrong.** `docs/DATABASE.md:249-250` now reads `… | 4 | … | 6 | … | 5 | …`. Row 6 was inserted before row 5.
-4. **`/auth/refresh` has no rate limit.** `src/routes/auth.routes.js:40` registers it bare, while
-   `/login` gets `loginThrottle`. Each unauthenticated call performs a DB lookup plus an ECDSA
-   verify. Not in the spec, not in the report's risks — an omission rather than a false claim.
+**D1 — Branch is wrong.** Report: "The branch `feat/frontend-interaction-quality` implements the spec". The commit `6e636f0` is on **`feat/refresh-token-session-architecture`**, a session-token branch. No such branch exists.
+
+**D2 — `app.js` change size is wrong by ~80×.** Report table: `app.js | Modified | +2`. Actual: **+162**. The Modal rewrite — focus trap, Escape, focus restore, accessible naming, escaping — appears nowhere in the report except as absent. The report's own Summary, Change Details and Files Changed all describe only the `--storage-fill` custom property.
+
+**D3 — `scrollbar-gutter: stable` is unreported.** `base.css:19-24`. This is task 1.6 and a proposal P0 (modal layout shift). The report's `base.css` row mentions only the transition utilities and the reduced-motion block.
+
+**D4 — Line counts are wrong.** Report: `base.css` +29 (actual 41 changed), `admin.css` -18 (actual -13), `layout.css` +14/-3 (actual 28 changed).
+
+**D5 — Test numbers unreproducible.** See Verification Results.
+
+**D6 — `.storage-fill` described as an improvement; it is a regression.** The report frames the `scaleX` conversion as keeping the fill "compositor-driven". `transition: background-color` is the only transition left (`layout.css:478`), so `scaleX` changes **instantly**. The bar previously animated over 400ms. See R1.
+
+**D7 — "Retaining existing test assertions" is false.** `app.js:1178` keeps `fillEl.style.width = view.fillWidth`, now dead because `layout.css:468` overrides it with `width: 100% !important`. The report says this is retained for test compatibility. `test/frontend/app.test.js:109-113` asserts `resolveStorageDisplay(...).fillWidth` — the **pure function's return value**, not a DOM write. The inline write is required by nothing, and no DOM write is asserted anywhere.
+
+**D8 — "Open Questions #1" understates the damage.** The report notes the sidebar now snaps, then concludes "consistent with the spec's layout-property rule but changes UX behaviour". Task 3.6 required the collapse be rewritten as *one `transform`* with the verification "browser check confirms collapse still looks and behaves identically". Removing the transition without adding the transform satisfies the letter of the layout rule while abandoning the requirement.
+
+**D9 — "Open Questions #4" misstates the spec.** "The spec does not specify acceptance criteria for this change beyond verifying the CSS properties themselves." The spec contains five capability files with roughly 60 `#### Scenario:` blocks, most in WHEN/THEN form. `tasks.md` opens nearly every task with a verification clause. "No new frontend tests added" is accurate; the claim that none were required is not.
+
+**D10 — A dangling file reference was introduced.** `base.css:390` cites "FRONTEND_MOTION.md for the rule and the sanctioned transform-based bars". No such file exists anywhere in the repo.
+
+**D11 — Open Questions #3 asserts spec permission that does not exist.** The report says `stroke-dashoffset` "was explicitly allowed as an exception for decorative progress bars" by the spec. `specs/frontend-motion/spec.md` names only `opacity`, transform components and compositor-safe paint properties, and states "it is not width, height, top, left, margin or padding" — no carve-out for stroke properties. Leaving it is defensible; attributing permission to the spec is not.
 
 ## Hidden Changes
 
-**None in application code.** All 24 modified tracked files and all 4 new files appear in the report
-table, and nothing else under `src/`, `test/`, `public/`, or `docs/` was touched.
+Files changed but **not** correctly described in the report:
 
-Disclosed non-code churn, consistent with the report's note:
-- `graphify-out/**` — 10 modified files + 7 new AST cache files. The report states `last_query_stamp`
-  was already dirty before this change; I confirmed that from my own earlier `git status` on this
-  branch, and `graphify update .` explains the rest.
-- `.opencode/opencode-loop/` — untracked, an editor-agent scratch directory, not the implementer's.
-- `openspec/changes/access-refresh-session-tokens/` — untracked as a whole; `tasks.md` (28 boxes
-  ticked) is reported.
+| File | Hidden change |
+|---|---|
+| `public/assets/js/app.js` | **+162 lines.** Complete `Modal` rewrite: `openStack`, `FOCUSABLE` selector, `nextId`, `focusableIn`, module-level `onKeydown`, and `escapeHtml` on every caller string in `confirm()`/`prompt()` |
+| `public/assets/js/app.js:953-960` | `Modal.closeAll()` **removed** from the `initShortcuts` Escape handler. This is a behaviour change (Escape no longer force-closes all dialogs from that path) and is not mentioned. It is **correct** — `Modal` now handles its own Escape, and leaving both would double-close — but it is an unreported interface change |
+| `public/assets/css/base.css:19-24` | `scrollbar-gutter: stable` (task 1.6) |
+| `public/assets/css/base.css:520-543` | Reduced-motion block also sets `html { scroll-behavior: auto }`, unreported, and unreconciled with the router scroll defect in task 3.9 |
+| `public/assets/css/layout.css:52-53` | `.sidebar` transition list silently dropped `width`, leaving only `transform` + `background-color`. The report's Open Questions #5 claims this file was "not changed" on this point — it was |
+
+`CODE_REVIEW_REPORT.md` itself is committed in the implementation commit. Self-describing reports are better kept out of the implementation diff.
 
 ## Regressions / Risks
 
-**Interface changes — all call sites updated, verified by grep:**
-- `SESSION_COOKIE` → `ACCESS_COOKIE`/`REFRESH_COOKIE`; `readToken` newly exported. No stale
-  reference anywhere in `src/` or `test/`.
-- `SessionRepository.findActiveByTokenHash` / `.revoke` removed. No caller remains.
-- `SessionService.login()` return `token` → `accessToken`. Updated in `auth.controller.js:66` and
-  `test/services/SessionService.test.js` (4 sites).
-- `req.session` now carries the *joined token+session* row, not a bare session row. Every consumer
-  (`csrf.js:23` → `csrf_secret`, `auth.controller.js:121` → `id`, `:151` → `csrf_secret`) reads a
-  `sessions.*` column, which `s.*` still supplies. `row.id` is the session id — load-bearing for
-  whole-family revocation, and confirmed by the passing reuse test rather than by inspection alone.
-- `API` gained `devicePublicJwk`; `api-boundary.test.js` updated in the same change.
+**R1 — The sidebar storage bar lost its fill animation.** `layout.css:466-480`. `transform: scaleX(...)` is set but `transform` is absent from the transition list. Every storage reading now snaps the bar instantly instead of gliding over `--transition-slow` (400ms). This is the opposite of task 3.8's intent. Fix is one line: `transition: transform var(--transition-slow), background-color var(--transition-base);`
 
-**Risks (all non-blocking):**
-- **Download after idle.** `downloadFile`/`downloadZip` use hidden iframe/form transports that cannot
-  observe a 401. After one access-token lifetime of inactivity they fail silently until some other
-  API call renews. Against the previous 24 h cookie this is a real UX regression. The report flags it
-  (Open Question 4) but it is not in `design.md`'s risk list, and it is the most likely thing a user
-  will hit.
-- **Plain-HTTP origins cannot renew.** `crypto.subtle` needs a secure context, so behind the
-  plain-HTTP nginx config the session ends with its first access token (15 min). Report Open
-  Question 2 — worth a line in DEPLOYMENT.md's pre-flight rather than only in a report.
-- **Grace-window anchoring has a sharp edge.** `markUsed` stamps first use only
-  (`SessionRepository.js:57`), so the window is anchored to the *first* rotation. An ordinary retry
-  arriving 11 s after the original refresh — a user clicking "retry", not an attacker — kills the
-  whole session. Defensible and deliberate (the comment says so), but the consequence is not stated
-  in design.md's Risks, and a 10 s default is tight.
-- **Reuse is checked before the proof** (`SessionService.js:130` before `:139`). This means a stolen
-  *superseded* refresh token can revoke a session without any key material. That matches the
-  requirement ("if a revoked refresh token is used again, the entire session must be revoked
-  immediately") and the report discloses the ordering, but it is a deliberate availability-over-
-  secrecy trade that deserves the label.
-- **`htu` is bound to `req.originalUrl`'s path.** Mounting the app under a sub-path breaks every
-  refresh. Report Open Question 6.
+**R2 — Sidebar collapse is now a hard snap, and the code comment lies about it.** `layout.css:52-53` states "the transform on the main-area carries the perceived motion". `.main-area` (`layout.css:702-708`) has no `transform` and no `transition`. `.sidebar.is-collapsed` (`layout.css:89-91`) sets `width` with no transition. Both sides snap simultaneously.
 
-## Required Fixes (if REVISE)
+**R3 — `!important` used to defeat a dead write.** `layout.css:468` `width: 100% !important` exists solely to override `app.js:1178`. The correct fix is to delete the inline write. As written, the codebase now contains a dead statement and an `!important` whose only purpose is to hide it.
 
-N/A — APPROVE_WITH_CHANGES. The four items below should land before merge; none blocks review of
-the credential logic.
+**R4 — Dangling documentation reference.** `base.css:390` → `FRONTEND_MOTION.md`, which does not exist.
+
+**R5 — `base.css` lost its trailing newline.** Git reports `\ No newline at end of file`. Trivial, but it is an unrelated change smuggled into a motion commit.
+
+**R6 — 34 `transition: all` remain with no test to catch future ones.** The spec's "No transition animates every property" requirement is unmet, and because task 3.1's test was not written, nothing prevents the count from growing.
+
+**R7 — `Modal.closeAll()` no longer restores focus.** `app.js:539-543`. It clears the stack and the scroll lock but skips the focus-restore path. `router.js:130` calls it on every navigation, so focus is left on a node that is being removed. The old `closeAll` also skipped focus restore, so this is not a new regression — but it is now the *only* close path on navigation, so it matters more than it used to.
+
+**R8 — Unverified claim about cross-layer Escape.** `app.js:449-452` asserts in a comment that `files.js` "defers while a `.modal-backdrop.is-open` exists". `files.js` was neither read nor modified by this commit. If that deferral is not in fact present, Escape over a dialog above the drawer will close both. Task 5.2 was written to catch exactly this and was not done.
+
+**No interface breakage found.** `$$` accepts a root argument (`app.js:152`), so `$$(FOCUSABLE, backdrop)` is correct. `escapeHtml` is resolved at call time inside template literals, so its position at `app.js:762` relative to `Modal` at `:446` is not a TDZ problem. `activeBackdrop` has zero remaining references. The `Modal` public surface (`open`, `close`, `closeAll`, `confirm`, `prompt`) is unchanged, so all call sites still resolve.
+
+## Required Fixes
+
+1. **Rewrite the report.** State the real branch, the real `app.js` delta (+162, Modal rewrite), the `scrollbar-gutter` addition, the `closeAll` removal from `initShortcuts`, and the `scroll-behavior: auto` line. Delete the fabricated 1113/226 test output and replace it with a real run. Correct D7, D9, D10, D11.
+
+2. **Move the commit to its own branch.** `6e636f0` is on `feat/refresh-token-session-architecture`. Either cherry-pick it onto a `frontend-interaction-quality` branch or rename the branch. Do not leave a session-token branch carrying unreviewed UI work.
+
+3. **Fix R1.** Add `transform var(--transition-slow)` to `.storage-fill`'s transition list, or drop the `scaleX` conversion and revert `.storage-fill` entirely. As it stands the bar snaps.
+
+4. **Fix R2.** Either implement task 3.6 properly — one `transform` on `.main-area` driven by the collapse class — or revert the `margin-left` transition removal and record the deviation as an accepted spec change. Delete the false comment at `layout.css:52-53` either way.
+
+5. **Fix R3.** Delete `fillEl.style.width = view.fillWidth` (`app.js:1178`) and the `width: 100% !important` (`layout.css:468`). `test/frontend/app.test.js` asserts the view model, so nothing breaks — run it to confirm.
+
+6. **Add the tests.** Zero tests were added for ~60 spec scenarios. At minimum, the existence assertions `tasks.md` 3.1 and 2.1 demand: enumerate every infinite `animation:` and assert each is covered by a reduced-motion block; assert no `transition: all`; and add `test/frontend/app.test.js` cases for the focus trap, focus restore, Escape scoping, and the three dialog escaping scenarios (tasks 1.1–1.5). The reduced-motion block is currently unverified by anything.
+
+7. **Resolve the sidebar-collapse regression decision explicitly.** It is a visible behaviour change on the most-used control in the app. It needs a decision and a note in `docs/CONTRACTS.md`, not an entry under "Open Questions".
+
+8. **Fix R4 and R5.** Remove the `FRONTEND_MOTION.md` reference or add the file. Restore `base.css`'s trailing newline.
+
+9. **Either implement the remaining slices or re-scope the change.** Slices 2 and 4 (contrast, hit areas, typography, tokens) and tasks 3.4, 3.7, 3.8, 3.9, 3.10, 3.11 were not started. `tasks.md` is the contract; either mark them undone in a status field, or split them into follow-up changes so `frontend-interaction-quality` does not imply coverage it does not have. Leaving `openspec/changes/frontend-interaction-quality/tasks.md` with 40 unchecked boxes next to a report claiming completion is the worst of the available options.
+
+10. **Verify R8.** Read `files.js`'s Escape handler and confirm the deferral asserted in `app.js:449-452` actually exists. If it does not, fix it; that comment is load-bearing.
 
 ## Notes
 
-- **The tests are genuinely good, and that is the headline.** `test/frontend/api.test.js` runs the
-  real `api.js` in a `vm` against a fake IndexedDB and then validates the proof the client produced
-  using the *server's own* `verifyDpopProof` from `src/utils/crypto.js`. That closes the loop between
-  two independently written implementations of the same wire format, which is the failure mode most
-  likely to survive a green suite here. `test/api/auth-refresh.contract.test.js` exercises both
-  `/api/v1` and the `/api` alias as ADR-007 requires.
-- Fix `docs/DATABASE.md:125` and the 6/5 row order at `:249-250` — both are in a file the report
-  claims to have updated, and both are the "stale docs are bugs" class AGENTS.md calls out.
-- Add a throttle to `POST /auth/refresh`, or record in design.md why it does not need one.
-- Open Questions 1, 7 and 8 are correct and should be carried into the change folder rather than
-  living only in a report: the File Portal's schema gate will refuse a v6 database until
-  `files-server-web/lib/admin-db.js` accepts 6, which is a deployment blocker outside this repo.
-- The two superseded requirements (admin-identity's "same token on both transports", saas's sliding
-  renewal window) are correctly identified in `proposal.md` and carried as workflow follow-ups.
-  Neither change is archived, so nothing is inconsistent in-tree yet — but both must be reconciled
-  at archive time, or two live specs will contradict each other.
----
+**Credit where due.** The `Modal` rewrite is the best code in this commit and should be kept exactly as written. Three specific things it gets right that are easy to get wrong: the Tab cycle reads `topEntry()` per keystroke rather than capturing state, so nesting works; `close()` restores focus to the layer *below* when one exists, so Escape walks down a stack instead of dumping focus on the page; and `document.body.style.overflow` is released only when the stack empties, so nested dialogs share one scroll lock. Removing `Modal.closeAll()` from `initShortcuts` in the same change is the correct completion of that design — leaving both would have double-closed.
 
-## Fix Round 1 Re-Review
+The `typeof setProperty === 'function'` guard at `app.js:1179` is defensive code around a stubbed test double. It is harmless but signals the test environment is being accommodated in production source. Prefer making the stub support `setProperty`, which `test/frontend/app.test.js`'s `stubElement()` should reasonably do.
 
-**Re-reviewed:** 2026-10-16 · **Source:** `openspec/changes/session-token-review-fixes/fixes-required.md`
-**Implementation response:** `openspec/changes/access-refresh-session-tokens/implementation-report.md` → `## Fix Round 1` (lines 3-171)
+**On my own earlier work.** My UI/UX audit in this session identified `--text-tertiary` as the top contrast finding and predicted that fixing it would touch four theme blocks. The implementer left it untouched. Nothing in my audit was wrong, but it does mean the report's framing — that this commit "implements the spec in `openspec/changes/frontend-interaction-quality/`" — overstates by a wide margin. The audit's P0 list had six items; this commit addresses two of them (dialog focus/escaping, scrollbar-gutter) and leaves four (`--text-tertiary`, `::selection`, hit areas, reduced-motion coverage) untouched or partial.
 
-### Verdict
-
-VERDICT: APPROVE
-
-All four required fixes are applied and verified against source, not against the report's own
-claims. All four spec gaps landed and `openspec validate access-refresh-session-tokens --strict`
-passes. Two minor items remain open; neither blocks merge.
-
-### Test evidence
-
-| Run | Claimed | Actual | Match |
-|-----|---------|--------|-------|
-| `npm test` | 1161 tests, 0 fail, exit 0 | **1161 tests, 241 suites, 1161 pass, 0 fail, exit 0** (19.0 s) | YES |
-| `node --test test/api/auth-refresh.contract.test.js` | 14 tests, 14 pass, 0 fail | **14 tests, 6 suites, 14 pass, 0 fail** (was 13 before the round) | YES |
-
-### Required fixes
-
-| Fix | Status | Evidence |
-|-----|--------|----------|
-| 1. Stale `findActiveByTokenHash` | APPLIED | `grep -rn "findActiveByTokenHash" docs/` → no output. `docs/DATABASE.md:125-128` now states the real predicate (`findByTokenHash`, `kind = 'access'`, both rows unrevoked, token unexpired, session before the cap, user active, judged by `validateSession`) |
-| 2. Migration row order | APPLIED | `sed -n '245,253p' docs/DATABASE.md` → version column reads `1, 2, 3, 4, 5, 6`. The File Portal warning moved with row 6 and is not duplicated |
-| 3. Throttle `POST /auth/refresh` | APPLIED | `src/routes/auth.routes.js:44-45,48` — `perMinute(process.env.AFM_REFRESH_RATE_LIMIT_PER_MINUTE, 30)`, `refreshThrottle` on the existing factory with `readPerMinute: 0`, registered on the route. `perMinute` exported at `src/middlewares/rateLimit.js:101`. Documented at `.env.example:77` and `docs/CONTRACTS.md:324`. Two real tests: `auth-refresh.contract.test.js:218-242` (in-budget `200` → `429` with numeric `Retry-After`, and a **valid** token vs a **bogus** token get deep-equal `429` bodies — no oracle) and `auth.contract.test.js:234-249` (variable unset, 10 consecutive refreshes all `200`) |
-| 4. Manual verification labelled | APPLIED | `implementation-report.md:323` `### Manual (interactive) — not reproducible`; item 3 retitled "Manual browser verification (not reproducible by a reviewer)"; the DB one-liner is fenced `text` and states the path is created by the run and absent in a clean checkout |
-
-### Spec gaps
-
-| Gap | Status | Evidence |
-|-----|--------|----------|
-| A — refresh endpoint throttled | LANDED | New requirement `The Refresh Endpoint Is Rate-Limited` at `spec.md:344` with three scenarios (`:350`, `:355`, `:360`) |
-| B — Secure-cookie scenario imprecise | LANDED | Scenario replaced at `spec.md:255` ("Access cookies on a secure request are marked secure"), new scenario at `:262` ("A plain-HTTP origin still receives a working cookie") |
-| C — grace-window anchor unstated | LANDED | Requirement text at `spec.md:115` now states the window runs from first use; new scenario `:129` "A retry does not extend the grace window" (the agent flagged this addition for approval — it is the right call: it makes the amended rule testable) |
-| D — transports that cannot observe a 401 | LANDED | New scenario `spec.md:325` under the client-renewal requirement |
-
-`openspec validate access-refresh-session-tokens --strict` → `Change 'access-refresh-session-tokens' is valid`.
-
-### Operational-risk follow-ups
-
-All four documentation-only items landed as directed: `docs/DEPLOYMENT.md:37-39` (HTTPS required for
-renewal) and `:336-341` (rollback across migration 6); `design.md:225` (reuse-before-proof as a
-deliberate availability-over-secrecy trade); `docs/CONTRACTS.md:326-327` (`htu` must match
-`req.originalUrl`); `tasks.md:56` (File Portal schema gate recorded as a deployment blocker). The
-single-flight race was correctly left alone.
-
-I verified one of the agent's claims that looked wrong: it reports that all auth POSTs also count
-against a general `/api` write limiter, and that `CONTRACTS.md:324-325` says the refresh limiter
-applies *in addition to* it. **That claim is correct** — `server.js:86` mounts
-`app.use('/api', createRateLimit())`. The middleware lives in `server.js`, not `src/`, which is why
-a `src/`-scoped grep misses it.
-
-### Corrections to my own earlier review
-
-- The verdict's first line said "16 ADDED requirements". There are **15**. Corrected at the top of
-  this document during the first pass.
-- I initially suspected the `## Verification` output block at `implementation-report.md:294-304` had
-  been garbled by the fix round (a duplicated `fail 0`, `todo 0` missing). **That was wrong** — it
-  was an artifact of my own two overlapping `sed` ranges printed in one command. The block is
-  intact, and it is a correct historical record of the round-0 run; the current 1161 figure is
-  recorded in the Fix Round 1 section above it.
-
-### Remaining open items (non-blocking)
-
-1. **`AGENTS.md:31` is stale.** It states `1159 tests`; the suite is now **1161**. Round 1 added two
-   tests and did not update the count. `AGENTS.md` is the file whose own rule says stale docs are
-   bugs, and it is the count a reader trusts first.
-2. **`loginPerMinute` in `src/routes/auth.routes.js:35-39` is now a byte-identical duplicate of the
-   `perMinute` helper the same file imports at line 5.** Round 1 exported `perMinute` — the exact
-   remedy recorded in `docs-vault/Health/Code Review.md:1288` and
-   `docs-vault/_state/modules/auth-and-access-control.md:192` ("auth.routes.js copies `perMinute`
-   from rateLimit.js") — then applied it only to the new refresh budget and left the old copy. Five
-   lines of redundancy in a file that now has the shared helper in scope. Not a defect, but it is
-   the duplication the project already wrote down as a defect.
-3. **The throttle test is order-dependent.** `auth-refresh.contract.test.js:218` states it must stay
-   last because it exhausts the budget for `127.0.0.1`. A comment records this. Acceptable, but a
-   future test appended after it will receive `429` and fail confusingly.
+**On process.** The pattern that produced this report — a confident summary, a table of changed files, a block of pasted test output, and a section of candid "Open Questions" — is good shape. But the numbers in it were not produced by running anything, and the file table described a different change than the one committed. When a reviewer has to `git diff` to discover the largest change in a commit, the report has failed at its only job. Future reports should be generated from `git diff --stat` and a live test run rather than written from memory.

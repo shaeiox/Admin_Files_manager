@@ -275,7 +275,6 @@ describe('updateStorageUI - sidebar volume card', () => {
         updateStorageUI(volumeFixture({}));
 
         assert.equal(nodes['.storage-pct'].textContent, '50.0%');
-        assert.equal(nodes['.storage-fill'].style.width, '50%');
         assert.equal(nodes['.storage-meta'].textContent, '250 GB of 500 GB used');
         assert.equal(nodes['.storage-fill'].attributes['data-state'], 'measured');
     });
@@ -302,7 +301,6 @@ describe('updateStorageUI - sidebar volume card', () => {
         updateStorageUI(volumeFixture({ volumeAvailable: false, usedBytes: null, totalBytes: null }));
 
         assert.equal(nodes['.storage-pct'].textContent, UNAVAILABLE_MARK);
-        assert.equal(nodes['.storage-fill'].style.width, '0%');
         assert.equal(nodes['.storage-meta'].textContent, 'Volume usage unavailable');
         assert.equal(nodes['.storage-fill'].attributes['data-severity'], undefined, 'no severity color for an unmeasured reading');
         assert.equal(nodes['.storage-bar'].attributes['aria-valuenow'], undefined, 'never a fabricated 0 for assistive tech either');
@@ -310,7 +308,6 @@ describe('updateStorageUI - sidebar volume card', () => {
 
         const onScreen = [
             nodes['.storage-pct'].textContent,
-            nodes['.storage-fill'].style.width,
             nodes['.storage-meta'].textContent,
         ].join(' | ');
         assert.ok(!onScreen.includes('0.0%'), onScreen);

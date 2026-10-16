@@ -388,8 +388,7 @@ hr {
 /* ── Transitions ──
    The utilities animate only compositor-friendly properties: opacity,
    transform, background-color and color. A transition on width, height,
-   margin, padding or inset would relayout the document per frame — see
-   FRONTEND_MOTION.md for the rule and the sanctioned transform-based bars. */
+   margin, padding or inset would relayout the document per frame. */
 .transition-fast { transition: opacity var(--transition-fast), transform var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast); }
 .transition-base { transition: opacity var(--transition-base), transform var(--transition-base), background-color var(--transition-base), color var(--transition-base); }
 .transition-slow { transition: opacity var(--transition-slow), transform var(--transition-slow), background-color var(--transition-slow), color var(--transition-slow); }

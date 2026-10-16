@@ -1175,7 +1175,6 @@ function updateStorageUI(storage) {
   if (!pctEl || !fillEl || !metaEl) return;
 
   pctEl.textContent = view.pctText;
-  fillEl.style.width = view.fillWidth;
   if (view.available && typeof fillEl.style.setProperty === 'function') {
     fillEl.style.setProperty('--storage-fill', String(view.pctValue / 100));
   }
