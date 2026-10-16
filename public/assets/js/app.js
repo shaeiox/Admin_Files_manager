@@ -306,7 +306,20 @@ function resolveType(filename, isFolder = false) {
 
 const Toast = (() => {
   let stack = null;
-  const EXIT_ANIMATION_MS = 250;
+  /**
+   * How long `.toast.is-leaving` animates, read from the --transition-base token
+   * that animation uses, so a token change can never remove a toast mid-exit.
+   * No readable token means no stylesheet, hence no animation to wait for.
+   */
+  function exitAnimationMs() {
+    try {
+      const value = getComputedStyle(document.documentElement).getPropertyValue('--transition-base');
+      const m = /([\d.]+)(ms|s)\b/.exec(value);
+      if (m) return m[2] === 's' ? Number(m[1]) * 1000 : Number(m[1]);
+    } catch { /* no style engine (tests) */ }
+    return 0;
+  }
+
   // A burst (eight uploads finishing together) must not bury the page: past this
   // many visible toasts the oldest is dismissed to make room for the newest.
   const MAX_VISIBLE = 4;
@@ -359,7 +372,7 @@ const Toast = (() => {
     setTimeout(() => {
       activeToasts.delete(node);
       node.remove();
-    }, EXIT_ANIMATION_MS);
+    }, exitAnimationMs());
   }
 
   function pause(node) {
@@ -435,6 +448,7 @@ const Toast = (() => {
     warning: (t, m, d) => show('warning', t, m, d),
     info: (t, m, d) => show('info', t, m, d),
     dismiss,
+    exitAnimationMs,
     MAX_VISIBLE,
   };
 })();
@@ -470,13 +484,18 @@ const Modal = (() => {
     return backdrop ? $$(FOCUSABLE, backdrop) : [];
   }
 
-  function open(id) {
+  /**
+   * `onDismiss` (optional) is what Escape does instead of a bare close(): a
+   * programmatic dialog passes its cancel path, so its promise settles and its
+   * node is removed rather than left hidden and pending forever.
+   */
+  function open(id, { onDismiss = null } = {}) {
     const backdrop = typeof id === 'string' ? document.getElementById(id) : id;
     if (!backdrop || openStack.some(entry => entry.backdrop === backdrop)) return;
     // Captured before anything is focused, so it is the element the user came
     // from - the trigger - and not the dialog's own first control.
     const restoreTo = document.activeElement || null;
-    openStack.push({ backdrop, restoreTo });
+    openStack.push({ backdrop, restoreTo, onDismiss });
     backdrop.classList.add('is-open');
     // The backdrop is focusable only programmatically; with it, a dialog that
     // contains no control of its own still keeps focus while it is open.
@@ -535,7 +554,8 @@ const Modal = (() => {
 
     if (e.key === 'Escape') {
       e.preventDefault();
-      close(top.backdrop);
+      if (top.onDismiss) top.onDismiss();
+      else close(top.backdrop);
       return;
     }
     if (e.key !== 'Tab') return;
@@ -606,7 +626,7 @@ const Modal = (() => {
       `);
 
       document.body.appendChild(backdrop);
-      requestAnimationFrame(() => open(backdrop));
+      requestAnimationFrame(() => open(backdrop, { onDismiss: () => finish(false) }));
 
       const finish = val => {
         close(backdrop);
@@ -662,7 +682,7 @@ const Modal = (() => {
       `);
 
       document.body.appendChild(backdrop);
-      requestAnimationFrame(() => open(backdrop));
+      requestAnimationFrame(() => open(backdrop, { onDismiss: () => finish(null) }));
 
       const input = backdrop.querySelector('input');
       const finish = val => {
@@ -1175,9 +1195,9 @@ function updateStorageUI(storage) {
   if (!pctEl || !fillEl || !metaEl) return;
 
   pctEl.textContent = view.pctText;
-  if (view.available && typeof fillEl.style.setProperty === 'function') {
-    fillEl.style.setProperty('--storage-fill', String(view.pctValue / 100));
-  }
+  // A ratio for the composited scaleX in layout.css. Unavailable resets to an
+  // empty bar, so a previous reading never lingers behind the outline state.
+  fillEl.style.setProperty('--storage-fill', view.available ? String(view.pctValue / 100) : '0');
   fillEl.setAttribute('data-state', view.state);
   // 'ok'/'warning'/'critical' or removed entirely when unavailable - CSS
   // keys the fill color off this attribute; a missing attribute keeps the

@@ -31,12 +31,13 @@ app.set('trust proxy', NGINX_PROXY_HOPS);
 //                         <script> and no on* handler anywhere in the shells.
 //   style-src    ...    - 'unsafe-inline' is still REQUIRED: 13 inline style=
 //                         attributes live in the page modules' innerHTML
-//                         templates (app/dashboard/uploads). tokens.css also
-//                         @imports Google Fonts. Script strictness is what blocks
+//                         templates (app/dashboard/uploads). Script strictness is what blocks
 //                         XSS; inline style is a far weaker vector, so this is the
 //                         honest cost of not rewriting every renderer. Tighten to
 //                         'self' once those templates stop emitting style=.
-//   font-src     ...    - fonts.gstatic.com serves the @imported webfonts.
+//   font-src     'self'  - DM Sans and Inter are self-hosted under
+//                         /assets/fonts (frontend-interaction-quality); no
+//                         font or stylesheet comes from a third-party host.
 //   img-src      'self' data:  - thumbnails are same-origin; components.css uses
 //                         data:image/svg+xml backgrounds.
 //   connect-src  'self'  - window.API is same-origin /api/v1 (ADR-007). A cross-
@@ -47,8 +48,8 @@ app.set('trust proxy', NGINX_PROXY_HOPS);
 const CSP_DIRECTIVES = {
     defaultSrc: ["'self'"],
     scriptSrc: ["'self'"],
-    styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-    fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    fontSrc: ["'self'"],
     imgSrc: ["'self'", 'data:'],
     connectSrc: ["'self'"],
     objectSrc: ["'none'"],

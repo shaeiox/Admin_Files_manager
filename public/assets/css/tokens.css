@@ -3,15 +3,52 @@
    Admin Files Manager — Dimension Style
    ============================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400;1,9..40,500&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+/* ── Typefaces: self-hosted, no third-party request (design-tokens spec) ──
+   Latin variable woff2 subsets of DM Sans and Inter (SIL OFL 1.1; licences in
+   ../fonts/). Upright only - nothing in the UI sets italic. font-display: swap
+   shows the fallback first; the "Fallback" faces are local Arial scaled to each
+   family's metrics (computed from the woff2 files) so the swap barely reflows. */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('../fonts/dm-sans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('../fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'DM Sans Fallback';
+  src: local('Arial');
+  size-adjust: 106.51%;
+  ascent-override: 93.14%;
+  descent-override: 29.11%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Inter Fallback';
+  src: local('Arial');
+  size-adjust: 107.12%;
+  ascent-override: 90.44%;
+  descent-override: 22.52%;
+  line-gap-override: 0%;
+}
 
 :root {
   /* ── Color Tokens ── */
   --color-void-canvas: #0a0a0a;
   --color-graphite: #161616;
   --color-frosted-glass: #d4d4d4;
-  --color-ink-black: #000000;
   --color-snow-white: #ffffff;
   --color-bone: #ededed;
   --color-ash: #c2c2c2;
@@ -24,31 +61,24 @@
   /* ── Gradient Tokens ── */
   --gradient-dusk-violet: linear-gradient(
     90deg,
-    rgba(0, 0, 0, 0),
-    rgba(0, 0, 0, 0) 40%,
+    rgba(107, 98, 242, 0),
+    rgba(107, 98, 242, 0) 40%,
     rgba(107, 98, 242, 0.565) 50%,
-    rgba(0, 0, 0, 0) 60%,
-    rgba(0, 0, 0, 0)
-  );
-  --gradient-hero-horizon: linear-gradient(
-    135deg,
-    #d97706 0%,
-    #ea580c 25%,
-    #7c3aed 50%,
-    #2563eb 75%,
-    #1d4ed8 100%
+    rgba(107, 98, 242, 0) 60%,
+    rgba(107, 98, 242, 0)
   );
   --gradient-radial-spotlight: radial-gradient(
     circle at 50% 50%,
     rgba(107, 98, 242, 0.3) 0%,
     rgba(107, 98, 242, 0.05) 50%,
-    transparent 70%
+    rgba(107, 98, 242, 0) 70%
   );
 
   /* ── Typography — Font Families ── */
-  --font-dm-sans: 'DM Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-geist: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-system-ui: system-ui, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Each token names its first family. DM Sans: UI and display; Inter: body
+     copy and section headings (was --font-geist, which declared Inter). */
+  --font-dm-sans: 'DM Sans', 'DM Sans Fallback', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-inter: 'Inter', 'Inter Fallback', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   /* ── Typography — Scale ── */
   --text-caption: 13px;
@@ -104,17 +134,22 @@
   --spacing-80: 80px;
 
   /* ── Border Radius ── */
-  --radius-xs: 4px;
+  /* Five steps; every border-radius in the UI is one of these (no literals).
+     sm    6px     small marks: tags inside text, checkboxes, tooltips, kbd,
+                   code, resizer grips, the speed graph, focus rings
+     md    10px    controls: icon buttons, nav items, inputs, selects, menu
+                   items, file-type icons, skeleton lines
+     lg    16px    floating and inner surfaces: menus, toasts, file cards,
+                   tiles, the login card
+     xl    24px    page-level panels: .card, modals, stat cards, the hero
+                   panel, dropzone, queue and tree panels, the file table
+     pill  9999px  buttons, chips, badges, progress tracks, and every circle
+                   (dots, avatars, spinners - all square boxes) */
   --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-ui: 10px;
+  --radius-md: 10px;
   --radius-lg: 16px;
-  --radius-2xl: 19px;
-  --radius-cards: 24px;
-  --radius-largecards: 40px;
-  --radius-panels: 42px;
+  --radius-xl: 24px;
   --radius-pill: 9999px;
-  --radius-icons: 4px;
 
   /* ── Shadows ── */
   --shadow-subtle: rgba(255, 255, 255, 0.1) 0px 0px 0px 1px inset;
@@ -137,6 +172,8 @@
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-sidebar: 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* Pointer hover waits this long before a [data-tip] hint opens; focus does not. */
+  --tooltip-delay: 400ms;
 
   /* ── Z-Index Scale ── */
   --z-base: 1;

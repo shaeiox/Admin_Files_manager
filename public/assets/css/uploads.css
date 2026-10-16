@@ -16,7 +16,7 @@
   gap: var(--spacing-16);
   min-height: 280px;
   padding: var(--spacing-48) var(--spacing-32);
-  border-radius: var(--radius-largecards);
+  border-radius: var(--radius-xl);
   border: 1.5px dashed var(--border-hover);
   background: var(--bg-card);
   text-align: center;
@@ -92,7 +92,8 @@
   background: var(--bg-tag);
   border: 1px solid var(--border-primary);
   color: var(--text-secondary);
-  transition: all var(--transition-base);
+  transition: background-color var(--transition-base), border-color var(--transition-base), color var(--transition-base),
+    opacity var(--transition-base), transform var(--transition-base), box-shadow var(--transition-base), visibility var(--transition-base);
 }
 
 .dz-icon svg { width: 28px; height: 28px; }
@@ -138,7 +139,7 @@
   align-items: center;
   gap: var(--spacing-6);
   padding: var(--spacing-6) var(--spacing-10);
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-primary);
   font-size: 11px;
   color: var(--text-muted);
@@ -272,7 +273,7 @@
    ══════════════════════════════════════════ */
 
 .queue-panel {
-  border-radius: var(--radius-cards);
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border-card);
   background: var(--bg-card);
   overflow: hidden;
@@ -300,7 +301,7 @@
 }
 
 .queue-title {
-  font-family: var(--font-geist);
+  font-family: var(--font-inter);
   font-size: var(--text-body);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
@@ -367,7 +368,7 @@
 .qstat-dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   flex-shrink: 0;
 }
 
@@ -512,8 +513,11 @@
   height: 100%;
   border-radius: var(--radius-pill);
   background: var(--accent-primary);
-  width: 0%;
-  transition: width 300ms linear, background-color var(--transition-base);
+  /* Inline scaleX(ratio) from uploads.js. 250ms linear = PROGRESS_CADENCE_MS,
+     the shared paint beat, so one glide ends as the next value lands. */
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 250ms linear, background-color var(--transition-base);
   position: relative;
   overflow: hidden;
 }
@@ -548,7 +552,7 @@
 .qi-meta .sep {
   width: 2px;
   height: 2px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: currentColor;
   opacity: 0.6;
 }
@@ -623,7 +627,8 @@
   background: var(--bg-tag);
   text-align: left;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   position: relative;
   overflow: hidden;
 }
@@ -645,7 +650,7 @@
   right: var(--spacing-12);
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--accent-primary);
   box-shadow: 0 0 8px var(--accent-primary);
 }
@@ -695,7 +700,7 @@
 .preset-tag {
   font-size: 10px;
   padding: 2px var(--spacing-6);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   border: 1px solid var(--border-secondary);
   color: var(--text-tertiary);
@@ -733,7 +738,7 @@
 .tips-icon {
   width: 44px;
   height: 44px;
-  border-radius: var(--radius-ui);
+  border-radius: var(--radius-md);
   background: var(--bg-badge);
   color: var(--accent-primary);
   display: grid;
@@ -768,7 +773,8 @@
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   flex-shrink: 0;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
+    opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast), visibility var(--transition-fast);
   cursor: pointer;
 }
 
@@ -882,10 +888,13 @@
 
 .speed-bar {
   width: 3px;
-  border-radius: 1.5px;
+  height: 100%;
+  border-radius: var(--radius-sm);
   background: rgba(107, 98, 242, 0.4);
-  transition: height 400ms ease-out;
-  min-height: 2px;
+  /* Inline scaleY(ratio) from uploads.js, anchored to the baseline. */
+  transform-origin: bottom center;
+  transform: scaleY(0.06);
+  transition: transform 400ms ease-out;
 }
 
 .speed-bar:last-child { background: var(--accent-primary); }
@@ -898,7 +907,7 @@
   .dropzone {
     min-height: 220px;
     padding: var(--spacing-32) var(--spacing-20);
-    border-radius: var(--radius-cards);
+    border-radius: var(--radius-xl);
   }
   .dz-title { font-size: 21px; }
   .dz-icon { width: 56px; height: 56px; }

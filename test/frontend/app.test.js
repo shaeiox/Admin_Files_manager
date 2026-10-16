@@ -36,7 +36,7 @@ const { resolveStorageDisplay, resolveIdentityDisplay, updateStorageUI, updateUs
 function stubElement() {
     return {
         textContent: '',
-        style: {},
+        style: { setProperty(name, value) { this[name] = String(value); } },
         attributes: {},
         setAttribute(name, value) { this.attributes[name] = String(value); },
         removeAttribute(name) { delete this.attributes[name]; },
@@ -275,6 +275,7 @@ describe('updateStorageUI - sidebar volume card', () => {
         updateStorageUI(volumeFixture({}));
 
         assert.equal(nodes['.storage-pct'].textContent, '50.0%');
+        assert.equal(nodes['.storage-fill'].style['--storage-fill'], '0.5', 'scaleX ratio, not a width');
         assert.equal(nodes['.storage-meta'].textContent, '250 GB of 500 GB used');
         assert.equal(nodes['.storage-fill'].attributes['data-state'], 'measured');
     });
@@ -301,6 +302,7 @@ describe('updateStorageUI - sidebar volume card', () => {
         updateStorageUI(volumeFixture({ volumeAvailable: false, usedBytes: null, totalBytes: null }));
 
         assert.equal(nodes['.storage-pct'].textContent, UNAVAILABLE_MARK);
+        assert.equal(nodes['.storage-fill'].style['--storage-fill'], '0', 'an empty bar, never a stale reading');
         assert.equal(nodes['.storage-meta'].textContent, 'Volume usage unavailable');
         assert.equal(nodes['.storage-fill'].attributes['data-severity'], undefined, 'no severity color for an unmeasured reading');
         assert.equal(nodes['.storage-bar'].attributes['aria-valuenow'], undefined, 'never a fabricated 0 for assistive tech either');

@@ -65,6 +65,10 @@ const Uploads = (() => {
     session: { completed: 0, bytes: 0 },
     speedHistory: new Array(20).fill(0),
     ticker: null,
+    // Rows whose transferred-byte count changed since the last paint, and the
+    // one shared cadence that paints them (see PROGRESS_CADENCE_MS).
+    progressDirty: new Set(),
+    progressTimer: null,
     recent: { status: 'loading', items: [], message: '' },
     pendingCreate: null,
     outcomes: { done: [], failed: 0, timer: null },
@@ -403,7 +407,7 @@ const Uploads = (() => {
               <div class="qi-pct">${Math.round(pct)}%</div>
             </div>
           </div>
-          <div class="qi-bar" aria-hidden="true"><div class="qi-fill" style="width:${pct}%"></div></div>
+          <div class="qi-bar" aria-hidden="true"><div class="qi-fill" style="transform:scaleX(${pct / 100})"></div></div>
           <div class="qi-meta">${meta}</div>
         </div>
         <div class="qi-actions">${actions}</div>
@@ -990,14 +994,39 @@ const Uploads = (() => {
     }
   }
 
+  /**
+   * One cadence for every row: progress events only mark a row dirty, and a
+   * single shared interval paints the dirty rows. Painting at a fixed beat that
+   * equals the .qi-fill transition (uploads.css) means each glide ends exactly
+   * as the next value lands, so the bar moves continuously instead of jumping
+   * and then stalling. The value itself is still only what the transfer
+   * reported; nothing is interpolated in script. No timer is created per row.
+   */
+  const PROGRESS_CADENCE_MS = 250;
+
   function updateItemProgress(item) {
+    state.progressDirty.add(item);
+    if (!state.progressTimer) state.progressTimer = setInterval(flushProgress, PROGRESS_CADENCE_MS);
+  }
+
+  function flushProgress() {
+    if (!state.progressDirty.size) {
+      clearInterval(state.progressTimer);
+      state.progressTimer = null;
+      return;
+    }
+    state.progressDirty.forEach(paintItemProgress);
+    state.progressDirty.clear();
+  }
+
+  function paintItemProgress(item) {
     const node = document.querySelector(`[data-item-id="${item.id}"]`);
     if (!node) return;
     const pct = computeProgressPct(item);
     const fill = node.querySelector('.qi-fill');
     const pctEl = node.querySelector('.qi-pct');
     const meta = node.querySelector('.qi-meta');
-    if (fill) fill.style.width = pct + '%';
+    if (fill) fill.style.transform = `scaleX(${pct / 100})`;
     if (pctEl) pctEl.textContent = Math.round(pct) + '%';
     if (meta && item.status === 'uploading') meta.innerHTML = uploadingMeta(item);
   }
@@ -1133,7 +1162,7 @@ const Uploads = (() => {
         </div>
       </div>
       <div class="progress" role="progressbar" aria-label="Overall upload progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
-        <div class="progress-bar ${progress.speed > 0 ? 'is-striped' : ''}" style="width:${progress.pct}%"></div>
+        <div class="progress-bar ${progress.speed > 0 ? 'is-striped' : ''}" style="--progress:${progress.pct / 100}"></div>
       </div>
     `;
   }
@@ -1185,7 +1214,7 @@ const Uploads = (() => {
 
     const max = Math.max(...state.speedHistory, 1);
     metricNodes.bars.forEach((bar, i) => {
-      bar.style.height = clamp((state.speedHistory[i] / max) * 100, 6, 100) + '%';
+      bar.style.transform = `scaleY(${clamp(state.speedHistory[i] / max, 0.06, 1)})`;
     });
   }
 
@@ -1531,7 +1560,7 @@ const Uploads = (() => {
       retryAllFailed, pauseAll, resumeAll, cancelAll,
       applyPreset, applyDestination, createAndUseDestination, verifyDestination,
       onQueueClick, onNoticeClick, onDrop, onDragEnter, onDragLeave, onDragOver,
-      renderQueue, renderQueueItem, updateItemProgress, renderMetrics, renderSummaries,
+      renderQueue, renderQueueItem, updateItemProgress, flushProgress, PROGRESS_CADENCE_MS, renderMetrics, renderSummaries,
       renderRecent, loadRecent, flushOutcomes, tick,
     },
   };

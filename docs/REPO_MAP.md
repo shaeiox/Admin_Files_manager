@@ -107,14 +107,15 @@ admin-files-manager/
 │   │                             #   reached by a real navigation/redirect, never an SPA swap. No sidebar.
 │   └── assets/
 │       ├── css/                  # Load order matters: tokens → base → themes → layout
-│       │   ├── tokens.css        # Design tokens (colors/spacing/type)
-│       │   ├── base.css          # Reset + utilities
-│       │   ├── themes.css        # Dark/light theme overrides via [data-theme]
+│       │   ├── tokens.css        # Design tokens (colors/spacing/type/radius) + the self-hosted @font-face
+│       │   ├── base.css          # Reset + utilities + THE reduced-motion policy (one block)
+│       │   ├── themes.css        # Dark/light theme overrides via [data-theme]; text tokens are AA-measured
 │       │   ├── layout.css        # App shell, sidebar, topbar
 │       │   ├── components.css    # Buttons, modals, toasts, tables, dropdowns
 │       │   ├── dashboard|files|uploads|settings.css   # Page-specific styles
 │       │   ├── admin.css         # Admin page — reuses settings.css's pane/form shell, adds tables/notices
 │       │   └── login.css         # Standalone sign-in card; not part of the shared app-shell layout
+│       ├── fonts/                # DM Sans + Inter, Latin variable woff2, and their SIL OFL notices
 │       └── js/
 │           ├── app.js            # ⭐ Shared core: Icons, Format, Toast, Modal, Dropdown, $. Also owns
 │           │                     #   initApp()/loadGlobalData() — skipped on the login page (ADR-009)
@@ -431,6 +432,32 @@ Rules worth knowing before you touch this path:
   ArrowRight/ArrowLeft for expansion.
 - **Drawer** is a modal dialog; its Escape handler is registered in the capture phase so it runs
   before `app.js`'s global Escape and only closes the topmost layer.
+
+## Frontend token contract (frontend-interaction-quality)
+
+- **Typography is self-hosted.** `public/assets/fonts/dm-sans-latin.woff2` and `inter-latin.woff2`
+  (Latin, upright, weights 400-600; italic is not shipped because nothing sets it) are declared in
+  `tokens.css` with `font-display: swap` and metric-matched `'DM Sans Fallback'` / `'Inter Fallback'`
+  faces. No stylesheet or page contacts a font host, and the CSP is `font-src 'self'`. Licences:
+  `public/assets/fonts/OFL-*.txt`. Font tokens: `--font-dm-sans` (UI, display), `--font-inter`
+  (body copy, section headings) - each names its first family.
+- **Radius scale: five steps**, no literals anywhere (`test/frontend/tokens.test.js`):
+  `--radius-sm` 6px small marks (tooltips, checkboxes, kbd/code, grips) · `--radius-md` 10px controls
+  (icon buttons, nav items, inputs, menu items) · `--radius-lg` 16px floating/inner surfaces (menus,
+  toasts, file cards, tiles, login card) · `--radius-xl` 24px page-level panels (`.card`, modals, stat
+  cards, hero, dropzone, file table) · `--radius-pill` buttons, chips, tracks and every circle.
+- **Contrast is measured**, not assumed: `test/helpers/contrast.js` computes WCAG ratios from the four
+  `themes.css` blocks; every text token clears 4.5:1 on every surface in both themes, selection uses
+  `--selection-bg` / `--selection-text`, and the accent is held to 4.5:1 as a fill under text and 3:1
+  as an icon/marker colour (body-size accent text uses `--text-link`).
+- **Reduced motion is honoured globally** by the single `@media (prefers-reduced-motion: reduce)` block
+  in `base.css`: every animation lands on its end state in 0.001ms and every loop stops; transitions
+  apply instantly (so press feedback still shows). No other stylesheet may declare its own block.
+- **Motion stays on the compositor**: no `transition: all`, and no transition or keyframe names a layout
+  property (`test/frontend/motion.test.js`). Bars are `scaleX`/`scaleY` of an inline ratio
+  (`--progress`, `--storage-fill`, or an inline `transform`); the sidebar collapse is a translateX glide
+  in `sidebar.js`. Upload rows paint on one shared 250ms cadence (`PROGRESS_CADENCE_MS` = the
+  `.qi-fill` transition). Touch hit areas (`any-pointer: coarse`) are a transparent 44px `::before`.
 
 ## Request Lifecycle (typical mutation)
 
