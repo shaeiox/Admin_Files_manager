@@ -18,9 +18,9 @@
     "semantic_hash": "cd679acdaf4b7d999f5512b735faeb08"
   },
   "package.json": {
-    "mtime": 1792172119.1597068,
-    "seen": 1792244615.7068536,
-    "ast_hash": "e90c82c3a368766bba9f73bb97197328",
+    "mtime": 1792245812.2899034,
+    "seen": 1792247151.271465,
+    "ast_hash": "e1cbbbc5e92a9fedceec7cce53156ba8",
     "semantic_hash": ""
   },
   "public/assets/js/api.js": {
@@ -30,9 +30,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/app.js": {
-    "mtime": 1792169452.9835129,
-    "seen": 1792170344.3281279,
-    "ast_hash": "66786d95851e11f0ba5e2ce6ef166fc3",
+    "mtime": 1792246197.729634,
+    "seen": 1792247151.271473,
+    "ast_hash": "2f36240206503aee72c4fb862b5ae0d0",
     "semantic_hash": ""
   },
   "public/assets/js/dashboard.js": {
@@ -42,9 +42,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/files.js": {
-    "mtime": 1792010011.7484145,
-    "seen": 1792095697.8933918,
-    "ast_hash": "05286159a2299c9826c7f2271bcd4804",
+    "mtime": 1792247583.4875326,
+    "seen": 1792247655.6673062,
+    "ast_hash": "0f08de8492fa5fb1593513ecdaaaf2e9",
     "semantic_hash": ""
   },
   "public/assets/js/settings.js": {
@@ -408,15 +408,15 @@
     "semantic_hash": "6f72ba4f8d01347aabdf0261fa963963"
   },
   "docs/CONTRACTS.md": {
-    "mtime": 1792169206.1044753,
-    "seen": 1792170344.3287148,
-    "ast_hash": "c483e35a4baf8f9237d3477198e645a2",
+    "mtime": 1792246197.748631,
+    "seen": 1792247151.2719517,
+    "ast_hash": "a85e55c405b34b061cccd90c0a393ad8",
     "semantic_hash": ""
   },
   "docs/REPO_MAP.md": {
-    "mtime": 1792171612.793379,
-    "seen": 1792244615.707396,
-    "ast_hash": "8e2c6d767d5a95b2a9adb8e2e1d58658",
+    "mtime": 1792247941.6900048,
+    "seen": 1792247960.520257,
+    "ast_hash": "251e334deec5a015aa4a0d1a4727122d",
     "semantic_hash": ""
   },
   "docs/STRUCTURE.md": {
@@ -426,9 +426,9 @@
     "semantic_hash": "6c19cb20e9b94ebf3090a0d4232f976f"
   },
   "docs/architecture.md": {
-    "mtime": 1792169206.1044753,
-    "seen": 1792170344.3287256,
-    "ast_hash": "eee5df8a196b88e791a006bcc9fd73a2",
+    "mtime": 1792247090.0000265,
+    "seen": 1792247151.2719617,
+    "ast_hash": "333741e6598c0f8ff742983948834ec9",
     "semantic_hash": ""
   },
   "docs/backend-checklist.md": {
@@ -456,9 +456,9 @@
     "semantic_hash": ""
   },
   "public/files.html": {
-    "mtime": 1792169206.246905,
-    "seen": 1792170344.3291461,
-    "ast_hash": "d3086eef233c7dd8df7bf65316b7c54d",
+    "mtime": 1792246815.5152295,
+    "seen": 1792247151.2722955,
+    "ast_hash": "c575f117fe13324e48f250985067a801",
     "semantic_hash": ""
   },
   "public/index.html": {
@@ -492,9 +492,9 @@
     "semantic_hash": ""
   },
   "src/utils/fileTypes.js": {
-    "mtime": 1792005447.022523,
-    "seen": 1792006867.7654262,
-    "ast_hash": "1f3336d752337ad7180165d2b399e9a3",
+    "mtime": 1792246197.727629,
+    "seen": 1792247151.271619,
+    "ast_hash": "0c52a75d875cc9de3a40f2013793a017",
     "semantic_hash": ""
   },
   "test/api/dashboard.contract.test.js": {
@@ -600,9 +600,9 @@
     "semantic_hash": ""
   },
   "test/frontend/files.test.js": {
-    "mtime": 1792095314.9721448,
-    "seen": 1792095697.8936784,
-    "ast_hash": "cb2a06af4dec6d4a4e3059279f3977c1",
+    "mtime": 1792247885.6238816,
+    "seen": 1792247960.519777,
+    "ast_hash": "20498dd6badd4edf8e6d76c4fe8febfb",
     "semantic_hash": ""
   },
   "test/integration/error-disclosure.test.js": {
@@ -624,9 +624,9 @@
     "semantic_hash": ""
   },
   "test/utils/fileTypes.test.js": {
-    "mtime": 1791060952.819189,
-    "seen": 1791088819.505868,
-    "ast_hash": "3b94726a43a7117f853bab0c9d373e35",
+    "mtime": 1792246197.7506282,
+    "seen": 1792247151.2717543,
+    "ast_hash": "3eb24f3382a48d64ed3b94e16871ff58",
     "semantic_hash": ""
   },
   "docs/decisions/ADR-003-files-page-integrity.md": {
@@ -996,9 +996,9 @@
     "semantic_hash": ""
   },
   "test/frontend/tooltips.test.js": {
-    "mtime": 1792005447.022523,
-    "seen": 1792006867.7654977,
-    "ast_hash": "65c1c2566992f17efd5b9ec9e31bf8c3",
+    "mtime": 1792247591.9279494,
+    "seen": 1792247655.6675305,
+    "ast_hash": "df855311a325356af7af9e16e63f5d77",
     "semantic_hash": ""
   },
   "openspec/changes/notification-panel-and-tooltip-placement/.openspec.yaml": {
@@ -2349,6 +2349,42 @@
     "mtime": 1792169206.237989,
     "seen": 1792170344.3291435,
     "ast_hash": "26ae31d19ae692ff19121b9968c1bc90",
+    "semantic_hash": ""
+  },
+  "openspec/changes/files-page-ux-redesign/.openspec.yaml": {
+    "mtime": 1792245888.7344437,
+    "seen": 1792247151.2721248,
+    "ast_hash": "ffaa2825a14ba7a7d265157ddb903a84",
+    "semantic_hash": ""
+  },
+  "openspec/changes/files-page-ux-redesign/design.md": {
+    "mtime": 1792246079.7079313,
+    "seen": 1792247151.2721262,
+    "ast_hash": "3e97f9293e3ffce8eee63f2fdda159d9",
+    "semantic_hash": ""
+  },
+  "openspec/changes/files-page-ux-redesign/proposal.md": {
+    "mtime": 1792246197.752638,
+    "seen": 1792247151.2721276,
+    "ast_hash": "5b1728e3ef98fce97f77455782c735d8",
+    "semantic_hash": ""
+  },
+  "openspec/changes/files-page-ux-redesign/specs/files-browser-layout/spec.md": {
+    "mtime": 1792246017.2573993,
+    "seen": 1792247151.272129,
+    "ast_hash": "b31abc5ac00c67055f165ae5fecde459",
+    "semantic_hash": ""
+  },
+  "openspec/changes/files-page-ux-redesign/specs/files-entry-presentation/spec.md": {
+    "mtime": 1792246203.874525,
+    "seen": 1792247151.2721303,
+    "ast_hash": "02191c0999b0df135733cbda2635c8af",
+    "semantic_hash": ""
+  },
+  "openspec/changes/files-page-ux-redesign/tasks.md": {
+    "mtime": 1792247120.7223,
+    "seen": 1792247151.2721317,
+    "ast_hash": "b29c2eec298abe04335d373348b4db48",
     "semantic_hash": ""
   }
 }
