@@ -35,3 +35,7 @@ docs/security-audit/
 # Knowledge-graph output (generated, no LLM cost to rebuild)
 !graphify-out/
 portal.log
+# Runtime SQLite database
+portal-state.sqlite
+portal-state.sqlite-shm
+portal-state.sqlite-wal
