@@ -1019,11 +1019,13 @@
   .sidebar {
     transform: translateX(-100%);
     width: var(--sidebar-width) !important;
-    box-shadow: var(--shadow-modal);
   }
 
+  /* Shadow only while open: parked off-canvas, its 80px blur bled into the
+     page's left edge as a grey vignette. */
   .sidebar.is-mobile-open {
     transform: translateX(0);
+    box-shadow: var(--shadow-modal);
   }
 
   .sidebar.is-collapsed {

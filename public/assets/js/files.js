@@ -69,13 +69,13 @@ const Files = (() => {
     { key: 'check', width: 44, fixed: true },
     { key: 'name', width: null, min: 140, label: 'Name' },
     { key: 'size', width: 110, min: 60, label: 'Size' },
-    { key: 'type', width: 130, min: 60, label: 'Type' },
-    { key: 'downloads', width: 110, min: 60, label: 'Downloads' },
+    { key: 'type', width: 150, min: 60, label: 'Type' },
+    { key: 'downloads', width: 128, min: 60, label: 'Downloads' },
     { key: 'modified', width: 150, min: 80, label: 'Modified' },
     { key: 'actions', width: 96, fixed: true },
   ];
   const COLUMN_MAX = 1200;
-  const NAME_FILL_MIN = 200;   // the least an unsized Name column may shrink to
+  const NAME_FILL_MIN = 176;   // the least an unsized Name column may shrink to (fits 1440px without sideways scroll)
   const COLUMN_STEP = 16;      // arrow key; Shift multiplies by 4
   const COLUMN_STORE_KEY = 'files-col-widths';
   // Mirrors the media queries in files.css that hide columns; the table's
@@ -83,7 +83,7 @@ const Files = (() => {
   const COLUMN_BREAKPOINTS = [
     { max: 1024, hide: ['type', 'downloads'] },
     { max: 860, hide: ['type', 'downloads', 'modified'] },
-    { max: 560, hide: ['type', 'downloads', 'modified', 'size'] },
+    { max: 767, hide: ['type', 'downloads', 'modified', 'size'] },
   ];
 
   /** Drag-resize range for the folder tree panel (arrow keys use the same step/shift as columns). */
@@ -496,7 +496,7 @@ const Files = (() => {
 
   function renderBreadcrumbHtml(path) {
     const parts = path.split('/').filter(Boolean);
-    const crumbs = [{ label: 'Files', path: '/' }];
+    const crumbs = [{ label: 'All files', path: '/' }];
     let built = '';
     for (const part of parts) {
       built += `/${part}`;
@@ -515,8 +515,13 @@ const Files = (() => {
 
   function renderChipsHtml(state) {
     const counts = state.counts;
+    // With counts, a chip that would list nothing is hidden (All and the active
+    // filter excepted); without counts nothing is known, so every chip shows.
+    // `other` has no reading to show either way unless it has members.
+    const hasCount = c => counts && Number.isFinite(counts[c.key]);
     return TYPE_CHIPS
-      .filter(c => c.key !== 'other' || state.filter === 'other' || (counts && counts.other > 0))
+      .filter(c => c.key === 'all' || state.filter === c.key ||
+        (hasCount(c) ? counts[c.key] > 0 : c.key !== 'other'))
       .map(c => {
         const n = counts && Number.isFinite(counts[c.key]) ? counts[c.key] : null;
         const active = state.filter === c.key;
@@ -564,8 +569,22 @@ const Files = (() => {
     return file.starred ? `<span class="star-mark" title="Starred">${icon('star', 12)}<span class="sr-only">Starred</span></span>` : '';
   }
 
+  /** A listing can mix folders only during a search or in a library view. */
+  function showsPaths(state) {
+    return !!(state.search || state.library);
+  }
+
+  /** Size and age as one secondary line, for phones where those columns are hidden. */
+  function metaLine(f) {
+    const parts = [];
+    if (f.size != null) parts.push(Format.bytes(f.size));
+    parts.push(Format.relative(f.modified));
+    return parts.join(' · ');
+  }
+
   function renderListHtml(state) {
     const files = state.files;
+    const withPaths = showsPaths(state);
     const selectedOnPage = files.filter(f => state.selected.has(f.id)).length;
     const allSelected = files.length > 0 && selectedOnPage === files.length;
     const scope = `Select all ${files.length} ${files.length === 1 ? 'item' : 'items'} on this page`;
@@ -591,18 +610,19 @@ const Files = (() => {
               <div class="ftype-icon ${esc(t.key)}" aria-hidden="true">${icon(t.icon, 16)}</div>
               <div class="fname-text">
                 <div class="fname" title="${name}">${name}${starMark(f)}</div>
-                <div class="fpath" title="${esc(f.path)}">${esc(f.path)}</div>
+                ${withPaths ? `<div class="fpath" title="${esc(f.path)}">${esc(f.path)}</div>` : ''}
+                <div class="fmeta" aria-hidden="true">${esc(metaLine(f))}</div>
               </div>
             </div>
           </td>
           <td class="col-size"><span class="mono-num">${f.size == null ? '<span aria-label="Size unavailable">—</span>' : Format.bytes(f.size)}</span></td>
-          <td class="col-type"><span class="tag">${esc(typeLabel(f))}</span></td>
+          <td class="col-type"><span class="ftype-label">${esc(typeLabel(f))}</span></td>
           <td class="col-downloads"><span class="mono-num">${f.downloads != null ? Format.compact(f.downloads) : '<span aria-label="Not applicable">—</span>'}</span></td>
           <td class="col-modified"><span class="mono-num mono-sm" title="${esc(Format.dateTime(f.modified))}">${esc(Format.relative(f.modified))}</span></td>
           <td class="col-actions">
             <div class="row-actions">
-              ${f.isFolder ? '' : `<button type="button" class="btn-icon btn-icon-sm" data-act="download" data-id="${id}" tabindex="${tab}" data-tip="Download" data-tip-pos="bottom" aria-label="Download ${name}">${icon('download', 15)}</button>`}
-              <button type="button" class="btn-icon btn-icon-sm" data-act="more" data-id="${id}" tabindex="${tab}" data-tip="More" data-tip-pos="bottom" aria-label="More actions for ${name}">${icon('moreHorizontal', 15)}</button>
+              ${f.isFolder ? '' : `<button type="button" class="btn-icon btn-icon-sm" data-act="download" data-id="${id}" tabindex="${tab}" data-tip="Download" data-tip-pos="left" aria-label="Download ${name}">${icon('download', 15)}</button>`}
+              <button type="button" class="btn-icon btn-icon-sm" data-act="more" data-id="${id}" tabindex="${tab}" data-tip="More" data-tip-pos="left" aria-label="More actions for ${name}">${icon('moreHorizontal', 15)}</button>
             </div>
           </td>
         </tr>`;
@@ -663,7 +683,7 @@ const Files = (() => {
                 <span class="sep" aria-hidden="true"></span>
                 <span title="${esc(Format.dateTime(f.modified))}">${esc(Format.relative(f.modified))}</span>
               </div>
-              <span class="tag file-card-type">${esc(typeLabel(f))}</span>
+              <span class="file-card-type">${esc(typeLabel(f))}</span>
             </div>
           </div>
         </div>`;
@@ -706,6 +726,14 @@ const Files = (() => {
       note = t.key === 'image' && !previewCapability.available
         ? 'Previews are not enabled on this server'
         : 'No preview for this file type';
+    }
+    // A grid card states the absence through its glyph's accessible name rather
+    // than repeating the sentence on every card; the drawer still shows it.
+    if (where !== 'drawer' && note) {
+      return `
+      <div class="${cls}">
+        <div class="ftype-icon ${esc(t.key)}" role="img" aria-label="${note}" title="${note}">${icon(t.icon, 22)}</div>
+      </div>`;
     }
     return `
       <div class="${cls}">
@@ -836,12 +864,19 @@ const Files = (() => {
 
   function renderDrawerFooterHtml(file) {
     return `
-      <button type="button" class="btn btn-ghost btn-sm" data-drawer-act="star" aria-pressed="${!!file.starred}">
-        ${icon('star', 14)} ${file.starred ? 'Unstar' : 'Star'}
-      </button>
-      ${file.isFolder
-        ? `<button type="button" class="btn btn-primary btn-sm drawer-primary" data-drawer-act="open">${icon('folderOpen', 14)} Open folder</button>`
-        : `<button type="button" class="btn btn-primary btn-sm drawer-primary" data-drawer-act="download">${icon('download', 14)} Download</button>`}`;
+      <div class="drawer-footer-row">
+        <button type="button" class="btn btn-ghost btn-sm" data-drawer-act="star" aria-pressed="${!!file.starred}">
+          ${icon('star', 14)} ${file.starred ? 'Unstar' : 'Star'}
+        </button>
+        ${file.isFolder
+          ? `<button type="button" class="btn btn-primary btn-sm drawer-primary" data-drawer-act="open">${icon('folderOpen', 14)} Open folder</button>`
+          : `<button type="button" class="btn btn-primary btn-sm drawer-primary" data-drawer-act="download">${icon('download', 14)} Download</button>`}
+      </div>
+      <div class="drawer-footer-row">
+        <button type="button" class="btn btn-ghost btn-sm" data-drawer-act="rename">${icon('edit', 14)} Rename</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-drawer-act="move">${icon('move', 14)} Move</button>
+        <button type="button" class="btn btn-ghost btn-sm drawer-danger" data-drawer-act="delete">${icon('trash', 14)} Delete permanently</button>
+      </div>`;
   }
 
   /* ══════════════════════════════════════════
@@ -998,6 +1033,7 @@ const Files = (() => {
     cancelPendingSearch();
     syncSearchInput();
     for (const a of ancestorsOf(path)) state.expanded.add(a);
+    closeTreeSheet();
     updateBreadcrumb();
     renderTree();
     renderChips();
@@ -1040,9 +1076,18 @@ const Files = (() => {
     if (focusedPath) focusTreeItem(focusedPath);
   }
 
+  /** The heading names what is being browsed: the library view, else the folder. */
+  function locationTitle(state) {
+    if (state.library && LIBRARY_VIEWS[state.library]) return LIBRARY_VIEWS[state.library].title;
+    return state.currentPath === '/' ? 'All files' : baseName(state.currentPath);
+  }
+
+  /** Heading and path trail, kept together on every navigation. */
   function updateBreadcrumb() {
     const bc = $('#breadcrumb');
     if (bc) bc.innerHTML = renderBreadcrumbHtml(state.currentPath);
+    const title = $('#pageTitle');
+    if (title) title.textContent = locationTitle(state);
   }
 
   function renderChips() {
@@ -1109,8 +1154,8 @@ const Files = (() => {
     if (!bar) return;
     const count = selectedFiles().length;
     const wasVisible = bar.classList.contains('is-visible');
+    // In the command bar: visible selection actions replace the listing controls (files.css :has).
     bar.classList.toggle('is-visible', count > 0);
-    if (document.body && document.body.classList) document.body.classList.toggle('has-bulk-bar', count > 0);
     bar.setAttribute('aria-hidden', String(count === 0));
     if (count === 0) bar.setAttribute('inert', '');
     else bar.removeAttribute('inert');
@@ -1403,7 +1448,8 @@ const Files = (() => {
       loadTree();
     }
     state.selected = new Set();
-    loadFiles({ silent: true });
+    await loadFiles({ silent: true });
+    return newPath;
   }
 
   async function deleteItems(items) {
@@ -1459,16 +1505,30 @@ const Files = (() => {
      like Explorer); a cut clears once every item has actually moved. */
 
   /** Shows/hides the toolbar Paste affordance and keeps its count current. */
+  /** "2 items ready to move" - what the clipboard strip says is pending. */
+  function clipboardSentence(mode, n) {
+    return `${n} ${n === 1 ? 'item' : 'items'} ready to ${mode === 'copy' ? 'copy' : 'move'}`;
+  }
+
   function updatePasteButton() {
     const btn = $('#btnPaste');
     const cancelBtn = $('#btnCancelCut');
+    const strip = $('#clipboardStrip');
     const n = state.clipboardPaths.size;
     if (btn) {
       btn.hidden = n === 0;
       const countEl = btn.querySelector('.paste-count');
       if (countEl) countEl.textContent = n > 0 ? `(${n})` : '';
     }
-    if (cancelBtn) cancelBtn.hidden = n === 0;
+    if (cancelBtn) {
+      cancelBtn.hidden = n === 0;
+      cancelBtn.setAttribute('aria-label', state.clipboardMode === 'copy' ? 'Cancel copy' : 'Cancel move');
+    }
+    if (strip) {
+      strip.hidden = n === 0;
+      const text = strip.querySelector('.clipboard-text');
+      if (text) text.textContent = n > 0 ? clipboardSentence(state.clipboardMode, n) : '';
+    }
   }
 
   /** Mark items pending a clipboard op. Clears whatever was pending before. */
@@ -1844,13 +1904,12 @@ const Files = (() => {
     if (footer) footer.innerHTML = renderDrawerFooterHtml(file);
   }
 
+  /** The bulk bar lives in the command bar inside .app-shell, so the shell covers it. */
   function setBackgroundInert(on) {
-    for (const sel of ['.app-shell', '#bulkBar']) {
-      const el = $(sel);
-      if (!el) continue;
-      if (on) el.setAttribute('inert', '');
-      else if (sel !== '#bulkBar' || selectedFiles().length > 0) el.removeAttribute('inert');
-    }
+    const shell = $('.app-shell');
+    if (!shell) return;
+    if (on) shell.setAttribute('inert', '');
+    else shell.removeAttribute('inert');
   }
 
   function openDrawer(id, opener) {
@@ -1896,9 +1955,12 @@ const Files = (() => {
   }
 
   function trapDrawerFocus(e) {
-    const drawer = $('#fileDrawer');
-    if (e.key !== 'Tab' || !drawer) return;
-    const focusables = Array.from(drawer.querySelectorAll('button:not([disabled]), [href], input, [tabindex]:not([tabindex="-1"])'));
+    trapFocusIn($('#fileDrawer'), e);
+  }
+
+  function trapFocusIn(container, e) {
+    if (e.key !== 'Tab' || !container) return;
+    const focusables = Array.from(container.querySelectorAll('button:not([disabled]), [href], input, [tabindex]:not([tabindex="-1"])'));
     if (!focusables.length) return;
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
@@ -1924,7 +1986,75 @@ const Files = (() => {
     const q = sel => document.querySelector && document.querySelector(sel);
     if (q('.modal-backdrop.is-open') || q('.context-menu.is-open') || q('.dropdown-menu.is-open')) return;
     if (isDrawerOpen()) return closeDrawer();
+    if (isTreeSheetOpen()) return closeTreeSheet();
+    if (state.selected.size > 0) return clearSelection();
     cancelClipboard();
+  }
+
+  /* ── folder tree as a sheet (below 1024px; the button is hidden above) ── */
+
+  /** Everything behind the sheet; the sheet itself lives inside .app-shell. */
+  const SHEET_BACKGROUND = ['.sidebar', '.topbar', '.files-header', '#filesToolbar', '#filterChips', '#filesContainer'];
+  let treeSheetOpener = null;
+
+  function isTreeSheetOpen() {
+    const panel = $('#treePanel');
+    return !!panel && panel.classList.contains('is-sheet-open');
+  }
+
+  function setSheetBackgroundInert(on) {
+    for (const sel of SHEET_BACKGROUND) {
+      const node = $(sel);
+      if (!node) continue;
+      if (on) node.setAttribute('inert', '');
+      else node.removeAttribute('inert');
+    }
+  }
+
+  function openTreeSheet() {
+    const panel = $('#treePanel');
+    if (!panel || isTreeSheetOpen()) return;
+    treeSheetOpener = $('#btnTreeSheet');
+    panel.classList.add('is-sheet-open');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    const backdrop = $('#treeSheetBackdrop');
+    if (backdrop) backdrop.hidden = false;
+    if (treeSheetOpener) treeSheetOpener.setAttribute('aria-expanded', 'true');
+    setSheetBackgroundInert(true);
+    const current = panel.querySelector('[aria-current="page"]') || panel.querySelector('[role="treeitem"]');
+    if (current && current.focus) current.focus();
+  }
+
+  function closeTreeSheet() {
+    const panel = $('#treePanel');
+    if (!panel || !isTreeSheetOpen()) return;
+    panel.classList.remove('is-sheet-open');
+    panel.removeAttribute('role');
+    panel.removeAttribute('aria-modal');
+    const backdrop = $('#treeSheetBackdrop');
+    if (backdrop) backdrop.hidden = true;
+    setSheetBackgroundInert(false);
+    const opener = treeSheetOpener;
+    treeSheetOpener = null;
+    if (opener) {
+      opener.setAttribute('aria-expanded', 'false');
+      if (opener.focus) opener.focus();
+    }
+  }
+
+  /** Below 768px the selection's secondary actions are one menu. */
+  function openBulkMoreMenu(anchor) {
+    const items = selectedFiles();
+    if (!items.length) return;
+    const { x, y } = anchorPoint(anchor);
+    ContextMenu.show(x, y, [
+      { label: 'Move', icon: 'move', action: () => handleAction('bulkMove') },
+      { label: 'Copy', icon: 'copy', action: () => handleAction('bulkCopy') },
+      { label: items.every(f => f.starred) ? 'Unstar' : 'Star', icon: 'star', action: () => handleAction('bulkStar') },
+      { label: 'Access policy…', icon: 'lock', action: () => handleAction('bulkPolicy') },
+    ]);
+    focusFirstMenuItem();
   }
 
   /**
@@ -1956,6 +2086,19 @@ const Files = (() => {
     else if (act === 'copy-path') copyToClipboard(file.path, 'Location copied');
     else if (act === 'open') { closeDrawer(); navigateTo(file.path); }
     else if (act === 'open-parent') { closeDrawer(); navigateTo(parentPath(file.path)); }
+    else if (act === 'rename') renameFromDrawer(file);
+    else if (act === 'move') { closeDrawer(); cutItems([file]); }
+    else if (act === 'delete') { closeDrawer(); deleteItems([file]); }
+  }
+
+  /** Same prompt and reporting as the row menu; the open drawer follows the new name. */
+  async function renameFromDrawer(file) {
+    const newPath = await renameItem(file);
+    if (!newPath || !isDrawerOpen() || drawerFileId !== file.id) return;
+    const renamed = state.files.find(f => f.path === newPath) ||
+      Object.assign({}, file, { id: newPath, path: newPath, name: baseName(newPath) });
+    drawerFileId = renamed.id;
+    fillDrawer(renamed);
   }
 
   /* ══════════════════════════════════════════
@@ -2387,7 +2530,7 @@ const Files = (() => {
       // Scoped to the breakpoint where the tree sits beside the files container;
       // below it .files-layout collapses to one column and this must not fight that.
       treeWidthSheet.textContent =
-        `@media (min-width: 861px) { .files-layout { grid-template-columns: ${w}px var(--spacing-20) minmax(0, 1fr); } }`;
+        `@media (min-width: 1024px) { .files-layout { grid-template-columns: ${w}px var(--spacing-12) minmax(0, 1fr); } }`;
     }
     const handle = $('#treePanelResizer');
     if (handle) handle.setAttribute('aria-valuenow', String(w));
@@ -2705,7 +2848,10 @@ const Files = (() => {
     const title = $('#pageTitle');
     if (title) title.textContent = def.title;
     const subtitle = $('#pageSubtitle');
-    if (subtitle) subtitle.textContent = def.subtitle;
+    if (subtitle) {
+      subtitle.textContent = def.subtitle;
+      subtitle.hidden = false;
+    }
     if (document.title !== undefined) document.title = `${def.title} · Dimension Files Manager`;
     const navItems = document.querySelectorAll ? document.querySelectorAll('.nav-item') : [];
     navItems.forEach(item => {
@@ -2762,7 +2908,6 @@ const Files = (() => {
     bind('#btnTreeNewFolder', 'click', () => handleAction('newFolder', state.currentPath));
     bind('#btnPaste', 'click', () => handleAction('paste'));
     bind('#btnCancelCut', 'click', cancelClipboard);
-    bind('#btnTopbarUpload', 'click', openFilePicker);
     bind('#btnPageUpload', 'click', openFilePicker);
     bind('#hiddenFileInput', 'change', e => {
       const jobs = jobsFromFiles(e.target.files, state.currentPath);
@@ -2776,7 +2921,12 @@ const Files = (() => {
     bind('#bulkCopy', 'click', () => handleAction('bulkCopy'));
     bind('#bulkPolicy', 'click', () => handleAction('bulkPolicy'));
     bind('#bulkDelete', 'click', () => handleAction('bulkDelete'));
+    bind('#bulkMore', 'click', e => openBulkMoreMenu(e.currentTarget));
     bind('#bulkClear', 'click', clearSelection);
+
+    bind('#btnTreeSheet', 'click', openTreeSheet);
+    bind('#treeSheetBackdrop', 'click', closeTreeSheet);
+    bind('#treePanel', 'keydown', e => { if (isTreeSheetOpen()) trapFocusIn($('#treePanel'), e); });
 
     bind('#fileDrawer', 'click', onDrawerClick);
     bind('#fileDrawer', 'keydown', trapDrawerFocus);
@@ -2838,7 +2988,7 @@ const Files = (() => {
     widthSheet = null;
     if (treeWidthSheet && treeWidthSheet.remove) treeWidthSheet.remove();
     treeWidthSheet = null;
-    if (document.body && document.body.classList) document.body.classList.remove('has-bulk-bar');
+    closeTreeSheet();
   }
 
   return {
@@ -2853,7 +3003,7 @@ const Files = (() => {
       listQuery, resolveLibraryView, summarizeDelete, deleteConfirmCopy,
       renderTreeHtml, renderBreadcrumbHtml, renderChipsHtml, renderListHtml, renderGridHtml,
       renderFooterHtml, renderSkeletonHtml, renderEmptyHtml, renderErrorHtml, renderDrawerHtml,
-      renderDrawerFooterHtml,
+      renderDrawerFooterHtml, showsPaths, metaLine, locationTitle, clipboardSentence,
       COLUMNS, sanitizeColumnWidths, clampColumnWidth, columnWidth, columnWidthsCss,
     },
     // Controller seam for the same suite: drives the real handlers against a stub DOM.
@@ -2866,6 +3016,7 @@ const Files = (() => {
       syncAfterMutation, cancelPendingSearch, runUploads, handleDrop, openBulkDownloadMenu,
       setColumnWidth, resetColumnWidth, onResizeKeydown, onContainerDblClick,
       cutItems, copyItems, cancelClipboard, pasteItems, setAccessPolicy,
+      openTreeSheet, closeTreeSheet, isTreeSheetOpen,
     },
   };
 })();

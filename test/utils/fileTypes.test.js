@@ -92,3 +92,12 @@ describe('the listing handler does not carry its own taxonomy', () => {
         assert.deepEqual(inlined, [], 'quoted extension literals in the controller');
     });
 });
+
+describe('common source languages are code (files-page-ux-redesign)', () => {
+    test('C, C++, C#, Kotlin, Swift, Ruby and the rest classify as code on both sides', () => {
+        for (const ext of ['c', 'h', 'cpp', 'hpp', 'cs', 'kt', 'swift', 'rb', 'lua', 'dart', 'hs', 'ex', 'exs', 'ml', 'sol', 'svelte', 'vue', 'toml', 'ps1']) {
+            assert.equal(classifyFile(`sample.${ext}`), 'code', `.${ext} server`);
+            assert.equal(resolveType(`sample.${ext}`).key, 'code', `.${ext} client`);
+        }
+    });
+});

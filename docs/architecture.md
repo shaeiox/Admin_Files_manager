@@ -645,7 +645,7 @@ User action → mutate state → applyFilters() → renderView() → bindRowInte
 - Filter chips (persist to `applyFilters`)
 - Debounced search (180ms)
 - Select all / individual (indeterminate state supported)
-- Bulk action bar (`#bulkBar`) appears when `selected.size > 0`
+- Bulk actions (`#bulkBar`) replace the command bar's listing controls when `selected.size > 0`
 - File details drawer (`#fileDrawer`) — opens on row click
 - Right-click context menu — full action set
 - Drag-and-drop overlay (`#dropOverlay`) — window-wide

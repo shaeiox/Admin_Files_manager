@@ -147,7 +147,11 @@
           <button type="button" class="mobile-menu-btn" aria-label="Open menu">
             <i data-icon="menu" data-icon-size="18"></i>
           </button>
-          <nav class="breadcrumb" id="breadcrumb" aria-label="Breadcrumb"></nav>
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <span class="breadcrumb-item">Dimension</span>
+            <span class="breadcrumb-sep"><i data-icon="chevronRight" data-icon-size="14"></i></span>
+            <span class="breadcrumb-item is-current">Files</span>
+          </nav>
         </div>
 
         <div class="topbar-right">
@@ -155,37 +159,28 @@
             <span class="icon-sun"><i data-icon="sun" data-icon-size="12"></i></span>
             <span class="icon-moon"><i data-icon="moon" data-icon-size="12"></i></span>
           </button>
-          <button type="button" class="btn btn-primary btn-sm" id="btnTopbarUpload">
-            <i data-icon="plus" data-icon-size="15"></i>
-            <span>Upload</span>
-          </button>
         </div>
       </header>
 
       <!-- Page -->
       <div class="page">
 
-        <!-- Page header -->
-        <div class="page-header">
+        <!-- Page header: the heading names the folder (or library view) being
+             browsed and the trail under it is the full path (files.js updateLocation). -->
+        <div class="page-header files-header">
           <div class="page-title-group">
-            <span class="page-eyebrow">
-              <span class="dot"></span>
-              File Browser
-            </span>
             <h1 class="page-title" id="pageTitle">All files</h1>
-            <p class="page-subtitle" id="pageSubtitle">Browse, organize, and manage the files in your storage root.</p>
+            <nav class="breadcrumb files-trail" id="breadcrumb" aria-label="Folder path"></nav>
+            <!-- Library views only: their scope is not obvious from the heading. -->
+            <p class="page-subtitle" id="pageSubtitle" hidden></p>
           </div>
 
           <div class="page-actions">
-            <!-- Shown only while a Cut is pending (files.js updatePasteButton); pastes into the
-                 folder currently being viewed. See AGENTS.md-style note in files.js: Cut/Paste
-                 replaces a destination-picker modal with a clipboard-style flow. -->
-            <button type="button" class="btn btn-primary btn-sm" id="btnPaste" hidden>
-              <i data-icon="clipboard" data-icon-size="15"></i>
-              <span>Paste <span class="paste-count"></span></span>
-            </button>
-            <button type="button" class="btn-icon btn-icon-sm" id="btnCancelCut" data-tip="Cancel move" data-tip-pos="bottom" aria-label="Cancel move" hidden>
-              <i data-icon="x" data-icon-size="15"></i>
+            <!-- Below 1024px the folder tree is a sheet opened from here. -->
+            <button type="button" class="btn btn-ghost btn-sm files-folders-btn" id="btnTreeSheet"
+              aria-controls="treePanel" aria-expanded="false">
+              <i data-icon="folder" data-icon-size="15"></i>
+              <span>Folders</span>
             </button>
             <button type="button" class="btn btn-ghost btn-sm" id="btnNewFolder">
               <i data-icon="folderPlus" data-icon-size="15"></i>
@@ -193,22 +188,39 @@
             </button>
             <button type="button" class="btn btn-primary btn-sm" id="btnPageUpload">
               <i data-icon="upload" data-icon-size="15"></i>
-              <span>Upload files</span>
+              <span>Upload</span>
             </button>
-            <!-- Opened by the two Upload buttons and the empty-folder action. -->
+            <!-- Opened by the Upload button and the empty-folder action. -->
             <input type="file" id="hiddenFileInput" multiple hidden aria-hidden="true" tabindex="-1">
           </div>
         </div>
 
-        <!-- Toolbar -->
-        <div class="files-toolbar">
+        <!-- Command bar: listing controls, replaced by the selection actions while
+             anything is selected; a pending Cut/Copy shows as a strip above them. -->
+        <div class="files-toolbar" id="filesToolbar">
+          <!-- Shown only while a Cut/Copy is pending (files.js updatePasteButton); pastes into
+               the folder currently being viewed. Cut/Paste replaces a destination-picker modal. -->
+          <div class="clipboard-strip" id="clipboardStrip" role="status" hidden>
+            <span class="clipboard-text"></span>
+            <button type="button" class="btn btn-primary btn-sm" id="btnPaste" hidden>
+              <i data-icon="clipboard" data-icon-size="15"></i>
+              <span>Paste here</span><span class="paste-count sr-only"></span>
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btnCancelCut" aria-label="Cancel move" hidden>
+              <span>Cancel</span>
+            </button>
+          </div>
+
+          <div class="toolbar-listing">
           <div class="toolbar-left">
             <div class="search-field toolbar-search">
               <i data-icon="search" data-icon-size="15" class="search-icon"></i>
-              <label for="filesSearch" class="sr-only">Search names in this folder</label>
-              <input id="filesSearch" class="search-input" type="search" placeholder="Search names in this folder…"
+              <label for="filesSearch" class="sr-only">Search this folder and subfolders</label>
+              <input id="filesSearch" class="search-input" type="search" placeholder="Search this folder and subfolders"
                 autocomplete="off">
             </div>
+            <!-- Type filter chips (files.js renderChips): only types with members show. -->
+            <div class="filter-row" id="filterChips" role="group" aria-label="Filter by type"></div>
           </div>
 
           <div class="toolbar-right">
@@ -243,16 +255,48 @@
               <i data-icon="refresh" data-icon-size="16"></i>
             </button>
           </div>
-        </div>
+          </div>
 
-        <!-- Filter chips row -->
-        <div class="filter-row" id="filterChips" role="group" aria-label="Filter by type"></div>
+          <!-- Selection mode. Acts on the selected items of the current page only. -->
+          <div class="bulk-bar" id="bulkBar" role="toolbar" aria-label="Actions for selected items" aria-hidden="true" inert>
+            <div class="bulk-count"><span class="num">0</span> selected <span class="bulk-scope">on this page</span></div>
+            <div class="bulk-actions">
+              <button type="button" class="btn btn-ghost btn-sm" id="bulkDownload" aria-label="Download selected">
+                <i data-icon="download" data-icon-size="15"></i><span>Download</span>
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm bulk-secondary" id="bulkMove" aria-label="Move selected">
+                <i data-icon="move" data-icon-size="15"></i><span>Move</span>
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm bulk-secondary" id="bulkCopy" aria-label="Copy selected">
+                <i data-icon="copy" data-icon-size="15"></i><span>Copy</span>
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm bulk-secondary" id="bulkStar" aria-label="Star or unstar selected">
+                <i data-icon="star" data-icon-size="15"></i><span>Star</span>
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm bulk-secondary" id="bulkPolicy" aria-label="Set access policy for selected">
+                <i data-icon="lock" data-icon-size="15"></i><span>Access policy</span>
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm bulk-danger" id="bulkDelete" aria-label="Delete selected permanently">
+                <i data-icon="trash" data-icon-size="15"></i><span>Delete permanently</span>
+              </button>
+              <!-- Below 768px the secondary actions collapse into this menu. -->
+              <button type="button" class="btn-icon btn-icon-sm bulk-more" id="bulkMore" aria-label="More actions for selected" aria-haspopup="menu">
+                <i data-icon="moreHorizontal" data-icon-size="15"></i>
+              </button>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm bulk-clear" id="bulkClear" aria-label="Clear selection">
+              <i data-icon="x" data-icon-size="15"></i><span>Clear</span>
+            </button>
+          </div>
+        </div>
 
         <!-- Layout: tree + content -->
         <div class="files-layout">
 
           <!-- Folder tree -->
-          <aside class="tree-panel" aria-label="Folder tree">
+          <!-- Below 1024px this panel is a modal sheet (files.js openTreeSheet). -->
+          <div class="tree-sheet-backdrop" id="treeSheetBackdrop" hidden></div>
+          <aside class="tree-panel" id="treePanel" aria-label="Folder tree">
             <div class="tree-head">
               <div class="tree-title" id="treeTitle">Folders</div>
               <button type="button" class="btn-icon btn-icon-sm" id="btnTreeNewFolder" data-tip="New folder here" data-tip-pos="left" aria-label="New folder in the current folder">
@@ -274,39 +318,6 @@
         <div id="filesStatus" class="sr-only" role="status" aria-live="polite"></div>
       </div>
     </main>
-  </div>
-
-  <!-- ══════════════════════════════════════════
-       BULK ACTION BAR
-       Acts on the selected items of the current page only.
-       ══════════════════════════════════════════ -->
-  <div class="bulk-bar" id="bulkBar" role="toolbar" aria-label="Actions for selected items" aria-hidden="true" inert>
-    <div class="bulk-count"><span class="num">0</span> selected <span class="bulk-scope">on this page</span></div>
-    <div class="divider-v"></div>
-    <div class="bulk-actions">
-      <button type="button" class="btn-icon" id="bulkDownload" data-tip="Download selected" aria-label="Download selected">
-        <i data-icon="download" data-icon-size="16"></i>
-      </button>
-      <button type="button" class="btn-icon" id="bulkStar" data-tip="Star or unstar selected" aria-label="Star or unstar selected">
-        <i data-icon="star" data-icon-size="16"></i>
-      </button>
-      <button type="button" class="btn-icon" id="bulkMove" data-tip="Move selected" aria-label="Move selected">
-        <i data-icon="move" data-icon-size="16"></i>
-      </button>
-      <button type="button" class="btn-icon" id="bulkCopy" data-tip="Copy selected" aria-label="Copy selected">
-        <i data-icon="copy" data-icon-size="16"></i>
-      </button>
-      <button type="button" class="btn-icon" id="bulkPolicy" data-tip="Set access policy for selected" aria-label="Set access policy for selected">
-        <i data-icon="lock" data-icon-size="16"></i>
-      </button>
-      <button type="button" class="btn-icon" id="bulkDelete" data-tip="Delete selected permanently" aria-label="Delete selected permanently">
-        <i data-icon="trash" data-icon-size="16"></i>
-      </button>
-    </div>
-    <div class="divider-v"></div>
-    <button type="button" class="btn-icon btn-icon-sm" id="bulkClear" data-tip="Clear selection" aria-label="Clear selection">
-      <i data-icon="x" data-icon-size="15"></i>
-    </button>
   </div>
 
   <!-- ══════════════════════════════════════════

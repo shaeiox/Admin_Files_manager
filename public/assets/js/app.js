@@ -285,7 +285,7 @@ const FileTypes = {
   audio: { exts: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma'], icon: 'music', label: 'Audio' },
   document: { exts: ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'md'], icon: 'fileText', label: 'Document' },
   archive: { exts: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso', 'dmg'], icon: 'archive', label: 'Archive' },
-  code: { exts: ['js', 'ts', 'jsx', 'tsx', 'html', 'css', 'scss', 'json', 'xml', 'php', 'py', 'java', 'go', 'rs', 'sh', 'yml', 'yaml', 'sql'], icon: 'code', label: 'Code' },
+  code: { exts: ['js', 'ts', 'jsx', 'tsx', 'html', 'css', 'scss', 'json', 'xml', 'php', 'py', 'java', 'go', 'rs', 'sh', 'yml', 'yaml', 'sql', 'c', 'h', 'cpp', 'hpp', 'cs', 'kt', 'swift', 'rb', 'lua', 'dart', 'hs', 'ex', 'exs', 'ml', 'sol', 'svelte', 'vue', 'toml', 'ps1'], icon: 'code', label: 'Code' },
 };
 
 function resolveType(filename, isFolder = false) {
