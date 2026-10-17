@@ -28,7 +28,7 @@
 ```bash
 npm run dev      # Start with nodemon (http://localhost:3000)
 npm start        # Start in production mode
-npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 1243 tests, exits 0:
+npm test         # node:test, zero dependencies, scoped to test/**/*.test.js. 1244 tests, exits 0:
                  # services, API contracts (live server, incl. versioning.contract), frontend modules in a vm
                  # (incl. api-boundary), integration, guardrails.
 ```

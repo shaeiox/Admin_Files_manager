@@ -161,6 +161,11 @@ const server = app.listen(config.port, config.listenHost(), () => {
     console.log(`🌍 Environment: ${config.env}`);
     console.log(`=========================================`);
 });
+// Node (>= 18) aborts any request whose body takes longer than requestTimeout
+// (default 300 s) with a bare 408: a 10 GB upload at 3 MB/s died at ~1 GB.
+// Off here; a stalled body is bounded by nginx client_body_timeout instead,
+// and headersTimeout (60 s) still guards slow headers.
+server.requestTimeout = 0;
 
 /* ─── Graceful Shutdown ─── */
 // On SIGTERM (what systemd sends) or SIGINT: stop accepting connections, let
@@ -168,6 +173,7 @@ const server = app.listen(config.port, config.listenHost(), () => {
 // wedge a deployment: after the grace period the process exits by force.
 //
 // Timeouts are ORDERED (production-cicd-readiness D5) - keep them that way:
+//   Node requestTimeout         off   (above)           never cuts a long upload
 //   application grace period   30 s   (here)            exits first
 //   systemd TimeoutStopSec     45 s   (scripts/systemd/dimension.service) > app, or systemd SIGKILLs a draining process
 //   nginx proxy_read_timeout  600 s   (scripts/nginx/cloudavid.conf)       > app, or the proxy severs a live request
