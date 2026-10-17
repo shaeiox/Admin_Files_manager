@@ -186,8 +186,10 @@ function loadFiles({ routes = {}, location = '', store = {} } = {}) {
   for (const sel of ['#filesContainer', '#folderTree', '#breadcrumb', '#filterChips', '#filesSearch', '#bulkBar',
     '#fileDrawer', '#drawerBackdrop', '#filesStatus', '#selectAll', '#pageTitle', '#pageSubtitle', '#sortDropdown',
     '#sortLabel', '#sortTrigger', '#viewToggle', '.app-shell', '#uploadTray', '#hiddenFileInput',
-    '#btnPaste', '#btnCancelCut']) el(sel);
+    '#btnPaste', '#btnCancelCut', '#clipboardStrip', '#treePanel', '#treeSheetBackdrop', '#btnTreeSheet',
+    '.sidebar', '.topbar', '.files-header', '#filesToolbar']) el(sel);
   el('#btnPaste').children['.paste-count'] = new FakeEl(doc, '.paste-count');
+  el('#clipboardStrip').children['.clipboard-text'] = new FakeEl(doc, '.clipboard-text');
   const drawer = el('#fileDrawer');
   drawer.children['.drawer-body'] = new FakeEl(doc, '.drawer-body');
   drawer.children['.drawer-footer'] = new FakeEl(doc, '.drawer-footer');
@@ -1131,7 +1133,7 @@ describe('names, roles and states', () => {
       assert.ok(boxes.every(b => /aria-label="[^"]+"/.test(b)), 'checkbox without a name');
     }
     const chips = [...pure.renderChipsHtml(state).matchAll(/<button[^>]*class="filter-chip[^>]*>/g)].map(m => m[0]);
-    assert.ok(chips.length >= 8);
+    assert.equal(chips.length, 4, 'All plus the three types with members (zero-count chips are hidden)');
     assert.ok(chips.every(c => /aria-label="[^"]+"/.test(c) && /aria-pressed="(true|false)"/.test(c)));
   });
 
@@ -1181,7 +1183,8 @@ describe('names, roles and states', () => {
     const out = pure.renderBreadcrumbHtml('/media/photos');
     assert.equal((out.match(/<button type="button" class="breadcrumb-item/g) || []).length, 3);
     assert.equal((out.match(/aria-current="page"/g) || []).length, 1);
-    assert.match(FILES_HTML, /<nav class="breadcrumb" id="breadcrumb" aria-label="Breadcrumb">/);
+    assert.match(FILES_HTML, /<nav class="breadcrumb files-trail" id="breadcrumb" aria-label="Folder path">/);
+    assert.match(out, /data-nav-path="\/"[^>]*>All files</);
   });
 
   test('the tree is a labelled tree of items carrying their paths and expansion', () => {
@@ -1307,18 +1310,20 @@ describe('UI quality', () => {
     assert.equal(pure.typeOf({ name: 'Makefile', isFolder: false, type: 'code' }).key, 'code');
   });
 
-  test('the bulk bar is laid out for the narrowest viewport', () => {
-    const narrow = FILES_CSS.slice(FILES_CSS.indexOf('@media (max-width: 560px)'));
-    assert.match(narrow, /\.bulk-bar \{[^}]*left: var\(--spacing-12\);[^}]*right: var\(--spacing-12\);/);
-    assert.match(narrow, /\.bulk-bar \.divider-v \{ display: none; \}/);
-    assert.match(FILES_CSS, /body\.has-bulk-bar \.page/);
+  test('the selection actions collapse to Download, Delete and a menu on phones', () => {
+    const narrow = FILES_CSS.slice(FILES_CSS.indexOf('@media (max-width: 767px)'));
+    assert.match(narrow, /\.bulk-secondary \{ display: none; \}/);
+    assert.match(narrow, /\.bulk-more \{ display: inline-flex; \}/);
+    for (const id of ['bulkMove', 'bulkCopy', 'bulkStar', 'bulkPolicy']) {
+      assert.match(FILES_HTML, new RegExp(`class="[^"]*bulk-secondary[^"]*" id="${id}"`), `${id} collapses`);
+    }
+    assert.match(FILES_SRC, /bind\('#bulkMore', 'click'/);
   });
 
   test('sticky surfaces are offset, not stacked, and disabled at narrow widths', () => {
     assert.match(FILES_CSS, /top: calc\(var\(--topbar-height\) \+ 12px \+ var\(--files-toolbar-offset\)\)/);
     const narrow = FILES_CSS.slice(FILES_CSS.indexOf('@media (max-width: 860px)'));
     assert.match(narrow, /\.files-toolbar \{ position: static; \}/);
-    assert.match(narrow, /\.tree-panel \{ position: static;/);
   });
 });
 
@@ -1503,16 +1508,16 @@ describe('list columns are fixed-width and resizable', () => {
     const css = pure.columnWidthsCss({});
     assert.equal(widthOf(css, '.files-table col.col-name'), 'auto');
     assert.equal(widthOf(css, '.files-table col.col-size'), '110px');
-    assert.match(css, /^\.files-table \{ width: 100%; min-width: 840px; \}$/m);
+    assert.match(css, /^\.files-table \{ width: 100%; min-width: 854px; \}$/m);
     // At 1024px the stylesheet hides Type and Downloads: they no longer count.
-    assert.match(css, /@media \(max-width: 1024px\) \{ \.files-table \{ width: 100%; min-width: 600px; \} \}/);
+    assert.match(css, /@media \(max-width: 1024px\) \{ \.files-table \{ width: 100%; min-width: 576px; \} \}/);
   });
 
   test('a sized Name column makes the table exactly as wide as its columns', () => {
     const { pure } = loadFiles();
     const css = pure.columnWidthsCss({ name: 300, size: 90 });
     assert.equal(widthOf(css, '.files-table col.col-name'), '300px');
-    assert.match(css, /^\.files-table \{ width: 920px; min-width: 0; \}$/m);
+    assert.match(css, /^\.files-table \{ width: 958px; min-width: 0; \}$/m);
   });
 
   test('stored widths are sanitised: junk dropped, fixed columns ignored, values clamped', () => {
@@ -1569,8 +1574,8 @@ describe('Cut/Copy mark items pending a clipboard op; Paste in another folder is
   });
 
   test('the bulk bar Cut/Copy buttons and toolbar Paste/Cancel controls exist, bound once, dispatching through handleAction', () => {
-    assert.match(FILES_HTML, /id="bulkMove" data-tip="Move selected" aria-label="Move selected"/);
-    assert.match(FILES_HTML, /id="bulkCopy" data-tip="Copy selected" aria-label="Copy selected"/);
+    assert.match(FILES_HTML, /id="bulkMove" aria-label="Move selected">\s*<i[^>]*><\/i><span>Move<\/span>/);
+    assert.match(FILES_HTML, /id="bulkCopy" aria-label="Copy selected">\s*<i[^>]*><\/i><span>Copy<\/span>/);
     assert.match(FILES_HTML, /id="btnPaste" hidden/);
     assert.match(FILES_HTML, /id="btnCancelCut"[^>]*hidden/);
     assert.equal((FILES_SRC.match(/#bulkMove/g) || []).length, 1);
@@ -1842,5 +1847,221 @@ describe('Cut/Copy mark items pending a clipboard op; Paste in another folder is
     // The Admin nav link itself follows "always show, handle 403 gracefully" -
     // this page does the same rather than duplicating role logic client-side.
     assert.doesNotMatch(FILES_SRC, /session\.role|isAdmin/);
+  });
+});
+
+/* ══════════════════════════════════════════
+   files-page-ux-redesign
+   ══════════════════════════════════════════ */
+
+describe('header names the location (files-page-ux-redesign)', () => {
+  test('the heading follows navigation and the trail sits under it', async () => {
+    const page = await booted();
+    assert.equal(page.els['#pageTitle'].textContent, 'All files');
+    page.c.navigateTo('/media/photos');
+    assert.equal(page.els['#pageTitle'].textContent, 'photos');
+    assert.equal((html(page, '#breadcrumb').match(/class="breadcrumb-item/g) || []).length, 3);
+    assert.match(html(page, '#breadcrumb'), /data-nav-path="\/media"/);
+    page.c.navigateTo('/');
+    assert.equal(page.els['#pageTitle'].textContent, 'All files');
+  });
+
+  test('a library view is named in the heading and keeps its scope note', async () => {
+    const page = loadFiles({ routes: PAGE_ROUTES, location: '?view=starred' });
+    page.Files.init();
+    await settleAll();
+    assert.equal(page.els['#pageTitle'].textContent, 'Starred');
+    assert.equal(page.els['#pageSubtitle'].hidden, false);
+    assert.match(page.els['#pageSubtitle'].textContent, /folder you are browsing/);
+    page.c.navigateTo('/docs');
+    assert.equal(page.els['#pageTitle'].textContent, 'Starred');
+  });
+
+  test('no eyebrow, no fixed subtitle, and exactly one upload control outside the empty state', () => {
+    assert.doesNotMatch(FILES_HTML, /page-eyebrow|File Browser/);
+    assert.doesNotMatch(FILES_HTML, /Browse, organize, and manage/);
+    assert.match(FILES_HTML, /id="pageSubtitle" hidden/);
+    assert.doesNotMatch(FILES_HTML, /btnTopbarUpload/);
+    assert.doesNotMatch(FILES_SRC, /btnTopbarUpload/);
+    assert.equal((FILES_SRC.match(/'click', openFilePicker\)/g) || []).length, 1);
+  });
+
+  test('the search copy states the scope the server searches', () => {
+    assert.match(FILES_HTML, /placeholder="Search this folder and subfolders"/);
+    assert.match(FILES_HTML, /<label for="filesSearch" class="sr-only">Search this folder and subfolders<\/label>/);
+  });
+});
+
+describe('command bar modes (files-page-ux-redesign)', () => {
+  test('selection actions live in the command bar and replace the listing controls', () => {
+    const toolbar = FILES_HTML.slice(FILES_HTML.indexOf('id="filesToolbar"'), FILES_HTML.indexOf('class="files-layout"'));
+    assert.match(toolbar, /id="filterChips"/, 'the type filter shares the command bar');
+    assert.match(toolbar, /class="toolbar-listing"/);
+    assert.match(toolbar, /id="bulkBar"/);
+    assert.match(FILES_CSS, /\.files-toolbar:has\(\.bulk-bar\.is-visible\) \.toolbar-listing \{ display: none; \}/);
+    assert.doesNotMatch(FILES_CSS, /has-bulk-bar/);
+  });
+
+  test('Escape clears a selection before it cancels a pending clipboard op', async () => {
+    const page = await booted();
+    page.c.cutItems([LISTING.items[2]]);
+    page.c.setSelected('/b.png', true);
+    page.c.onEscape({ key: 'Escape' });
+    assert.equal(page.state().selected.size, 0);
+    assert.equal(page.state().clipboardPaths.size, 1, 'the pending cut survives the first Escape');
+    page.c.onEscape({ key: 'Escape' });
+    assert.equal(page.state().clipboardPaths.size, 0);
+  });
+
+  test('a pending cut shows as a strip that says what is pending and survives navigation', async () => {
+    const page = await booted();
+    page.c.cutItems([LISTING.items[2], LISTING.items[3]]);
+    const strip = page.els['#clipboardStrip'];
+    assert.equal(strip.hidden, false);
+    assert.equal(strip.children['.clipboard-text'].textContent, '2 items ready to move');
+    page.c.navigateTo('/docs');
+    await settleAll();
+    assert.equal(strip.hidden, false);
+    assert.equal(strip.children['.clipboard-text'].textContent, '2 items ready to move');
+    page.c.cancelClipboard();
+    assert.equal(strip.hidden, true);
+  });
+
+  test('a pending copy says copy', async () => {
+    const page = await booted();
+    page.c.copyItems([LISTING.items[2]]);
+    assert.equal(page.els['#clipboardStrip'].children['.clipboard-text'].textContent, '1 item ready to copy');
+    assert.equal(page.els['#btnCancelCut'].getAttribute('aria-label'), 'Cancel copy');
+  });
+});
+
+describe('entry presentation (files-page-ux-redesign)', () => {
+  const rowsOf = (out) => [...out.matchAll(/<tr data-entry[\s\S]*?<\/tr>/g)].map(m => m[0]);
+
+  test('the path line appears only in search results and library views', () => {
+    const { pure } = loadFiles();
+    const plainState = pure.createState({ files: LISTING.items, total: 4 });
+    assert.doesNotMatch(pure.renderListHtml(plainState), /class="fpath"/);
+    const search = pure.createState({ files: LISTING.items, total: 4, search: 'a' });
+    assert.equal((pure.renderListHtml(search).match(/class="fpath"/g) || []).length, 4);
+    const library = pure.createState({ files: LISTING.items, total: 4, library: 'recent' });
+    assert.match(pure.renderListHtml(library), /class="fpath"/);
+  });
+
+  test('type is plain text and every row carries a size and age line for phones', () => {
+    const { pure } = loadFiles();
+    const out = pure.renderListHtml(pure.createState({ files: LISTING.items, total: 4 }));
+    assert.doesNotMatch(out, /<td class="col-type"><span class="tag">/);
+    assert.match(out, /<td class="col-type"><span class="ftype-label">Code · TS<\/span>/);
+    const rows = rowsOf(out);
+    assert.equal(rows.length, 4);
+    assert.ok(rows.every(r => /class="fmeta"/.test(r)));
+    assert.match(rows[2], /class="fmeta" aria-hidden="true">10 B · /);
+    assert.doesNotMatch(rows[0], /class="fmeta" aria-hidden="true">[^<]*B ·/, 'a folder has no size to show');
+  });
+
+  test('zero-count chips are hidden; All and the active filter always show; no counts shows every chip', () => {
+    const { pure } = loadFiles();
+    const counts = { all: 10, folder: 9, image: 0, video: 0, document: 1, audio: 0, archive: 0, code: 0, other: 0 };
+    const keys = (out) => [...out.matchAll(/data-filter="([a-z]+)"/g)].map(m => m[1]);
+    assert.deepEqual(keys(pure.renderChipsHtml(pure.createState({ counts }))), ['all', 'folder', 'document']);
+    assert.deepEqual(keys(pure.renderChipsHtml(pure.createState({ counts, filter: 'image' }))), ['all', 'folder', 'image', 'document']);
+    assert.deepEqual(keys(pure.renderChipsHtml(pure.createState({ counts: null }))),
+      ['all', 'folder', 'image', 'video', 'document', 'audio', 'archive', 'code']);
+  });
+
+  test('grid cards state preview absence through the glyph, the drawer still says it', () => {
+    const { pure } = loadFiles();
+    const state = pure.createState({ files: [file('/a.ts', { type: 'code' })], total: 1, view: 'grid' });
+    const grid = pure.renderGridHtml(state);
+    assert.doesNotMatch(grid, /class="preview-note"/);
+    assert.match(grid, /role="img" aria-label="No preview for this file type"/);
+    assert.match(pure.renderDrawerHtml(file('/a.ts', { type: 'code' })), /<span class="preview-note">No preview for this file type<\/span>/);
+  });
+
+  test('the drawer offers Rename, Move and Delete permanently', () => {
+    const { pure } = loadFiles();
+    for (const f of [file('/a.ts'), file('/docs', { isFolder: true })]) {
+      const out = pure.renderDrawerFooterHtml(f);
+      for (const act of ['star', 'rename', 'move', 'delete']) assert.match(out, new RegExp(`data-drawer-act="${act}"`));
+      assert.match(out, /Delete permanently/);
+    }
+  });
+
+  test('renaming from the drawer uses the row prompt and the drawer follows the new name', async () => {
+    const renamed = { ...LISTING, items: [...LISTING.items.slice(0, 2), file('/c.ts', { type: 'code' }), LISTING.items[3]] };
+    let listed = LISTING;
+    const page = await booted({ '/fs/list': () => listed, 'PUT /fs/rename': { success: true, data: { newPath: '/c.ts' } } });
+    page.c.openDrawer('/a.ts');
+    page.modal.prompt = 'c.ts';
+    listed = renamed;
+    page.c.onDrawerClick(event(target({ '[data-drawer-act]': { 'data-drawer-act': 'rename' } })));
+    await settleAll();
+    assert.equal(page.modal.lastPrompt.title, 'Rename file');
+    assert.deepEqual(plain(page.calls.put[0].body), { oldPath: '/a.ts', newName: 'c.ts' });
+    assert.match(page.els['#fileDrawer'].children['.drawer-body'].innerHTML, /c\.ts/);
+  });
+
+  test('Move from the drawer marks the item for a move and closes the drawer', async () => {
+    const page = await booted();
+    page.c.openDrawer('/a.ts');
+    page.c.onDrawerClick(event(target({ '[data-drawer-act]': { 'data-drawer-act': 'move' } })));
+    assert.equal(page.els['#fileDrawer'].classes.has('is-open'), false);
+    assert.equal(page.state().clipboardMode, 'cut');
+    assert.ok(page.state().clipboardPaths.has('/a.ts'));
+  });
+});
+
+describe('folder tree sheet below 1024px (files-page-ux-redesign)', () => {
+  test('opening makes a modal sheet over an inert background; navigating closes it and returns focus', async () => {
+    const page = await booted();
+    page.c.openTreeSheet();
+    assert.ok(page.c.isTreeSheetOpen());
+    assert.equal(page.els['#treePanel'].getAttribute('aria-modal'), 'true');
+    assert.equal(page.els['#treeSheetBackdrop'].hidden, false);
+    assert.equal(page.els['#btnTreeSheet'].getAttribute('aria-expanded'), 'true');
+    for (const sel of ['.sidebar', '.topbar', '.files-header', '#filesToolbar', '#filesContainer']) {
+      assert.ok(page.els[sel].hasAttribute('inert'), `${sel} inert`);
+    }
+    page.c.navigateTo('/docs');
+    assert.equal(page.c.isTreeSheetOpen(), false);
+    assert.equal(page.els['#treeSheetBackdrop'].hidden, true);
+    assert.equal(page.els['#btnTreeSheet'].getAttribute('aria-expanded'), 'false');
+    assert.equal(page.doc.activeElement, page.els['#btnTreeSheet']);
+    assert.ok(!page.els['#filesContainer'].hasAttribute('inert'));
+  });
+
+  test('Escape closes the sheet before anything below it', async () => {
+    const page = await booted();
+    page.c.setSelected('/a.ts', true);
+    page.c.openTreeSheet();
+    page.c.onEscape({ key: 'Escape' });
+    assert.equal(page.c.isTreeSheetOpen(), false);
+    assert.equal(page.state().selected.size, 1, 'the selection is the next layer down');
+  });
+
+  test('the sheet is styled only below 1024px and its button is hidden above', () => {
+    assert.match(FILES_CSS, /\.files-folders-btn \{ display: none; \}/);
+    const narrow = FILES_CSS.slice(FILES_CSS.indexOf('@media (max-width: 1023px)'));
+    assert.match(narrow, /\.files-folders-btn \{ display: inline-flex; \}/);
+    assert.match(narrow, /\.tree-panel\.is-sheet-open/);
+  });
+});
+
+describe('viewport-fit browser (files-page-ux-redesign)', () => {
+  test('where there is room, the page does not scroll and the tree and listing scroll inside themselves', () => {
+    const at = FILES_CSS.indexOf('@media (min-width: 768px) and (min-height: 560px)');
+    assert.ok(at > 0, 'the viewport-fit block exists');
+    const fit = FILES_CSS.slice(at);
+    assert.match(fit, /body\[data-page="files"\] \.main-area \{ height: 100dvh; \}/);
+    assert.match(fit, /\.files-layout \{[^}]*flex: 1;[^}]*min-height: 0;[^}]*grid-template-rows: minmax\(0, 1fr\);/);
+    assert.match(fit, /\.tree-panel \{ position: static; max-height: none; min-height: 0; \}/);
+    assert.match(fit, /\.files-table-wrap \{ flex: 1 1 auto; min-height: 0; max-height: none; \}/);
+    assert.match(fit, /\.grid-files \{[^}]*overflow-y: auto;[^}]*grid-auto-rows: max-content;/);
+  });
+
+  test('the fit is scoped to the Files page, so other pages keep their own scrolling', () => {
+    const fit = FILES_CSS.slice(FILES_CSS.indexOf('@media (min-width: 768px) and (min-height: 560px)'));
+    assert.doesNotMatch(fit, /(^|\n)\s*\.main-area \{/, 'main-area is only constrained under body[data-page="files"]');
   });
 });

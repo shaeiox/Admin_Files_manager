@@ -431,7 +431,22 @@ Rules worth knowing before you touch this path:
   active entry's checkbox and action buttons are tab stops. The tree uses the same pattern with
   ArrowRight/ArrowLeft for expansion.
 - **Drawer** is a modal dialog; its Escape handler is registered in the capture phase so it runs
-  before `app.js`'s global Escape and only closes the topmost layer.
+  before `app.js`'s global Escape and only closes the topmost layer. Escape order: open menu/modal →
+  drawer → folder sheet → selection → pending Cut/Copy.
+- **Layout (files-page-ux-redesign).** `#pageTitle` names the folder (or library view) on every
+  navigation, with the path trail `#breadcrumb` under it; the topbar carries a static "Dimension ›
+  Files" like the other pages, and the page header holds the only Upload (`#btnPageUpload`). One
+  command bar (`#filesToolbar`) holds search, the type chips, sort, view and refresh in
+  `.toolbar-listing`; while anything is selected `#bulkBar` (labelled buttons) replaces that row via
+  `:has()`, and a pending Cut/Copy shows as `#clipboardStrip`. Tree and listing share one surface
+  (`.files-layout`, the tree's tone is its `::before`); below 1024px `#treePanel` is a modal sheet
+  opened from `#btnTreeSheet`. The path line under a name shows only in search results and library
+  views; below 768px each row carries size and age as `.fmeta`.
+- **Viewport fit.** At ≥768px wide and ≥560px tall the Files page never scrolls: `.main-area` is
+  `100dvh` (scoped by `body[data-page="files"]`), `.page` is a flex column, and `.files-layout`
+  takes the remaining height, so the tree panel, the table wrapper and the grid each scroll inside
+  themselves and the pagination footer is always on screen. Phones and short windows keep ordinary
+  page scrolling. Grid rows are `max-content`: cards clip their overflow, so auto rows would squash them.
 
 ## Frontend token contract (frontend-interaction-quality)
 

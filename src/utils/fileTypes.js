@@ -28,7 +28,7 @@ const EXTENSION_MAP = {
     audio: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma'],
     document: ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'md'],
     archive: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso', 'dmg'],
-    code: ['js', 'ts', 'jsx', 'tsx', 'html', 'css', 'scss', 'json', 'xml', 'php', 'py', 'java', 'go', 'rs', 'sh', 'yml', 'yaml', 'sql'],
+    code: ['js', 'ts', 'jsx', 'tsx', 'html', 'css', 'scss', 'json', 'xml', 'php', 'py', 'java', 'go', 'rs', 'sh', 'yml', 'yaml', 'sql', 'c', 'h', 'cpp', 'hpp', 'cs', 'kt', 'swift', 'rb', 'lua', 'dart', 'hs', 'ex', 'exs', 'ml', 'sol', 'svelte', 'vue', 'toml', 'ps1'],
 };
 
 // Reverse index, built once. Extension keys are stored lowercase.

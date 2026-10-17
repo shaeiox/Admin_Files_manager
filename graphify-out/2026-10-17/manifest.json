@@ -18,9 +18,9 @@
     "semantic_hash": "cd679acdaf4b7d999f5512b735faeb08"
   },
   "package.json": {
-    "mtime": 1792169206.2200463,
-    "seen": 1792170344.328114,
-    "ast_hash": "007c8e83eea2ddda988d782ce5851fef",
+    "mtime": 1792172119.1597068,
+    "seen": 1792244615.7068536,
+    "ast_hash": "e90c82c3a368766bba9f73bb97197328",
     "semantic_hash": ""
   },
   "public/assets/js/api.js": {
@@ -54,9 +54,9 @@
     "semantic_hash": ""
   },
   "public/assets/js/sidebar.js": {
-    "mtime": 1792170141.4173028,
-    "seen": 1792170344.3281515,
-    "ast_hash": "b9f0b4185bcf919a5650af492a8f01f5",
+    "mtime": 1792171448.492478,
+    "seen": 1792244615.7068794,
+    "ast_hash": "faf8347fed56f21dcf4918fbf6f1b0bf",
     "semantic_hash": ""
   },
   "public/assets/js/theme.js": {
@@ -72,9 +72,9 @@
     "semantic_hash": ""
   },
   "server.js": {
-    "mtime": 1792169206.246905,
-    "seen": 1792170344.3281715,
-    "ast_hash": "b863d70d681c9b223ba016339b9c67ae",
+    "mtime": 1792244540.9979985,
+    "seen": 1792244615.7068932,
+    "ast_hash": "c187ef0c9c3f2fdfe16c544a74c41cbd",
     "semantic_hash": ""
   },
   "skills-lock.json": {
@@ -396,9 +396,9 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1792170248.3920097,
-    "seen": 1792170344.3285837,
-    "ast_hash": "aa3b309d6a93b3039f42cfd424a5c94a",
+    "mtime": 1792244586.7402992,
+    "seen": 1792244615.7072558,
+    "ast_hash": "cda116dcc5049067480b70d42f145b73",
     "semantic_hash": ""
   },
   "PROJECT_TREE.md": {
@@ -414,9 +414,9 @@
     "semantic_hash": ""
   },
   "docs/REPO_MAP.md": {
-    "mtime": 1792170248.3122132,
-    "seen": 1792170344.328721,
-    "ast_hash": "c1a90a9f60fb38f7fb521d62212b5ae7",
+    "mtime": 1792171612.793379,
+    "seen": 1792244615.707396,
+    "ast_hash": "8e2c6d767d5a95b2a9adb8e2e1d58658",
     "semantic_hash": ""
   },
   "docs/STRUCTURE.md": {
@@ -468,9 +468,9 @@
     "semantic_hash": ""
   },
   "public/settings.html": {
-    "mtime": 1792170256.3239832,
-    "seen": 1792170344.3291538,
-    "ast_hash": "f04a8f8ef7d537ed5098f1e6204a2b36",
+    "mtime": 1792170501.376501,
+    "seen": 1792244615.7078533,
+    "ast_hash": "19eb07297b7d6c53ce908a1341fb2aa9",
     "semantic_hash": ""
   },
   "public/uploads.html": {
@@ -1350,9 +1350,9 @@
     "semantic_hash": ""
   },
   "test/api/header-hygiene.test.js": {
-    "mtime": 1791904626.724474,
-    "seen": 1791955531.954987,
-    "ast_hash": "b1a633a90eb3f919253a50ff58f62d17",
+    "mtime": 1792244548.6271706,
+    "seen": 1792244615.7070353,
+    "ast_hash": "83e1446a480c6c0bf7baf1bcfaf55b90",
     "semantic_hash": ""
   },
   "test/api/rate-limit.test.js": {
@@ -2262,9 +2262,9 @@
     "semantic_hash": ""
   },
   "test/frontend/motion.test.js": {
-    "mtime": 1792170212.1154704,
-    "seen": 1792170344.3284023,
-    "ast_hash": "924a349066097a3ff993274e9a766a43",
+    "mtime": 1792171483.0548217,
+    "seen": 1792244615.7070825,
+    "ast_hash": "353ab94b2ccb6f0dfcb964c4900cdb7c",
     "semantic_hash": ""
   },
   "test/frontend/tokens.test.js": {
@@ -2334,9 +2334,9 @@
     "semantic_hash": ""
   },
   "openspec/changes/frontend-interaction-quality/tasks.md": {
-    "mtime": 1792169206.2200463,
-    "seen": 1792170344.328959,
-    "ast_hash": "e803b37b1948e07772b85ef2120a338d",
+    "mtime": 1792171612.7953832,
+    "seen": 1792244615.7076738,
+    "ast_hash": "74e7a3d9e1fcdf06feb0c4770e0cda64",
     "semantic_hash": ""
   },
   "public/assets/fonts/OFL-DMSans.txt": {

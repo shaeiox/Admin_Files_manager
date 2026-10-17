@@ -7,8 +7,8 @@
  * Controls whose default "above" tooltip clips against the viewport, a sticky
  * header, or an overflow container must declare an explicit data-tip-pos, and
  * the tooltip rule must be bounded. Row action buttons in the Files/Uploads
- * scroll areas use data-tip-pos="bottom"; the bulk bar keeps the default
- * because it floats near the viewport bottom (a "bottom" tip would clip).
+ * scroll areas use data-tip-pos="bottom". The bulk actions sit in the command
+ * bar as labelled buttons (files-page-ux-redesign), so they carry no tooltip.
  */
 
 const { test } = require('node:test');
@@ -50,8 +50,12 @@ test('drawer close uses a viewport-safe placement', () => {
 });
 
 test('scroll-container action buttons declare a placement', () => {
-  assert.match(FILES_JS, /data-tip="Download" data-tip-pos="bottom"/);
-  assert.match(FILES_JS, /data-tip="More" data-tip-pos="bottom"/);
+  // List rows open to the left: a "bottom" tip on the last row spilled out of
+  // the table's scroll box and gave short lists a stray scrollbar.
+  assert.match(FILES_JS, /data-act="download"[^>]*data-tip="Download" data-tip-pos="left"/);
+  assert.match(FILES_JS, /data-act="more"[^>]*data-tip="More" data-tip-pos="left"/);
+  // The grid card menu sits at the card's top, so its tip opens inside the card.
+  assert.match(FILES_JS, /file-card-menu">\s*<button[^>]*data-tip="More" data-tip-pos="bottom"/);
   assert.match(FILES_JS, /data-tip="Copy location" data-tip-pos="bottom"/);
   assert.match(UPLOADS_JS, /data-tip="\$\{label\}" data-tip-pos="bottom"/);
 });
@@ -61,12 +65,14 @@ test('grid more-actions control matches its list counterpart', () => {
   assert.strictEqual(occurrences.length, 2, 'list row and grid card both carry data-tip="More"');
 });
 
-test('bulk bar buttons intentionally keep the default above placement', () => {
-  // The bulk bar floats near the viewport bottom; a bottom-opening tooltip
-  // would clip. Guard against someone "fixing" this uniformly.
+test('bulk actions are labelled buttons in the command bar, so they need no tooltip', () => {
+  // Their meaning is the visible label; a tip would only repeat it. The one
+  // icon-only control (the narrow-screen overflow menu) keeps an aria-label.
   for (const id of ['bulkDownload', 'bulkStar', 'bulkMove', 'bulkCopy', 'bulkPolicy', 'bulkDelete', 'bulkClear']) {
-    const m = FILES_HTML.match(new RegExp(`id="${id}" data-tip="[^"]+"`));
-    assert.ok(m, `${id} has a tip`);
-    assert.doesNotMatch(m[0], /data-tip-pos="bottom"/);
+    const m = FILES_HTML.match(new RegExp(`<button[^>]*id="${id}"[^>]*>[\\s\\S]*?</button>`));
+    assert.ok(m, `${id} exists`);
+    assert.doesNotMatch(m[0], /data-tip=/, `${id} carries no tooltip`);
+    assert.match(m[0], /<span>[^<]+<\/span>/, `${id} has a visible label`);
   }
+  assert.match(FILES_HTML, /id="bulkMore" aria-label="More actions for selected"/);
 });
