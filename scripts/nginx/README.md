@@ -255,6 +255,7 @@ body ceiling, 600 s timeouts.
 | app `UPLOAD_MAX_BYTES` | 5 GiB default |
 | nginx `client_max_body_size` | 6 g — must stay **above** the app limit, else nginx 413s before the app decides |
 | nginx timeouts (body/read/send) | 600 s — must outlast the app's 30 s shutdown grace |
+| nginx `client_body_buffer_size` / `http2_body_preread_size` (admin) | 4 m — with unbuffered bodies this is the HTTP/2 per-stream upload window; keep ≥ bandwidth × RTT. The default capped uploads near 3 MB/s |
 | app `PORT` | 3000 — must match `proxy_pass` |
 
 ---
@@ -270,6 +271,7 @@ body ceiling, 600 s timeouts.
 | admin answers **401** with correct password | wrong htpasswd entry; regenerate. The browser cached old credentials — it re-prompts per protection space |
 | admin answers **502/504** | app not running or wrong port — `curl http://127.0.0.1:3000/api/v1/health`, fix `proxy_pass` |
 | **413** on upload | `client_max_body_size` < app `UPLOAD_MAX_BYTES` — raise both together |
+| browser uploads far slower than scp/sftp, fine with `curl --http1.1` | HTTP/2 upload window too small — `client_body_buffer_size` / `http2_body_preread_size` missing or below bandwidth × RTT (§7) |
 | portal **502/504** on `/api/` | portal not running or wrong port — `curl http://127.0.0.1:4000/api/health`, match `PORT` in its `.env` with `proxy_pass` |
 | a downloadable file is missing from the portal | content is never served from disk: check `FILES_ROOT` in the portal `.env` and the item's policy in Admin Files Manager |
 | portal JS/CSS/image you just added returns the SPA shell | it is outside `/assets/` — only `/assets/` and the three HTML shells are public (§5) |

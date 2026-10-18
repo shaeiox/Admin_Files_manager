@@ -385,6 +385,7 @@ discards all accounts, policies and the audit log.
 | systemd `TimeoutStopSec` | 45 s | Must exceed the app's grace, or systemd kills a draining process |
 | nginx `proxy_read_timeout` / `client_body_timeout` | 600 s | Must exceed both |
 | nginx `client_max_body_size` | 6g | Must stay **above** `UPLOAD_MAX_BYTES`. Raise both together. |
+| nginx `client_body_buffer_size` / `http2_body_preread_size` | 4m | With `proxy_request_buffering off` this is the HTTP/2 per-stream upload window. Keep it ≥ bandwidth × RTT; the default capped uploads near 3 MB/s. |
 | Session lifetime | 24 h | Fixed; sign in again afterwards |
 
 **Known limit:** Node's `server.requestTimeout` defaults to **300 s**. An upload that takes longer
@@ -406,6 +407,7 @@ than 5 minutes to arrive is ended by the application whatever nginx allows. At a
 | `pre-activation-failed` … `holds no store` | `AFM_DATA_DIR` points at an empty directory on a host that has run before. Point it back at the real store. |
 | `rolled-back` | The new release did not answer `/api/v1/health` within 60 s. Check `journalctl -u dimension` around the deploy time. |
 | `413` from nginx on a large upload | `client_max_body_size` is below `UPLOAD_MAX_BYTES`. |
+| Browser uploads much slower than scp/sftp, normal with `curl --http1.1` | The HTTP/2 upload window is too small: `client_body_buffer_size` / `http2_body_preread_size` are missing or below bandwidth × RTT. |
 | `\r: command not found` | A script arrived with CRLF line endings. `.gitattributes` pins LF for `*.sh`, `*.service`, `*.conf` and the hook; re-checkout. |
 
 ## Verification status (record honestly)
