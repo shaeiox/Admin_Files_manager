@@ -172,3 +172,31 @@ describe('the limiter does not apply outside the API surface', () => {
         assert.match(res.body, /<!DOCTYPE html>/i);
     });
 });
+
+describe('the skip predicate (resumable-uploads, task 3.1)', () => {
+    test('skip bypasses only the matching requests', () => {
+        // Required lazily: a top-level require would load rateLimit.js before
+        // this file sets the env vars above, freezing the live server's
+        // budgets at the defaults.
+        const { createRateLimit } = require('../../src/middlewares/rateLimit');
+        const limiter = createRateLimit({
+            writePerMinute: 1,
+            skip: (req) => req.path === '/skip-me',
+        });
+        const run = (path) => {
+            let outcome = null;
+            limiter(
+                { method: 'POST', ip: '10.99.0.1', path },
+                { setHeader() { } },
+                (err) => { outcome = err ? err.statusCode : 200; }
+            );
+            return outcome;
+        };
+
+        assert.equal(run('/skip-me'), 200, 'a skipped request passes');
+        assert.equal(run('/skip-me'), 200, 'and does not spend the budget');
+        assert.equal(run('/counted'), 200, 'the first counted request passes');
+        assert.equal(run('/counted'), 429, 'the second exceeds the 1/min budget');
+        assert.equal(run('/skip-me'), 200, 'skip still bypasses once the budget is exhausted');
+    });
+});

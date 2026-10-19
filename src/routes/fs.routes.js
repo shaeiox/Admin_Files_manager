@@ -23,4 +23,12 @@ router.put('/move', fsController.moveItems);
 router.post('/copy', fsController.copyItems);
 router.delete('/delete', fsController.deleteItems);
 
+// Resumable upload sessions (resumable-uploads, ADR-011): an additive surface
+// beside the legacy single-request upload above, which is untouched.
+router.post('/uploads', fsController.initiateUploadSession);
+router.get('/uploads/:id', fsController.getUploadSession);
+router.put('/uploads/:id/chunk', fsController.appendUploadChunk);
+router.post('/uploads/:id/complete', fsController.completeUploadSession);
+router.delete('/uploads/:id', fsController.abortUploadSession);
+
 module.exports = router;

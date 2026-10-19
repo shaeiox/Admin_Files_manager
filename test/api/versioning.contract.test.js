@@ -14,11 +14,14 @@
  *   - No filesystem route is reachable under either dashboard prefix, and the
  *     versioned filesystem prefix serves only the filesystem's own routes.
  *   - Every error on the versioned prefix is the { success: false, error }
- *     envelope, discloses nothing, and carries no `kind` (reserved, not emitted).
+ *     envelope and discloses nothing; `kind` is emitted only by the
+ *     upload-session refusals (resumable-uploads), whose closed vocabulary is
+ *     pinned here.
  *
- * Isolation: STORAGE_ROOT, MetadataService.dbPath and SettingsService.dbPath
- * (plus both caches) are redirected to a temp tree BEFORE server.js is required,
- * so the suite never writes the repository's data/*.json (AGENTS.md).
+ * Isolation: STORAGE_ROOT, MetadataService.dbPath, SettingsService.dbPath and
+ * UploadSessionService.dbPath (plus all caches) are redirected to a temp tree
+ * BEFORE server.js is required, so the suite never writes the repository's
+ * data/*.json (AGENTS.md).
  */
 
 const { test, describe, before, after } = require('node:test');
@@ -50,6 +53,9 @@ MetadataService.cache = null;
 const SettingsService = require('../../src/services/SettingsService');
 SettingsService.dbPath = SETTINGS_PATH;
 SettingsService.cache = null;
+const UploadSessionService = require('../../src/services/UploadSessionService');
+UploadSessionService.dbPath = path.join(TMP, 'upload-sessions.json');
+UploadSessionService.cache = null;
 applyBootstrapEnv();
 redirectAdminDb(path.join(TMP, 'admin.sqlite'));
 
@@ -128,7 +134,7 @@ function shapeOf(value) {
     return typeof value;
 }
 
-/** An error body: the envelope, nothing more, nothing disclosed. */
+/** An error body with no type-specific extras: the envelope, nothing disclosed. */
 function assertErrorEnvelope(res, where) {
     assert.ok(res.json, `${where}: the error body is JSON, not ${res.text.slice(0, 60)}`);
     assert.match(res.headers['content-type'] || '', /application\/json/, `${where}: JSON content type`);
@@ -136,7 +142,9 @@ function assertErrorEnvelope(res, where) {
     assert.equal(res.json.success, false, where);
     assert.equal(typeof res.json.error, 'string', where);
     assert.ok(res.json.error.length > 0, `${where}: non-empty message`);
-    assert.ok(!('kind' in res.json), `${where}: kind is reserved, not emitted`);
+    // `kind` / `receivedBytes` are additive fields on upload-session refusals
+    // only; every path asserting this shape is a non-session error.
+    assert.ok(!('kind' in res.json), `${where}: kind belongs to session refusals`);
     assertDiscloses(res, where);
 }
 
@@ -417,7 +425,7 @@ describe('no filesystem route under any dashboard prefix (security)', () => {
    ══════════════════════════════════════════ */
 
 describe('the error contract on /api/v1 (api-error-contract)', () => {
-    test('every error path is the envelope, discloses nothing, and carries no kind', async () => {
+    test('every non-session error path is the envelope, discloses nothing, and carries no kind', async () => {
         const cases = [
             [404, () => send('GET', '/api/v1/nope')],
             [404, () => send('GET', '/api/v1/fs/list?path=/does-not-exist')],
@@ -460,18 +468,35 @@ describe('the error contract on /api/v1 (api-error-contract)', () => {
         assert.equal(res.json.error, 'Settings store could not be read');
     });
 
-    test('kind is absent today, and its absence is a well-formed envelope', async () => {
-        const res = await send('GET', '/api/v1/fs/list?path=/does-not-exist');
-        assert.equal(res.json.success, false);
-        assert.equal(res.json.kind, undefined);
+    test('a non-session refusal has no kind; a session refusal carries one', async () => {
+        const plain = await send('GET', '/api/v1/fs/list?path=/does-not-exist');
+        assert.equal(plain.json.success, false);
+        assert.equal(plain.json.kind, undefined);
+
+        const session = await send('GET', `/api/v1/fs/uploads/${'a'.repeat(32)}`);
+        assert.equal(session.status, 404);
+        assert.equal(session.json.success, false);
+        assert.equal(session.json.kind, 'session_expired');
     });
 
-    test('src/ emits no kind token (reserved, not populated)', () => {
+    test('kind tokens come only from the upload-session service and its closed vocabulary', () => {
+        const KINDS = new Set([
+            'session_expired', 'session_completed', 'offset_mismatch', 'session_incomplete',
+            'destination_conflict', 'chunk_too_large', 'size_exceeded',
+        ]);
         const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
             e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]);
+        const found = [];
         for (const file of walk(path.join(REPO, 'src')).filter((f) => f.endsWith('.js'))) {
             const code = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-            assert.ok(!/\bkind\s*:/.test(code), `${path.relative(REPO, file)} emits a kind`);
+            // Object literals (`{ kind: 'x' }`) and property assignment
+            // (`err.kind = 'x'`), but never a pass-through (`payload.kind = err.kind`).
+            for (const [, token] of code.matchAll(/\bkind\s*[:=]\s*'([^']+)'/g)) found.push({ file, token });
+        }
+        assert.ok(found.length > 0, 'the vocabulary is emitted (by the upload-session refusals)');
+        for (const { file, token } of found) {
+            assert.ok(file.endsWith('UploadSessionService.js'), `${path.relative(REPO, file)} emits kind: ${token}`);
+            assert.ok(KINDS.has(token), `unknown kind token: ${token}`);
         }
     });
 });
@@ -497,6 +522,7 @@ function declaredEndpoints() {
 describe('the two prefixes are one implementation (legacy-api-compatibility)', () => {
     const EXPECTED = [
         'DELETE /fs/delete',
+        'DELETE /fs/uploads/:id',
         'GET /dashboard/health',
         'GET /dashboard/summary',
         'GET /fs/download',
@@ -504,6 +530,7 @@ describe('the two prefixes are one implementation (legacy-api-compatibility)', (
         'GET /fs/thumbnail',
         'GET /fs/thumbnail/capability',
         'GET /fs/tree',
+        'GET /fs/uploads/:id',
         'GET /health',
         'GET /settings',
         'POST /fs/copy',
@@ -511,12 +538,15 @@ describe('the two prefixes are one implementation (legacy-api-compatibility)', (
         'POST /fs/folder',
         'POST /fs/star',
         'POST /fs/upload',
+        'POST /fs/uploads',
+        'POST /fs/uploads/:id/complete',
         'PUT /fs/move',
         'PUT /fs/rename',
+        'PUT /fs/uploads/:id/chunk',
         'PUT /settings',
     ];
 
-    test('the served endpoint set is exactly the pre-change set - nothing added, removed or renamed', () => {
+    test('the served endpoint set is exactly the declared set - nothing added, removed or renamed', () => {
         assert.deepEqual(declaredEndpoints(), EXPECTED);
     });
 

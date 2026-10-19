@@ -194,7 +194,7 @@
             </span>
             <h1 class="page-title">Upload files</h1>
             <p class="page-subtitle">Drop files into a folder of the managed storage and follow each transfer live.
-              Pausing stops a transfer; resuming restarts that file from the beginning.</p>
+              Pausing stops a transfer; resuming continues it from the byte the server already holds.</p>
           </div>
 
           <div class="page-actions">
@@ -357,7 +357,7 @@
             <!-- Footer -->
             <div class="queue-footer">
               <div class="queue-footer-note">
-                A transfer interrupted by a network error is marked failed. Retrying restarts it from the beginning.
+                A transfer interrupted by a network error is marked failed. Retrying continues it from the byte the server already holds.
               </div>
               <button type="button" class="btn btn-danger btn-sm" id="cancelAll">
                 <i data-icon="x" data-icon-size="14"></i>
@@ -399,7 +399,7 @@
                   <li>Choose "Fast" (8 parallel) for many small files, or "One at a time" for a slow or shared connection.</li>
                   <li>A chosen or dropped folder uploads every file inside it, subfolders included, directly into the destination. Subfolder structure is not recreated.</li>
                   <li>Without "Replace files with the same name", a file whose name already exists in the destination is refused, never overwritten.</li>
-                  <li>Transfers are not resumable: pausing, or a dropped connection, means that file restarts from the beginning.</li>
+                  <li>A transfer interrupted by a pause, a dropped connection or a page reload keeps everything the server already stored: resuming continues from there, and after a reload, re-selecting the same file picks the transfer up. Cancelling discards the partial data.</li>
                 </ol>
               </div>
             </div>

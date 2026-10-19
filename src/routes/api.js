@@ -9,6 +9,7 @@ const authRoutes = require('./auth.routes');
 const adminRoutes = require('./admin.routes');
 const { authenticate } = require('../middlewares/authenticate');
 const csrf = require('../middlewares/csrf');
+const { createRateLimit, isUploadChunkRequest, CHUNK_PER_MINUTE } = require('../middlewares/rateLimit');
 
 /**
  * The API surface, assembled once (api-v1-versioning-and-boundary, ADR-007).
@@ -62,6 +63,15 @@ router.use('/auth', authRoutes);
 // are secured identically (AGENTS.md rule 4a). /health and /auth/login stay
 // reachable with no session.
 router.use(authenticate);
+
+// Resumable chunk appends carry their own allowance instead of the shared
+// write bucket (resumable-uploads, ADR-011; the reasoning lives in
+// rateLimit.js). Applied after `authenticate` and before CSRF or any file
+// work, and ONLY the append route passes through it - every other session
+// call stays under the general limiter in server.js.
+const chunkLimit = createRateLimit({ writePerMinute: CHUNK_PER_MINUTE });
+router.use((req, res, next) => (isUploadChunkRequest(req) ? chunkLimit(req, res, next) : next()));
+
 router.use(csrf);
 
 router.use('/fs', fsRoutes);

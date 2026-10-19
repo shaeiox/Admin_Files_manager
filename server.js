@@ -7,7 +7,7 @@ const path = require('path');
 
 const config = require('./src/config/env');
 const errorHandler = require('./src/middlewares/errorHandler');
-const { createRateLimit } = require('./src/middlewares/rateLimit');
+const { createRateLimit, isUploadChunkRequest } = require('./src/middlewares/rateLimit');
 const apiRoutes = require('./src/routes/api');
 
 const app = express();
@@ -84,7 +84,11 @@ if (config.cors.enabled) {
 /* ─── Rate limiting ─── */
 // Mounted on /api only, so the static shell and SPA fetches are never limited.
 // Placed BEFORE the body parsers: a flood is refused without paying to parse it.
-app.use('/api', createRateLimit());
+// Resumable chunk appends are SKIPPED here and carry their own allowance
+// (AFM_RATE_LIMIT_CHUNK_PER_MINUTE, mounted in src/routes/api.js): a 5 GiB
+// transfer is ~640 appends, far past the shared write bucket
+// (resumable-uploads, ADR-011).
+app.use('/api', createRateLimit({ skip: isUploadChunkRequest }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -148,6 +152,14 @@ require('./src/services/IntegrationSettingsService').stampVolume();
 if (String(process.env.PORTAL_ROOT || '').trim()) {
     console.warn('[integration] PORTAL_ROOT is no longer used and is ignored; set PORTAL_LOG_FILE for the portal log.');
 }
+
+/* ─── Resumable upload sessions ─── */
+// Sweep expired sessions and their staged bytes at boot (resumable-uploads,
+// design D9). Fire-and-forget and non-creating: a host that has never seen a
+// session skips it, so this never materialises a data file by itself.
+require('./src/services/UploadSessionService').sweep().catch((error) => {
+    console.error('[store] Upload-session boot sweep failed:', error.message);
+});
 
 /* ─── Boot Server ─── */
 // The handle is exported so integration tests can read the bound port and close

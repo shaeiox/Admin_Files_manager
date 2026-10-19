@@ -36,10 +36,17 @@ const errorHandler = (err, req, res, next) => {
         message = 'Request could not be processed.';
     }
 
-    res.status(statusCode).json({
+    const payload = {
         success: false,
         error: message,
-    });
+    };
+    // Additive, machine-readable extras (resumable-uploads): the client maps
+    // outcomes by these, never by prose. Emitted only when the throwing layer
+    // set them; every other error path keeps the two-key envelope.
+    if (typeof err.kind === 'string') payload.kind = err.kind;
+    if (typeof err.receivedBytes === 'number') payload.receivedBytes = err.receivedBytes;
+
+    res.status(statusCode).json(payload);
 };
 
 module.exports = errorHandler;

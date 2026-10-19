@@ -8,7 +8,8 @@
  * files.test.js): the real app.js and uploads.js are evaluated in a `vm`
  * context. window, document and XMLHttpRequest are stubs; the page shell is a
  * set of FakeEl objects that record what uploads.js writes into them, and
- * window.API is a scripted stub whose uploads the test resolves by hand.
+ * window.API is a scripted stub whose resumable session calls the test drives
+ * by hand (initiate, then appends, then complete).
  *
  * What a stub cannot observe — real focus order, screen-reader output, layout
  * at 320px, the browser's own drag-and-drop dispatch — is checked in a browser
@@ -131,7 +132,7 @@ function loadUploads({ routes = {}, optionInputs = [] } = {}) {
   };
   const timers = [];
   const intervals = [];
-  const calls = { get: [], post: [], upload: [] };
+  const calls = { get: [], post: [], initiate: [], append: [], complete: [], abort: [] };
   const toasts = [];
   const modal = { confirm: true, lastConfirm: null, confirms: 0 };
   const allRoutes = {
@@ -191,18 +192,37 @@ function loadUploads({ routes = {}, optionInputs = [] } = {}) {
     prompt: async () => { throw new Error('the destination control no longer uses Modal.prompt'); },
   };
 
+  /** A promise the test resolves by hand, with resolve/reject exposed. */
+  const pending = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
   sandbox.API = {
     BASE_URL: '/api',
     get: (url, opts) => { calls.get.push({ url, opts }); return respond(url); },
     post: (url, body, opts) => { calls.post.push({ url, body, opts }); return respond(`POST ${url}`); },
-    upload: (url, form, onProgress) => {
-      let resolve;
-      let reject;
-      const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
-      const rec = { url, form, onProgress, resolve, reject, aborted: false };
-      rec.abort = () => { rec.aborted = true; reject(httpError(0, 'Upload cancelled', 'aborted')); };
-      calls.upload.push(rec);
-      return { promise, abort: rec.abort };
+    uploadSession: {
+      initiate: (body) => {
+        const rec = pending();
+        calls.initiate.push({ body, ...rec });
+        return rec.promise;
+      },
+      append: (id, offset, chunk, onProgress) => {
+        const rec = pending();
+        const entry = { id, offset, chunk, onProgress, aborted: false, ...rec };
+        entry.abort = () => { entry.aborted = true; entry.reject(httpError(0, 'Upload cancelled', 'aborted')); };
+        calls.append.push(entry);
+        return { promise: entry.promise, abort: entry.abort };
+      },
+      complete: (id, body) => {
+        const rec = pending();
+        calls.complete.push({ id, body, ...rec });
+        return rec.promise;
+      },
+      abort: (id) => { calls.abort.push({ id }); return Promise.resolve({ success: true }); },
     },
   };
 
@@ -222,13 +242,40 @@ function loadUploads({ routes = {}, optionInputs = [] } = {}) {
       doc.rows[`[data-item-id="${id}"]`] = row;
       return row;
     },
+    /**
+     * Drive the first `count` transfers to completion through the session
+     * protocol: adopt each session, append its slice, then place the file.
+     * An append is answered with its own slice size, so this fits files that
+     * take one CHUNK_BYTES slice; longer transfers are driven by hand.
+     */
+    async finish(count = 1, pathOf = (i) => `/file-${i}`) {
+      await settleAll();
+      calls.initiate.slice(0, count).forEach((c, i) => c.resolve({
+        success: true, sessionId: `sess-${i}`, receivedBytes: 0, expiresAt: Date.now() + 86400000,
+      }));
+      await settleAll();
+      calls.append.slice(0, count).forEach(c => c.resolve({ success: true, receivedBytes: c.chunk.size }));
+      await settleAll();
+      calls.complete.slice(0, count).forEach((c, i) => c.resolve({ success: true, path: pathOf(i) }));
+      await settleAll();
+    },
   };
 }
 
 const plain = (v) => JSON.parse(JSON.stringify(v));
 const settle = () => new Promise(r => setImmediate(r));
 async function settleAll() { for (let i = 0; i < 8; i++) await settle(); }
-const fakeFile = (name, size = 100) => ({ name, size });
+const LAST_MODIFIED = 1700000000000;
+const fakeFile = (name, size = 100, lastModified = LAST_MODIFIED) => ({
+  name,
+  size,
+  lastModified,
+  // uploads.js slices the file per chunk; the stub carries the slice's size.
+  slice(from, to) {
+    const end = Math.min(Number.isFinite(to) ? to : size, size);
+    return { from, size: Math.max(0, end - from) };
+  },
+});
 
 /** A page whose root destination has been checked and found usable. */
 async function booted(opts) {
@@ -370,8 +417,9 @@ describe('failure kinds come from machine-readable signals', () => {
   test('a failed upload records the kind on the row and keeps going', async () => {
     const page = await booted();
     page.c.addFiles([fakeFile('dup.txt'), fakeFile('next.txt')]);
-    assert.equal(page.calls.upload.length, 2);
-    page.calls.upload[0].reject(httpError(409, 'A file with that name already exists.'));
+    await settleAll();
+    assert.equal(page.calls.initiate.length, 2);
+    page.calls.initiate[0].reject(httpError(409, 'A file with that name already exists.'));
     await settleAll();
     const [dup] = page.state().queue;
     assert.equal(dup.status, 'failed');
@@ -381,14 +429,16 @@ describe('failure kinds come from machine-readable signals', () => {
 });
 
 describe('api.js attaches status and kind to an upload failure (additive)', () => {
-  function loadApi(xhrBehaviour) {
+  function loadApi(xhrBehaviour, onXhr) {
     const sandbox = { console: { warn() {}, error() {} } };
     sandbox.window = sandbox;
     sandbox.XMLHttpRequest = function () {
       const xhr = this;
       xhr.upload = {};
-      xhr.open = () => {};
-      xhr.send = () => setImmediate(() => xhrBehaviour(xhr));
+      xhr.headers = {};
+      xhr.open = (method, url) => { xhr.method = method; xhr.url = url; };
+      xhr.setRequestHeader = (k, v) => { xhr.headers[k] = v; };
+      xhr.send = () => { if (onXhr) onXhr(xhr); setImmediate(() => xhrBehaviour(xhr)); };
       xhr.abort = () => xhr.onabort && xhr.onabort();
     };
     vm.createContext(sandbox);
@@ -430,6 +480,45 @@ describe('api.js attaches status and kind to an upload failure (additive)', () =
     const handle = ab.upload('/fs/upload', {});
     handle.abort();
     await assert.rejects(handle.promise, err => err.kind === 'aborted');
+  });
+
+  test('the session family is complete: one builder per endpoint', () => {
+    const API = loadApi(() => {});
+    assert.ok(Object.isFrozen(API.uploadSession));
+    for (const name of ['initiate', 'status', 'append', 'complete', 'abort']) {
+      assert.equal(typeof API.uploadSession[name], 'function', name);
+    }
+  });
+
+  test('append PUTs one raw chunk at the offset with the CSRF header', async () => {
+    let seen = null;
+    const API = loadApi(xhr => {
+      xhr.status = 200;
+      xhr.responseText = JSON.stringify({ success: true, receivedBytes: 5 });
+      xhr.onload();
+    }, xhr => { seen = xhr; });
+    API.setCsrfToken('tok-1');
+    const received = await API.uploadSession.append('a'.repeat(32), 8388608, { size: 5 }).promise;
+    assert.equal(received.receivedBytes, 5);
+    assert.equal(seen.method, 'PUT');
+    assert.match(seen.url, /\/fs\/uploads\/a{32}\/chunk\?offset=8388608$/);
+    assert.equal(seen.headers['Content-Type'], 'application/octet-stream');
+    assert.equal(seen.headers['X-CSRF-Token'], 'tok-1');
+  });
+
+  test('a session refusal carries kind and receivedBytes through', async () => {
+    const API = loadApi(xhr => {
+      xhr.status = 409;
+      xhr.statusText = 'Conflict';
+      xhr.responseText = JSON.stringify({
+        success: false, error: 'Offset does not match.', kind: 'offset_mismatch', receivedBytes: 700,
+      });
+      xhr.onload();
+    });
+    await assert.rejects(
+      API.uploadSession.append('b'.repeat(32), 0, { size: 5 }).promise,
+      err => err.status === 409 && err.kind === 'offset_mismatch' && err.receivedBytes === 700,
+    );
   });
 });
 
@@ -486,9 +575,12 @@ describe('remaining time is unavailable when speed is unknown', () => {
   test('the in-place patch uses the same derivations as the row', async () => {
     const page = await booted();
     page.c.addFiles([fakeFile('a.bin', 1000)]);
+    await settleAll();
+    page.calls.initiate[0].resolve({ success: true, sessionId: 's0', receivedBytes: 0 });
+    await settleAll();
     const item = page.state().queue[0];
     const row = page.mountRow(item.id);
-    page.calls.upload[0].onProgress(600, 1200);
+    page.calls.append[0].onProgress(600, 1200);
     page.c.flushProgress();
     assert.equal(row.children['.qi-fill'].style.transform, 'scaleX(0.5)');
     assert.equal(row.children['.qi-pct'].textContent, '50%');
@@ -500,8 +592,7 @@ describe('summary tiles measure a surviving source', () => {
   test('clearing completed rows does not reset the completed tiles', async () => {
     const page = await booted();
     page.c.addFiles([fakeFile('a.txt', 300), fakeFile('b.txt', 700)]);
-    page.calls.upload[0].resolve({ success: true, data: { path: '/a.txt', size: 300 } });
-    await settleAll();
+    await page.finish(1, () => '/a.txt');
     const before = plain(page.pure.computeQueueTiles(page.state().queue, page.state().session));
     page.c.clearCompleted();
     const after = plain(page.pure.computeQueueTiles(page.state().queue, page.state().session));
@@ -534,8 +625,8 @@ describe('global progress reflects only accounted work', () => {
   test('the bar shows the failed count beside it', async () => {
     const page = await booted();
     page.c.addFiles([fakeFile('a', 10), fakeFile('b', 10)]);
-    page.calls.upload[0].resolve({ data: { path: '/a', size: 10 } });
-    page.calls.upload[1].reject(httpError(500, 'Upload could not be saved.'));
+    await page.finish(1, () => '/a');
+    page.calls.initiate[1].reject(httpError(500, 'Upload could not be saved.'));
     await settleAll();
     assert.match(page.els['#queueGlobal'].innerHTML, /1 failed, not counted/);
     assert.match(page.els['#queueGlobal'].innerHTML, /100%/);
@@ -554,45 +645,71 @@ describe('global progress reflects only accounted work', () => {
 });
 
 describe('retry, pause and bulk actions', () => {
-  test('retry resets progress, clears the reason and enqueues exactly once', async () => {
+  test('retry continues from the acknowledged byte, clears the reason and enqueues exactly once', async () => {
     const page = await booted();
-    page.c.addFiles([fakeFile('a', 10)]);
-    page.calls.upload[0].onProgress(6, 12);
-    page.calls.upload[0].reject(httpError(500, 'boom'));
+    const chunk = page.Uploads.CHUNK_BYTES;
+    page.c.addFiles([fakeFile('a', chunk * 2)]);
+    await settleAll();
+    page.calls.initiate[0].resolve({ success: true, sessionId: 's0', receivedBytes: 0 });
+    await settleAll();
+    page.calls.append[0].resolve({ success: true, receivedBytes: chunk });
+    await settleAll();
+    // The second slice fails after the operator watched it start.
+    page.calls.append[1].onProgress(6, 12);
+    page.calls.append[1].reject(httpError(500, 'boom'));
     await settleAll();
     const item = page.state().queue[0];
+    assert.equal(item.status, 'failed');
+    assert.equal(item.uploaded, chunk, 'unacknowledged bytes rolled back to the acked offset');
     page.c.retryItem(item.id);
     page.c.retryItem(item.id); // a second retry of an already-retried item is a no-op
     assert.equal(page.state().queue.length, 1);
-    assert.equal(item.uploaded, 0);
     assert.equal(item.error, null);
-    assert.equal(page.calls.upload.length, 2, 'one new transfer, not two');
+    await settleAll();
+    assert.equal(page.calls.initiate.length, 2, 'one new attempt, not two');
+    page.calls.initiate[1].resolve({ success: true, sessionId: 's0', receivedBytes: chunk });
+    await settleAll();
+    assert.equal(page.calls.append[2].offset, chunk, 'the bytes the server holds are not re-sent');
   });
 
   test('bulk retry touches only failed items', async () => {
     const page = await booted();
     page.c.addFiles([fakeFile('a', 10), fakeFile('b', 10), fakeFile('c', 10)]);
-    page.calls.upload[0].resolve({ data: { path: '/a', size: 10 } });
-    page.calls.upload[1].reject(httpError(500, 'x'));
+    await page.finish(1, () => '/a');
+    page.calls.initiate[1].reject(httpError(500, 'x'));
     await settleAll();
     page.c.retryAllFailed();
     const statuses = page.state().queue.map(q => q.status);
     assert.deepEqual(plain(statuses), ['done', 'uploading', 'uploading']);
   });
 
-  test('pause aborts, zeroes progress, and resume restarts from the beginning', async () => {
+  test('pause aborts only the in-flight chunk and resume continues from the acknowledged byte', async () => {
     const page = await booted();
-    page.c.addFiles([fakeFile('a', 1000)]);
+    const chunk = page.Uploads.CHUNK_BYTES;
+    page.c.addFiles([fakeFile('a', chunk * 2)]);
+    await settleAll();
+    page.calls.initiate[0].resolve({ success: true, sessionId: 's0', receivedBytes: 0 });
+    await settleAll();
+    page.calls.append[0].resolve({ success: true, receivedBytes: chunk });
+    await settleAll();
     const item = page.state().queue[0];
-    page.calls.upload[0].onProgress(600, 1200);
+    page.calls.append[1].onProgress(4, 8); // 4 MiB into the second slice, unacknowledged
     page.c.pauseItem(item.id);
     await settleAll();
-    assert.equal(page.calls.upload[0].aborted, true);
+    assert.equal(page.calls.append[1].aborted, true);
     assert.equal(item.status, 'paused');
-    assert.equal(item.uploaded, 0);
+    assert.equal(item.uploaded, chunk, 'only acknowledged bytes survive the pause');
+    assert.equal(page.calls.abort.length, 0, 'pausing keeps the session');
+    const row = page.pure.renderItemHTML(item);
+    assert.match(row, /Resumes from where it stopped/);
+    assert.doesNotMatch(row, /from the beginning/);
     page.c.resumeItem(item.id);
     assert.equal(item.status, 'uploading');
-    assert.equal(page.calls.upload.length, 2);
+    await settleAll();
+    assert.equal(page.calls.initiate.length, 2);
+    page.calls.initiate[1].resolve({ success: true, sessionId: 's0', receivedBytes: chunk });
+    await settleAll();
+    assert.equal(page.calls.append[2].offset, chunk, 'resume does not restart at the beginning');
   });
 
   test('pause all affects only uploading items; resume all only paused ones', async () => {
@@ -601,7 +718,10 @@ describe('retry, pause and bulk actions', () => {
     page.c.addFiles([fakeFile('a', 10), fakeFile('b', 10)]);
     page.c.pauseAll();
     await settleAll();
-    // The freed slot lets the queued item start; the queued one was not paused.
+    // The paused item's initiate is still open, so its slot frees when it answers.
+    assert.deepEqual(plain(page.state().queue.map(q => q.status)), ['paused', 'queued']);
+    page.calls.initiate[0].resolve({ success: true, sessionId: 's0', receivedBytes: 0 });
+    await settleAll();
     assert.deepEqual(plain(page.state().queue.map(q => q.status)), ['paused', 'uploading']);
     page.c.resumeAll();
     assert.deepEqual(plain(page.state().queue.map(q => q.status)), ['queued', 'uploading']);
@@ -612,14 +732,15 @@ describe('retry, pause and bulk actions', () => {
     page.c.pauseAll(); page.c.resumeAll(); page.c.retryAllFailed(); page.c.clearCompleted(); page.c.startQueued();
     await page.c.cancelAll();
     assert.equal(page.modal.confirms, 0, 'no confirmation for nothing');
-    assert.equal(page.calls.upload.length, 0);
+    assert.equal(page.calls.initiate.length, 0);
     assert.equal(page.toasts.length, 0);
   });
 
   test('cancel all confirms, states the consequence, and keeps completed files', async () => {
     const page = await booted();
     page.c.addFiles([fakeFile('a', 10), fakeFile('b', 10), fakeFile('c', 10), fakeFile('d', 10)]);
-    page.calls.upload[0].resolve({ data: { path: '/a', size: 10 } });
+    await page.finish(1, () => '/a');
+    page.calls.initiate[1].resolve({ success: true, sessionId: 'sb', receivedBytes: 0 });
     await settleAll();
     await page.c.cancelAll();
     const msg = page.modal.lastConfirm.message;
@@ -627,13 +748,55 @@ describe('retry, pause and bulk actions', () => {
     assert.match(msg, /partial data/);
     assert.match(msg, /1 completed file stays on the server/);
     assert.deepEqual(plain(page.state().queue.map(q => q.status)), ['done']);
-    assert.ok(page.calls.upload.slice(1).every(u => u.aborted));
+    assert.equal(page.calls.append[1].aborted, true, 'the in-flight chunk is aborted');
+    assert.deepEqual(plain(page.calls.abort.map(a => a.id)), ['sb'], 'the stored session is discarded');
+    // Initiates still open at cancel time race it; the sessions they open are discarded too.
+    page.calls.initiate[2].resolve({ success: true, sessionId: 'sc', receivedBytes: 0 });
+    await settleAll();
+    assert.deepEqual(plain(page.calls.abort.map(a => a.id)), ['sb', 'sc']);
   });
 
   test('dead metrics state and the unused helper are gone', () => {
     for (const dead of ['totalFiles', 'totalUploaded', 'bytesUploaded', 'randBetween', 'bindQueueActions']) {
       assert.ok(!UPLOADS_SRC.includes(dead), `${dead} removed`);
     }
+  });
+});
+
+/* ══════════════════════════════════════════
+   PHASE 3b — the resumable session protocol (ADR-011)
+   ══════════════════════════════════════════ */
+
+describe('the resumable session protocol', () => {
+  test('re-selecting a file adopts the open session at its acknowledged byte', async () => {
+    const page = await booted();
+    page.c.addFiles([fakeFile('a.bin', 1000)]);
+    await settleAll();
+    page.calls.initiate[0].resolve({ success: true, sessionId: 's0', receivedBytes: 400 });
+    await settleAll();
+    const item = page.state().queue[0];
+    assert.equal(item.uploaded, 400, 'the row reports the server progress, not zero');
+    assert.match(page.pure.renderItemHTML(item), /40%/);
+    assert.equal(page.calls.append[0].offset, 400, 'only the remaining bytes are appended');
+  });
+
+  test('an offset mismatch adopts the server offset and continues from there', async () => {
+    const page = await booted();
+    page.c.addFiles([fakeFile('a.bin', 1000)]);
+    await settleAll();
+    page.calls.initiate[0].resolve({ success: true, sessionId: 's0', receivedBytes: 0 });
+    await settleAll();
+    const err = httpError(409, 'Offset does not match.', 'offset_mismatch');
+    err.receivedBytes = 700;
+    page.calls.append[0].reject(err);
+    await settleAll();
+    assert.equal(page.calls.append.length, 2, 'the attempt kept going');
+    assert.equal(page.calls.append[1].offset, 700, 'the server byte count won');
+    assert.equal(page.state().queue[0].uploaded, 700);
+  });
+
+  test('no session URL is built outside api.js', () => {
+    assert.doesNotMatch(UPLOADS_SRC, /\/fs\/uploads/);
   });
 });
 
@@ -648,8 +811,7 @@ describe('rendering cost does not scale with the queue', () => {
     const [first] = page.state().queue;
     const row = page.mountRow(first.id);
     const listWrites = page.els['#queueList'].htmlWrites;
-    page.calls.upload[0].resolve({ data: { path: '/a', size: 10 } });
-    await settleAll();
+    await page.finish(1, () => '/a');
     assert.equal(page.els['#queueList'].htmlWrites, listWrites, 'the list was not re-rendered');
     assert.ok(row.outerWrites >= 1);
     assert.match(row.outer, /Complete/);
@@ -685,8 +847,7 @@ describe('rendering cost does not scale with the queue', () => {
     page.c.applyPreset('fast');
     page.toasts.length = 0;
     page.c.addFiles(Array.from({ length: 8 }, (_, i) => fakeFile(`f${i}`, 10)));
-    page.calls.upload.forEach((u, i) => u.resolve({ data: { path: `/f${i}`, size: 10 } }));
-    await settleAll();
+    await page.finish(8, i => `/f${i}`);
     page.flushTimers();
     const done = page.toasts.filter(t => t.type === 'success' && /complete/.test(t.t));
     assert.equal(done.length, 1);
@@ -826,14 +987,23 @@ describe('option controls are well formed', () => {
     assert.ok(!presented.includes('preservePath'), 'the server ignores preservePath, so it is not offered');
   });
 
-  test('the request carries destination and overwrite before the file, and nothing unbacked', async () => {
+  test('a session start carries exactly the documented fields, and a chunk is the raw slice', async () => {
     const page = await booted();
     page.state().options.overwrite = true;
     page.c.addFiles([fakeFile('a', 10)]);
-    const form = page.calls.upload[0].form;
-    assert.deepEqual(plain(form.keys()), ['destination', 'overwrite', 'file']);
-    assert.equal(form.get('overwrite'), 'true');
-    assert.equal(form.get('destination'), '/');
+    await settleAll();
+    const body = page.calls.initiate[0].body;
+    assert.deepEqual(Object.keys(body).sort(), ['destination', 'lastModified', 'name', 'overwrite', 'size']);
+    assert.equal(body.overwrite, true);
+    assert.equal(body.destination, '/');
+    assert.equal(body.size, 10);
+    assert.equal(body.lastModified, LAST_MODIFIED);
+    page.calls.initiate[0].resolve({ success: true, sessionId: 's0', receivedBytes: 0 });
+    await settleAll();
+    const append = page.calls.append[0];
+    assert.equal(append.offset, 0);
+    assert.equal(append.chunk.from, 0, 'the raw slice, positioned at the offset');
+    assert.equal(append.chunk.size, 10);
   });
 
   test('an option toggle is read from its checked state', async () => {
@@ -1019,7 +1189,7 @@ describe('destination selection', () => {
     page.state().destination = '/gone'; // e.g. deleted elsewhere since it was chosen
     page.c.addFiles([fakeFile('a', 1), fakeFile('b', 1), fakeFile('c', 1)]);
     await settleAll();
-    assert.equal(page.calls.upload.length, 0, 'no transfer started');
+    assert.equal(page.calls.initiate.length, 0, 'no transfer started');
     assert.deepEqual(plain(page.state().queue.map(q => q.status)), ['held', 'held', 'held']);
     assert.equal(page.state().queue.filter(q => q.status === 'failed').length, 0, 'no identical failure per file');
     const notice = page.els['#queueNotice'];
@@ -1038,16 +1208,16 @@ describe('destination selection', () => {
     await page.c.applyDestination('/docs');
     page.c.addFiles([fakeFile('a', 1), fakeFile('b', 1), fakeFile('c', 1)]);
     await settleAll();
-    assert.equal(page.calls.upload.length, 1);
+    assert.equal(page.calls.initiate.length, 1);
     gone = true;
-    page.calls.upload[0].reject(httpError(400, 'Upload destination does not exist.'));
+    page.calls.initiate[0].reject(httpError(400, 'Upload destination does not exist.'));
     await settleAll();
     const [a, b, c] = page.state().queue;
     assert.equal(a.status, 'failed');
     assert.equal(a.errorKind, 'destination');
     assert.match(a.error, /does not exist/);
     assert.deepEqual([b.status, c.status], ['held', 'held']);
-    assert.equal(page.calls.upload.length, 1, 'the rest were not retried blindly');
+    assert.equal(page.calls.initiate.length, 1, 'the rest were not retried blindly');
   });
 
   test('queued items keep the destination they were queued against', async () => {
@@ -1055,25 +1225,22 @@ describe('destination selection', () => {
     page.c.applyPreset('sequential');
     page.c.addFiles([fakeFile('a', 1), fakeFile('b', 1)]);
     await page.c.applyDestination('/media');
-    page.calls.upload[0].resolve({ data: { path: '/a', size: 1 } });
-    await settleAll();
-    assert.equal(page.calls.upload[1].form.get('destination'), '/');
+    await page.finish(1, () => '/a');
+    assert.equal(page.calls.initiate[1].body.destination, '/');
     assert.match(page.pure.renderItemHTML(page.state().queue[1]), /to <span class="qi-dest">\/<\/span>/);
   });
 
   test('lowering concurrency aborts nothing and starts nothing until within the limit', async () => {
     const page = await booted();
     page.c.addFiles([fakeFile('a', 1), fakeFile('b', 1), fakeFile('c', 1), fakeFile('d', 1)]);
-    assert.equal(page.calls.upload.length, 3);
+    await settleAll();
+    assert.equal(page.calls.initiate.length, 3);
     page.c.applyPreset('sequential');
-    assert.ok(page.calls.upload.every(u => !u.aborted));
-    page.calls.upload[0].resolve({ data: { path: '/a', size: 1 } });
-    await settleAll();
-    assert.equal(page.calls.upload.length, 3, 'two still in flight: no new start');
-    page.calls.upload[1].resolve({ data: { path: '/b', size: 1 } });
-    page.calls.upload[2].resolve({ data: { path: '/c', size: 1 } });
-    await settleAll();
-    assert.equal(page.calls.upload.length, 4);
+    assert.deepEqual(plain(page.calls.abort), [], 'lowering the limit cancels no session');
+    await page.finish(1, () => '/a');
+    assert.equal(page.calls.initiate.length, 3, 'two still in flight: no new start');
+    await page.finish(3, i => `/${'abc'[i]}`);
+    assert.equal(page.calls.initiate.length, 4);
   });
 
   test('with auto-start off, files wait until Start queued', async () => {
@@ -1082,9 +1249,9 @@ describe('destination selection', () => {
     page.state().running = false;
     page.c.addFiles([fakeFile('a', 1)]);
     await settleAll();
-    assert.equal(page.calls.upload.length, 0);
+    assert.equal(page.calls.initiate.length, 0);
     page.c.startQueued();
-    assert.equal(page.calls.upload.length, 1);
+    assert.equal(page.calls.initiate.length, 1);
   });
 });
 
@@ -1126,8 +1293,7 @@ describe('accessibility', () => {
     page.c.addFiles([fakeFile('a', 1000)]);
     assert.equal(page.els['#queueList'].getAttribute('aria-busy'), 'true');
     assert.match(page.els['#queueAnnounce'].textContent, /1 uploading/);
-    page.calls.upload[0].resolve({ data: { path: '/a', size: 1000 } });
-    await settleAll();
+    await page.finish(1, () => '/a');
     assert.equal(page.els['#queueList'].getAttribute('aria-busy'), 'false');
     const { pure } = page;
     const counts = { uploading: 1, queued: 0, paused: 0, held: 0, done: 0, failed: 0, total: 1 };
@@ -1178,14 +1344,17 @@ describe('upload progress cadence (frontend-interaction-quality 3.8)', () => {
   test('progress events share one cadence: no timer per queue item, nothing painted until the beat', async () => {
     const page = await booted();
     page.c.addFiles([fakeFile('a.bin', 1000), fakeFile('b.bin', 1000), fakeFile('c.bin', 1000)]);
+    await settleAll();
     const rows = page.state().queue.map(item => page.mountRow(item.id));
+    page.calls.initiate.forEach((c, i) => c.resolve({ success: true, sessionId: `s${i}`, receivedBytes: 0 }));
+    await settleAll();
     const before = page.intervals.filter(t => t.ms === page.c.PROGRESS_CADENCE_MS).length;
-    for (const call of page.calls.upload) { call.onProgress(300, 1000); call.onProgress(600, 1000); }
+    for (const call of page.calls.append) { call.onProgress(300, 1000); call.onProgress(600, 1000); }
     const cadence = page.intervals.filter(t => t.ms === page.c.PROGRESS_CADENCE_MS);
     assert.equal(cadence.length - before, before === 0 ? 1 : 0, 'exactly one shared interval');
     assert.ok(page.c.PROGRESS_CADENCE_MS < 1000, 'sub-second');
     cadence[cadence.length - 1].fn();
-    for (const row of rows.slice(0, page.calls.upload.length)) {
+    for (const row of rows.slice(0, page.calls.append.length)) {
       assert.match(row.children['.qi-fill'].style.transform, /^scaleX\(0\.\d+\)$/);
       assert.equal(row.children['.qi-fill'].style.width, undefined, 'never a layout property');
     }
@@ -1194,7 +1363,10 @@ describe('upload progress cadence (frontend-interaction-quality 3.8)', () => {
   test('the cadence stops itself once nothing is dirty', async () => {
     const page = await booted();
     page.c.addFiles([fakeFile('a.bin', 1000)]);
-    page.calls.upload[0].onProgress(500, 1000);
+    await settleAll();
+    page.calls.initiate[0].resolve({ success: true, sessionId: 's0', receivedBytes: 0 });
+    await settleAll();
+    page.calls.append[0].onProgress(500, 1000);
     const timer = page.intervals.find(t => t.ms === page.c.PROGRESS_CADENCE_MS);
     timer.fn(); // paints
     timer.fn(); // idle beat

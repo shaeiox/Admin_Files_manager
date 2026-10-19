@@ -7,6 +7,8 @@
    the server implements. The derivations behind the numbers are pure functions
    exposed on `Uploads.pure` so the suite can assert them without a DOM
    (test/frontend/uploads.test.js); see openspec/changes/upload-pipeline-correctness.
+   Transfers run as resumable chunked sessions (ADR-011): pausing, retrying or
+   re-adding a file continues from the byte the server acknowledged.
    ============================================ */
 
 'use strict';
@@ -17,6 +19,13 @@ const Uploads = (() => {
 
   /** The application-wide marker for a value that could not be measured. */
   const UNAVAILABLE = Format.duration(null);
+
+  /**
+   * Client slice size for a resumable transfer (ADR-011). A protocol constant,
+   * not a setting: the server caps one append at 32 MiB and this stays well
+   * below it. Exposed for the suite.
+   */
+  const CHUNK_BYTES = 8 * 1024 * 1024;
 
   /* ══════════════════════════════════════════
      PRESETS
@@ -49,7 +58,8 @@ const Uploads = (() => {
 
   const state = {
     // { id, name, size, uploaded, speed, status, type, icon, destination, error,
-    //   errorKind, errorDetail, savedPath, startTime, endTime, file, abort, attempt }
+    //   errorKind, errorDetail, savedPath, startTime, endTime, file, lastModified,
+    //   sessionId, abort, attempt }
     // status: queued | uploading | paused | held | done | failed
     queue: [],
     concurrency: presets.find(p => p.key === DEFAULT_PRESET).concurrency,
@@ -106,9 +116,10 @@ const Uploads = (() => {
   }
 
   /**
-   * XHR progress counts the whole multipart body (boundaries, headers, other
-   * fields), which is larger than the file. Scale it onto the file's size so the
-   * transferred count never exceeds the declared size.
+   * XHR progress counts the request body: the whole multipart body on a legacy
+   * upload (boundaries and fields included, so larger than the file), the chunk
+   * itself on a session append. Scale the fraction onto the span actually being
+   * sent so a transferred count never exceeds it.
    */
   function scaleTransferred(loaded, total, size) {
     if (!(size > 0) || !(total > 0) || !Number.isFinite(loaded)) return 0;
@@ -199,9 +210,21 @@ const Uploads = (() => {
   const FAILURE_SHOWS_DETAIL = new Set(['too-large', 'server']);
   const STATUS_KINDS = { 403: 'forbidden', 409: 'conflict', 413: 'too-large' };
 
+  /**
+   * Server kinds the operator sees exactly as the equivalent display kind. The
+   * session protocol reports a destination collision under its own token, but
+   * the operator's fix is the same one (replace the existing file), so it keeps
+   * that label.
+   */
+  const SERVER_KIND_ALIASES = { destination_conflict: 'conflict' };
+
   function failureKind(err) {
     if (!err) return null;
-    if (typeof err.kind === 'string' && err.kind) return err.kind;
+    if (typeof err.kind === 'string' && err.kind) {
+      return Object.prototype.hasOwnProperty.call(SERVER_KIND_ALIASES, err.kind)
+        ? SERVER_KIND_ALIASES[err.kind]
+        : err.kind;
+    }
     if (typeof err.status === 'number') {
       if (Object.prototype.hasOwnProperty.call(STATUS_KINDS, err.status)) return STATUS_KINDS[err.status];
       if (err.status >= 500) return 'server';
@@ -358,7 +381,7 @@ const Uploads = (() => {
         break;
       case 'paused':
         statusEl = '<span class="qi-status paused">Paused</span>';
-        meta = `${Format.bytes(item.size)} <span class="sep"></span> Restarts from the beginning when resumed ${to}`;
+        meta = `${Format.bytes(item.uploaded)} of ${Format.bytes(item.size)} <span class="sep"></span> Resumes from where it stopped ${to}`;
         actions = actionButton('resume', 'play', 'Resume', name, id) + actionButton('cancel', 'x', 'Remove', name, id);
         break;
       case 'held':
@@ -567,6 +590,8 @@ const Uploads = (() => {
         startTime: null,
         endTime: null,
         file: f,
+        lastModified: Number.isFinite(f.lastModified) ? f.lastModified : 0,
+        sessionId: null,
         attempt: 0,
       });
     });
@@ -683,45 +708,25 @@ const Uploads = (() => {
     item.attempt = (item.attempt || 0) + 1;
     const attempt = item.attempt;
     Object.assign(item, {
-      status: 'uploading', startTime: Date.now(), endTime: null, lastBytes: 0, lastTime: Date.now(),
-      speed: 0, uploaded: 0, error: null, errorKind: null, errorDetail: null, savedPath: null,
+      status: 'uploading', startTime: Date.now(), endTime: null,
+      lastBytes: Number(item.uploaded) || 0, lastTime: Date.now(),
+      speed: 0, error: null, errorKind: null, errorDetail: null, savedPath: null,
     });
     renderQueueItem(item.id);
     ensureTicker();
 
-    // Fields BEFORE the file part: the server then validates the destination
-    // before writing a single byte (see docs/CONTRACTS.md, POST /api/fs/upload).
-    const form = new FormData();
-    form.append('destination', item.destination);
-    form.append('overwrite', String(!!state.options.overwrite));
-    form.append('file', item.file);
-
-    const { promise, abort } = window.API.upload('/fs/upload', form, (loaded, total) => {
-      if (item.attempt !== attempt || item.status !== 'uploading') return;
-      const sent = scaleTransferred(loaded, total, item.size);
-      const now = Date.now();
-      const elapsed = (now - item.lastTime) / 1000;
-      if (elapsed > 0.5) { // sample speed at most twice a second to avoid jitter
-        item.speed = Math.max(0, (sent - item.lastBytes) / elapsed);
-        item.lastBytes = sent;
-        item.lastTime = now;
-      }
-      item.uploaded = sent;
-      updateItemProgress(item);
-    });
-    item.abort = abort;
-
     try {
-      const response = await promise;
-      if (item.attempt === attempt && item.status === 'uploading') {
-        const data = response && response.data;
+      const placed = await runSessionTransfer(item, attempt);
+      // A completion that resolved while the operator was mid-pause still
+      // placed the file, so it reports done; only a cancelled item is left alone.
+      if (placed && item.attempt === attempt && item.status !== 'cancelled') {
         item.status = 'done';
         item.uploaded = item.size;
         item.endTime = Date.now();
         item.speed = 0;
-        item.savedPath = data && typeof data.path === 'string' ? data.path : null;
+        item.savedPath = placed && typeof placed.path === 'string' ? placed.path : null;
         state.session.completed++;
-        state.session.bytes += data && Number.isFinite(data.size) ? data.size : item.size;
+        state.session.bytes += item.size;
         noteOutcome('done', item);
       }
     } catch (err) {
@@ -737,10 +742,109 @@ const Uploads = (() => {
         if (mayBeDestinationFailure(err, failure.kind)) recheckAfterFailure(item);
       }
     } finally {
-      if (item.abort === abort) item.abort = null;
       state.activeCount--;
       if (state.queue.includes(item)) renderQueueItem(item.id);
       afterSettled();
+    }
+  }
+
+  /**
+   * One transfer attempt, as a resumable session (ADR-011): initiate - the
+   * server opens a new session or ADOPTS the one matching this fingerprint -
+   * then append the remaining slices from the server's acknowledged offset,
+   * then complete. Bytes the server has not acknowledged are never shown as
+   * progress. Returns the placement once the file is placed, or null when the
+   * attempt was interrupted (pause/cancel) before completion.
+   */
+  async function runSessionTransfer(item, attempt) {
+    const interactive = () => item.attempt === attempt && item.status === 'uploading';
+
+    // After a pause, a retry or a reload the server answers with its own
+    // offset for this fingerprint, so the transfer continues from there.
+    const opened = await window.API.uploadSession.initiate({
+      destination: item.destination,
+      name: item.name,
+      size: item.size,
+      lastModified: item.lastModified,
+      overwrite: !!state.options.overwrite,
+    });
+
+    // A cancel that raced the initiate does not want this session; discard it
+    // rather than leave staged bytes behind until the TTL sweep.
+    if (item.status === 'cancelled') {
+      window.API.uploadSession.abort(opened.sessionId).catch(() => { });
+      return null;
+    }
+    item.sessionId = opened.sessionId;
+    item.uploaded = clamp(Number(opened.receivedBytes) || 0, 0, item.size);
+    if (!interactive()) return null;
+
+    let offset = item.uploaded;
+    while (offset < item.size) {
+      const chunkStart = offset;
+      const end = Math.min(offset + CHUNK_BYTES, item.size);
+      const { promise, abort } = window.API.uploadSession.append(
+        item.sessionId,
+        offset,
+        item.file.slice(offset, end),
+        (loaded, total) => {
+          if (!interactive()) return;
+          // In-chunk progress is shown capped at this chunk's end; the
+          // unacknowledged remainder rolls back if the append fails.
+          const sent = chunkStart + scaleTransferred(loaded, total, end - chunkStart);
+          sampleSpeed(item, sent);
+          item.uploaded = sent;
+          updateItemProgress(item);
+        });
+      item.abort = abort;
+
+      let response;
+      try {
+        response = await promise;
+      } catch (err) {
+        item.uploaded = chunkStart; // unacknowledged bytes are not progress
+        if (!interactive()) return null;
+        // The server is the source of truth: adopt its offset and continue.
+        if (err && err.kind === 'offset_mismatch' && Number.isFinite(err.receivedBytes)) {
+          offset = clamp(err.receivedBytes, 0, item.size);
+          item.uploaded = offset;
+          continue;
+        }
+        throw err;
+      } finally {
+        if (item.abort === abort) item.abort = null;
+      }
+
+      const reported = Number(response && response.receivedBytes);
+      if (!Number.isFinite(reported)) {
+        throw new Error('The server did not report how many bytes it stored.');
+      }
+      offset = clamp(reported, chunkStart, item.size);
+      if (offset <= chunkStart) {
+        throw new Error('The server did not store the chunk it accepted.');
+      }
+      item.uploaded = offset;
+      updateItemProgress(item);
+    }
+
+    if (!interactive()) return null;
+
+    // Placement re-asserts the overwrite policy as late as possible.
+    const placed = await window.API.uploadSession.complete(item.sessionId, {
+      overwrite: !!state.options.overwrite,
+    });
+    item.sessionId = null;
+    return placed;
+  }
+
+  /** Speed is sampled at most twice a second, from already-computed progress. */
+  function sampleSpeed(item, sent) {
+    const now = Date.now();
+    const elapsed = (now - item.lastTime) / 1000;
+    if (elapsed > 0.5) {
+      item.speed = Math.max(0, (sent - item.lastBytes) / elapsed);
+      item.lastBytes = sent;
+      item.lastTime = now;
     }
   }
 
@@ -818,13 +922,25 @@ const Uploads = (() => {
 
   const findItem = id => state.queue.find(q => q.id === id);
 
-  /** Pausing aborts the request: transfer is not chunked, so resuming restarts at 0. */
+  /**
+   * Abandon an item's session: its staged bytes are discarded server-side. A
+   * 404 means the session is already gone, which is the same outcome.
+   */
+  function discardSession(item) {
+    const id = item.sessionId;
+    item.sessionId = null;
+    if (id) window.API.uploadSession.abort(id).catch(() => { });
+  }
+
+  /**
+   * Pausing aborts only the in-flight chunk - the server keeps the session and
+   * every byte it acknowledged, and resuming continues from there.
+   */
   function pauseItem(id) {
     const item = findItem(id);
     if (!item || item.status !== 'uploading') return;
     item.status = 'paused';
     item.speed = 0;
-    item.uploaded = 0;
     if (typeof item.abort === 'function') item.abort();
     renderQueueItem(id);
     renderSummaries();
@@ -834,7 +950,6 @@ const Uploads = (() => {
     const item = findItem(id);
     if (!item || item.status !== 'paused') return;
     item.status = 'queued';
-    item.uploaded = 0;
     renderQueueItem(id);
     startUploads();
   }
@@ -846,7 +961,6 @@ const Uploads = (() => {
     item.error = null;
     item.errorKind = null;
     item.errorDetail = null;
-    item.uploaded = 0;
     renderQueueItem(id);
     startUploads();
   }
@@ -857,6 +971,7 @@ const Uploads = (() => {
     const wasUploading = item.status === 'uploading';
     item.status = 'cancelled';
     if (wasUploading && typeof item.abort === 'function') item.abort();
+    discardSession(item);
     state.queue = state.queue.filter(q => q !== item);
 
     const node = document.querySelector(`[data-item-id="${item.id}"]`);
@@ -881,7 +996,6 @@ const Uploads = (() => {
       item.error = null;
       item.errorKind = null;
       item.errorDetail = null;
-      item.uploaded = 0;
       n++;
     });
     if (!n) return;
@@ -896,7 +1010,6 @@ const Uploads = (() => {
       if (item.status !== 'uploading') return;
       item.status = 'paused';
       item.speed = 0;
-      item.uploaded = 0;
       if (typeof item.abort === 'function') item.abort();
       n++;
     });
@@ -910,7 +1023,6 @@ const Uploads = (() => {
     state.queue.forEach(item => {
       if (item.status !== 'paused') return;
       item.status = 'queued';
-      item.uploaded = 0;
       n++;
     });
     if (!n) return;
@@ -951,6 +1063,7 @@ const Uploads = (() => {
       const wasUploading = item.status === 'uploading';
       item.status = 'cancelled';
       if (wasUploading && typeof item.abort === 'function') item.abort();
+      discardSession(item);
     });
     state.queue = state.queue.filter(q => q.status === 'done');
     if (!state.options.autoStart) state.running = false;
@@ -1546,6 +1659,7 @@ const Uploads = (() => {
     DEFAULT_PRESET,
     DEFAULT_OPTIONS,
     FAILURE_LABELS,
+    CHUNK_BYTES,
     pure: {
       computeProgressPct, computeRemainingSeconds, formatRemaining, scaleTransferred,
       computeQueueCounts, computeQueueTiles, computeGlobalProgress,

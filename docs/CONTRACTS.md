@@ -22,6 +22,11 @@
   | `GET /api/dashboard/health` | read | bare array |
   | `POST /api/fs/folder` | write | `{ success, data }` |
   | `POST /api/fs/upload` | write | `{ success, data }` |
+  | `POST /api/fs/uploads` | write | `{ success, sessionId, receivedBytes, expiresAt }` (ADR-011) |
+  | `PUT /api/fs/uploads/:id/chunk` | write | `{ success, receivedBytes }` |
+  | `GET /api/fs/uploads/:id` | read | bare session object |
+  | `POST /api/fs/uploads/:id/complete` | write | `{ success, path }` |
+  | `DELETE /api/fs/uploads/:id` | write | `{ success }` |
   | `PUT /api/fs/rename` | write | `{ success, data }` |
   | `PUT /api/fs/move` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
   | `POST /api/fs/copy` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
@@ -146,9 +151,11 @@ column: *public* = no session; *session* = access token as the `afm_access` cook
 `X-CSRF-Token` on every non-GET; *admin* = session whose user has `role = "admin"`.
 
 **Middleware order for every `/api` request** (`server.js`, then `src/routes/api.js`):
-general rate limiter (`/api` only) → `express.json` / `urlencoded` → `morgan` → version-segment
-guard → `GET /health` → `/auth` router (self-gated) → `authenticate` → `csrf` → resource routers
-(`/fs`, `/dashboard`, `/settings`, `/admin` + `requireAdmin`) → `/api` 404 catch-all →
+general rate limiter (`/api` only, passing the resumable chunk route through) → `express.json` /
+`urlencoded` → `morgan` → version-segment
+guard → `GET /health` → `/auth` router (self-gated) → `authenticate` → chunk allowance
+(`/fs/uploads/:id/chunk` only, `AFM_RATE_LIMIT_CHUNK_PER_MINUTE`; ADR-011) → `csrf` → resource
+routers (`/fs`, `/dashboard`, `/settings`, `/admin` + `requireAdmin`) → `/api` 404 catch-all →
 `errorHandler`.
 
 | Method | Path | Access | Status | Notes |
@@ -168,6 +175,11 @@ guard → `GET /health` → `/auth` router (self-gated) → `authenticate` → `
 | GET | `/api/fs/thumbnail` | session | ✅ live | Bounded image preview, or an explicit unavailable marker |
 | POST | `/api/fs/folder` | session | ✅ live | Create directory |
 | POST | `/api/fs/upload` | session | ✅ live | Multipart upload — **field order matters**, see below |
+| POST | `/api/fs/uploads` | session | ✅ live | Open or adopt a resumable upload session (ADR-011) |
+| PUT | `/api/fs/uploads/:id/chunk?offset=N` | session | ✅ live | One raw `application/octet-stream` chunk; offset must equal the stored size |
+| GET | `/api/fs/uploads/:id` | session | ✅ live | Read-only aggregate; **bare** session record with the server's `receivedBytes` |
+| POST | `/api/fs/uploads/:id/complete` | session | ✅ live | Place the staged bytes; idempotent within the tombstone |
+| DELETE | `/api/fs/uploads/:id` | session | ✅ live | Abort: staged bytes first, then the record |
 | POST | `/api/fs/star` | session | ✅ live | Toggle or set the starred flag |
 | POST | `/api/fs/download-zip` | session | ✅ live | Streams a ZIP of up to 500 paths; CSRF token may be a form field |
 | PUT | `/api/fs/rename` | session | ✅ live | Same-directory rename |
@@ -721,11 +733,12 @@ Placement semantics are owned by the shared `upload-destination-integrity` capab
 | Aborted by the operator (pause / cancel) | — | `aborted` | transport (`api.js`); never shown as a failure |
 | Rejected name · missing destination · destination not a folder | `400` | *none* | — |
 
-- **The server sends no `kind` field today.** The three `400` classes therefore share one status and
-  are not distinguishable by a machine-readable signal; the page shows the server's own authored
-  message for them rather than guessing. If the error body later carries a string `kind`, `api.js`
-  attaches it to the rejected `Error` (`err.kind`) and it takes precedence over the status. The page
-  never derives a kind from the human-readable message.
+- **The legacy upload path sends no `kind`** (the resumable-session family does — see below). The
+  three `400` classes therefore share one status and are not distinguishable by a machine-readable
+  signal; the page shows the server's own authored message for them rather than guessing. When the
+  error body carries a string `kind`, `api.js` attaches it to the rejected `Error` (`err.kind`) and
+  it takes precedence over the status. The page never derives a kind from the human-readable
+  message.
 - `api.js` attaches `err.status` (HTTP status; `0` when no response arrived) to every rejected
   request, and `err.kind` when one is known. Additive: no signature or return shape changed.
 - Kinds are short stable tokens (`^[a-z][a-z-]*$`), never reworded with the message.
@@ -741,6 +754,88 @@ operator's request with the existing `POST /api/fs/folder` (non-recursive: a mis
 `400`/`403`/`404`, the page re-checks its destination once; if it has become unusable the item carries
 the destination reason and the remaining items for it are held rather than retried blindly. Write
 permission cannot be probed without an upload, so "cannot be written to" is reported from a `403`.
+
+### Resumable upload sessions (ADR-011)
+
+Five endpoints let a failed or interrupted transfer resume. The legacy multipart
+`POST /api/fs/upload` above is untouched, and nothing partial is ever visible as a file. Full
+design: `openspec/changes/resumable-uploads/design.md`; store mechanics: `docs/DATABASE.md`.
+
+#### `POST /api/fs/uploads` → `200`
+
+Body `{ destination?, name, size, lastModified?, overwrite? }` →
+`{ success, sessionId, receivedBytes, expiresAt }`
+
+- **Idempotent per fingerprint** `(destination, name, size, lastModified)` (an absent
+  `lastModified` reads as `0`). A matching open session is adopted and answers the server's
+  `receivedBytes` (the staged file's size, never an echoed client claim); a matching completed
+  session answers its full size. Re-initiating refreshes `overwrite`. An open session for the same
+  destination+name with a different fingerprint is superseded — its bytes are a different file, so
+  its staged file is removed.
+- `400` bad destination/name/size · `403` destination outside the root (or reached by a link) ·
+  `409 destination_conflict` target exists without `overwrite: true` (parity with the multipart
+  early refusal) · `413 size_exceeded` over `UPLOAD_MAX_BYTES` (the legacy message names the
+  ceiling) · `507` free space below `AFM_UPLOAD_FREE_SPACE_BYTES` (pre-flight, before any byte).
+
+#### `PUT /api/fs/uploads/:id/chunk?offset=N` → `200`
+
+Body: the raw chunk (`application/octet-stream` — no body parser consumes it) →
+`{ success, receivedBytes }`
+
+- The offset must equal the staged file's current size; the server never trusts a claim, and a
+  mismatch writes nothing. Client chunks are 8 MiB; the server accepts ≤ 32 MiB per append
+  (`413 chunk_too_large`) and refuses any append that would push the staged total past the declared
+  size (`413 size_exceeded`). Any write failure rolls the staged file back to the acknowledged
+  offset, so the session stays resumable.
+- `404 session_expired` unknown/expired · `409 offset_mismatch` (carries `receivedBytes`) ·
+  `413 chunk_too_large` / `413 size_exceeded` · `507` disk full (session intact, offset unchanged).
+
+#### `GET /api/fs/uploads/:id` → `200`
+
+Bare `{ id, destination, name, size, receivedBytes, state, expiresAt }` (no `success` field).
+Never renews the TTL. `404 session_expired` unknown/expired.
+
+#### `POST /api/fs/uploads/:id/complete` → `200`
+
+Body `{ overwrite? }` (optional re-assert) → `{ success, path }` — the path actually written.
+Placement goes through `UploadService.commit()` (atomic, same-volume). A repeated completion within
+the 15-minute tombstone answers the same success without touching the file.
+
+- `409 session_incomplete` (carries `receivedBytes`; bytes kept) · `409 destination_conflict`
+  (session kept and still resumable; retry with `{ overwrite: true }` or a freed name).
+
+#### `DELETE /api/fs/uploads/:id` → `200`
+
+`{ success: true }`. Removes the staged file first, then the record. `404 session_expired` for an
+unknown or expired id — the client treats it as already aborted.
+
+#### `kind` values (this family only)
+
+| Status | `kind` | Meaning |
+|---|---|---|
+| `404` | `session_expired` | Unknown or expired session id |
+| `409` | `offset_mismatch` | Append offset ≠ stored size (`receivedBytes` included) |
+| `409` | `session_incomplete` | Complete before the declared size (`receivedBytes` included) |
+| `409` | `destination_conflict` | Target name/folder taken, at initiate or complete |
+| `409` | `session_completed` | Append to an already-completed session |
+| `413` | `chunk_too_large` | Declared chunk over 32 MiB |
+| `413` | `size_exceeded` | Declared or observed total past the ceiling / declared size |
+
+These are additive envelope fields; the closed vocabulary is pinned by
+`test/api/versioning.contract.test.js` and covered per outcome by
+`test/api/upload-sessions.contract.test.js`. No other endpoint emits `kind`.
+
+#### Lifecycle and recovery
+
+- Open sessions expire after **7 days** without an append (`updatedAt`; reads never renew). A
+  completed session keeps a **15-minute tombstone**, then both are swept — at boot (non-creating)
+  and on every initiate. Staged bytes live at `<destination>/.upload-<32-hex>.part`, invisible to
+  `list`/`tree`, and are removed by abort, completion, or sweep.
+- Recovery: after a reload or restart, re-selecting the same file re-initiates with the same
+  fingerprint and resumes from the server's `receivedBytes`. Pause aborts only the in-flight chunk;
+  cancel issues the `DELETE`.
+- **Identity is the browser's fingerprint, not content.** A different file with all four fields
+  identical inside the TTL window would be appended to — accepted and recorded (ADR-011).
 
 ### POST /api/fs/star
 
@@ -1131,7 +1226,7 @@ entries they are never listed or counted. A rename or move of the portal folder 
 | `413` | Too large | Upload over `UPLOAD_MAX_BYTES`; preview source over 50 MiB |
 | `415` | Unsupported | Preview requested for a non-image or a folder |
 | `422` | Unprocessable | Preview could not be decoded |
-| `429` | Too many requests | General `/api` limiter (60 writes / 600 reads per minute per IP, `AFM_RATE_LIMIT_*_PER_MINUTE`), login throttle, or too many concurrent uploads (`AFM_UPLOAD_MAX_CONCURRENT`). Rate-limit refusals carry `Retry-After` (seconds) |
+| `429` | Too many requests | General `/api` limiter (60 writes / 600 reads per minute per IP, `AFM_RATE_LIMIT_*_PER_MINUTE`; chunk appends are exempt and carry `AFM_RATE_LIMIT_CHUNK_PER_MINUTE` instead — ADR-011), login throttle, or too many concurrent uploads (`AFM_UPLOAD_MAX_CONCURRENT`). Rate-limit refusals carry `Retry-After` (seconds) |
 | `507` | Insufficient storage | Upload refused because free space is below `AFM_UPLOAD_FREE_SPACE_BYTES`, before any byte is staged |
 | `500` | Server error | Unmapped fs error. Message masked to a generic string. Also raised explicitly by a **corrupt or uninitializable `data/settings.json`** (`SettingsService` → static authored message) |
 
@@ -1155,13 +1250,17 @@ any environment.
   It does not change within v1; `/api/v1` and `/api` fail identically under identical conditions.
 - **Status meanings** are the table above, chosen by the failing condition. An unknown endpoint is
   `404` in the envelope, never an HTML page.
-- **`kind` — reserved, not emitted.** The envelope reserves an optional string `kind`, a stable
-  machine-readable token matching `^[a-z][a-z-]*$` (not a rewording of `error`). **No endpoint sends
-  it today** (`src/` contains no producer; pinned). Its absence is valid: classify by status alone,
-  and never infer a kind from the message. When present it takes precedence over the status. Adding
-  it to an endpoint later is additive. `api.js` attaches `err.status` (`0` on transport failure) to
-  every rejection and copies `err.kind` only when the body carries a string `kind`; the transport
-  itself tags `network` / `aborted` on uploads.
+- **`kind` — emitted only by the upload-session refusals (ADR-011).** The envelope reserves an
+  optional string `kind`, a stable machine-readable token (not a rewording of `error`); session
+  kinds use underscores (`offset_mismatch`, …) while `api.js`'s transport kinds use hyphens
+  (`network`, `aborted`) — both are opaque tokens. The closed vocabulary is listed under *Resumable
+  upload sessions*; `src/services/UploadSessionService.js` is the only producer in `src/`, pinned by
+  `test/api/versioning.contract.test.js`. Everywhere else its absence is valid: classify by status
+  alone, and never infer a kind from the message. When present it takes precedence over the status.
+  `receivedBytes` is likewise an additive field on refusals that carry a server reading
+  (`offset_mismatch`, `session_incomplete`). `api.js` attaches `err.status` (`0` on transport
+  failure) to every rejection and copies `err.kind` only when the body carries a string `kind`; the
+  transport itself tags `network` / `aborted` on uploads.
 - **No disclosure, every endpoint:** no stack, absolute path, drive letter, UNC/backslash path or raw
   errno text in any error body, in any environment (the Dashboard-scoped rule in
   `filesystem-security` is the narrower original). Pinned for the versioned prefix by
@@ -1175,8 +1274,9 @@ per-capability degradation, so a partial failure is expressed in the payload
 ## Data Schemas
 
 The JSON document shapes below are API-adjacent contracts. The SQLite admin database
-(`admin.sqlite`: users, sessions, audit log, file-access policies), the store mechanics and
-operational notes for all three stores are in **`docs/DATABASE.md`**.
+(`admin.sqlite`: users, sessions, audit log, file-access policies) and the three JSON stores
+(`metadata.json`, `settings.json`, `upload-sessions.json`) are all described — mechanics and
+operational notes — in **`docs/DATABASE.md`**.
 
 ### `data/metadata.json` (MetadataService)
 
@@ -1308,8 +1408,8 @@ left standing. If a capability is built later, its claim can return with it.
 | Checksum verification; CDN distribution across "42 edge points-of-presence" | dropzone description | No checksum, no CDN |
 | "Auto-encrypted in transit" | dropzone pill | Transport is whatever the deployment provides; nothing here encrypts |
 | "Auto-retry on failure" / "automatic retries" | dropzone pill + description | Retry is manual (row or bulk action) |
-| "Uploads resume automatically after network interruptions" | queue footer | Transfer is not chunked; an interrupted file restarts from 0 |
-| "Uploads resume from the last checkpoint" | tips | Same |
+| "Uploads resume automatically after network interruptions" | queue footer | Resumption now exists (ADR-011) but is operator-initiated: an interrupted transfer keeps the server's bytes, and Retry/Resume — or re-selecting the file after a reload — continues from there. Nothing resumes without an action, so the automatic wording stays out |
+| "Uploads resume from the last checkpoint" | tips | Resumption exists (ADR-011); the replacement copy names the server's stored bytes rather than a checkpoint — no checkpoint is stored, the staged file's size is the offset |
 | "save up to 40% space"; "Compress & deduplicate before upload"; `compress`/`dedupe` tags | tips, Optimize Storage preset | Nothing compresses or deduplicates; the `compress` flag was never transmitted |
 | "Client-side encryption enabled"; `encrypted`/`verified` tags | Secure Upload preset | Nothing encrypts or verifies |
 | "Preserve folder structure" toggle; "the structure is preserved automatically" | options, tips | The server ignores `preservePath`; a folder's files land flat in the destination |

@@ -1,12 +1,12 @@
 # DATABASE.md — Persistence Reference
 
-> Every byte the server persists outside `STORAGE_ROOT`. Three stores, one directory, no ORM.
+> Every byte the server persists outside `STORAGE_ROOT`. Four stores, one directory, no ORM.
 > The SQLite schema is defined in `src/db/schema.js`; the JSON document shapes are API contracts and
 > live in `docs/CONTRACTS.md` → *Data Schemas*. Change this file in the same commit as the code.
 
 ## Overview
 
-All three stores sit side by side under `AFM_DATA_DIR` (default `<cwd>/data`, **required** when
+All four stores sit side by side under `AFM_DATA_DIR` (default `<cwd>/data`, **required** when
 `NODE_ENV=production`; resolved by `src/config/dataDir.js`). None of them lives inside a release
 directory (ADR-008), and `data/*` is git-ignored.
 
@@ -15,6 +15,7 @@ directory (ADR-008), and `data/*` is git-ignored.
 | Admin database | `admin.sqlite` | `src/db/connection.js` (`AdminDatabase`) + `src/db/repositories/*` | users, sessions, audit log, file-access policies | `node:sqlite` (`DatabaseSync`), synchronous |
 | Metadata store | `metadata.json` | `MetadataService` | download counts, stars, activity feed | JSON document, async atomic writes |
 | Settings store | `settings.json` | `SettingsService` | operator settings (3 keys) | JSON document, async atomic writes |
+| Upload session store | `upload-sessions.json` | `UploadSessionService` | resumable-upload sessions and their staging state | JSON document, async atomic writes |
 
 The filesystem itself is the database for **files**: there is no table mirroring the tree. The
 `files` table below is deliberately **sparse** — a row exists only for a path an administrator has
@@ -384,6 +385,30 @@ decision record: ADR-006.
 
 ---
 
+## Upload session store — `upload-sessions.json`
+
+Shape: `docs/CONTRACTS.md` → the `POST /api/fs/uploads` family; decision record: ADR-011.
+
+- **Owner:** `UploadSessionService` (instance singleton, cached), same read/atomic-write mechanics
+  as the settings store, with one difference: writes serialize through an internal promise chain,
+  so overlapping writers never share the `upload-sessions.json.tmp` temp path.
+- **Document shape:** `{ sessions: { <id>: record } }` — one record per resumable upload:
+  `{ id, destination, name, size, lastModified, overwrite, state: "open" | "completed", createdAt,
+  updatedAt, completedAt? }`. `destination` is a client path; host paths never enter the store.
+- **Progress is not stored.** `receivedBytes` is the size of the staged file
+  (`<destination>/.upload-<id>.part`, removed by abort or sweep) read fresh at every request —
+  never a counter, never a client claim.
+- **Lifecycle:** an `open` session expires after 7 days without an append (`updatedAt`; reads do
+  not renew it); a `completed` session answers idempotent re-completion for 15 minutes (tombstone)
+  and is then swept. Sweeps run on initiate and at boot (fire-and-forget from `server.js`); the boot
+  sweep never creates the store — a host that has never seen a session sweeps nothing. Expiry is
+  enforced on every read regardless, so an expired session can never be resumed. Abort removes the
+  staged file before the record.
+- **Corruption is fatal to the request:** a corrupt file is a `500`, never silently defaulted
+  (same choice as the metadata and settings stores).
+- **Hermetic tests:** `test/services/uploadSessionService.test.js` redirects `dbPath` per case and
+  points `STORAGE_ROOT` at a temp directory before any src module loads.
+
 ## Which store do I use?
 
 | You need to persist… | Use |
@@ -391,4 +416,5 @@ decision record: ADR-006.
 | Anything about identity, sessions, roles, permissions, or an audit trail | `admin.sqlite`, via a new repository method and a migration if the shape changes |
 | A per-file counter or flag that may be lost without harm | `metadata.json` via `MetadataService` |
 | An operator preference with a real consumer | `settings.json` via `SettingsService` (and ADR-006's rule: no key without a consumer) |
+| In-progress upload bytes and the session that owns them | `upload-sessions.json` via `UploadSessionService` (resumable-uploads, ADR-011) |
 | Data about the files themselves | Nothing — read it from the filesystem |

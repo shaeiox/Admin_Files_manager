@@ -197,9 +197,12 @@ describe('every API URL is built inside the boundary', () => {
         // setCsrfToken/clearCsrfToken/redirectToLogin added by ADR-009: session
         // state, not a URL builder - they don't widen this boundary. Neither does
         // devicePublicJwk (access-refresh-session-tokens): login.js sends it.
+        // uploadSession (ADR-011) is a fixed family of named session builders
+        // (initiate/status/append/complete/abort), like thumbnailUrl - not a
+        // general escape hatch.
         assert.deepEqual(Object.keys(API).sort(), [
             'BASE_URL', 'clearCsrfToken', 'del', 'devicePublicJwk', 'downloadFile', 'downloadMultipleFiles', 'downloadZip',
-            'get', 'post', 'put', 'redirectToLogin', 'setCsrfToken', 'thumbnailUrl', 'upload',
+            'get', 'post', 'put', 'redirectToLogin', 'setCsrfToken', 'thumbnailUrl', 'upload', 'uploadSession',
         ]);
     });
 });

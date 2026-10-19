@@ -8,6 +8,7 @@ const MetadataService = require('../services/MetadataService');
 const FileAccessPolicyService = require('../services/FileAccessPolicyService');
 const IntegrationSettingsService = require('../services/IntegrationSettingsService');
 const UploadService = require('../services/UploadService');
+const UploadSessionService = require('../services/UploadSessionService');
 const AppError = require('../utils/AppError');
 const { validateFileName, validateClientPath } = require('../utils/validators');
 const { classifyFile, emptyBreakdown } = require('../utils/fileTypes');
@@ -701,6 +702,126 @@ async function downloadZip(req, res, next) {
     }
 }
 
+/* ─── Resumable upload sessions (resumable-uploads, ADR-011) ──────────────
+ * The legacy single-request `POST /fs/upload` above is untouched; these
+ * endpoints layer a chunked session protocol on top of it. Every progress
+ * number in a response is the SERVER's reading of the staged file - a client
+ * claim is never echoed back as fact.
+ */
+
+/**
+ * POST /api/fs/uploads
+ * Body: { destination?, name, size, lastModified?, overwrite? }
+ *
+ * Opens or adopts the resumable session for one file, idempotent per
+ * fingerprint (destination, name, size, lastModified).
+ */
+async function initiateUploadSession(req, res, next) {
+    try {
+        const body = req.body || {};
+        const destination = await UploadService.resolveDirectory(
+            body.destination === undefined ? '/' : body.destination
+        );
+        const name = validateFileName(body.name);
+        if (!Number.isSafeInteger(body.size) || body.size < 0) {
+            throw new AppError('Declared size must be a non-negative integer.', 400);
+        }
+        if (body.lastModified !== undefined && !Number.isFinite(body.lastModified)) {
+            throw new AppError('Last-modified must be a number when provided.', 400);
+        }
+
+        const { record, receivedBytes, expiresAt } = await UploadSessionService.initiate({
+            destination: destination.clientPath,
+            destinationPath: destination.securePath,
+            name,
+            size: body.size,
+            lastModified: body.lastModified === undefined ? 0 : body.lastModified,
+            overwrite: body.overwrite === true,
+        });
+
+        res.json({ success: true, sessionId: record.id, receivedBytes, expiresAt });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * PUT /api/fs/uploads/:id/chunk?offset=N
+ *
+ * The raw request body is exactly one chunk, streamed straight to the staged
+ * file. Content-Type application/octet-stream is consumed by no body parser,
+ * so `req` itself is the byte stream. The offset must equal what the server
+ * already stored; refusals happen before a byte is written.
+ */
+async function appendUploadChunk(req, res, next) {
+    try {
+        const rawOffset = Array.isArray(req.query.offset) ? req.query.offset[0] : req.query.offset;
+        const offset = Number(rawOffset);
+        if (!Number.isSafeInteger(offset) || offset < 0) {
+            throw new AppError('Append offset must be a non-negative integer.', 400);
+        }
+
+        const declared = req.headers['content-length'];
+        const contentLength = declared === undefined ? undefined : Number(declared);
+
+        const { receivedBytes } = await UploadSessionService.appendChunk(req.params.id, {
+            offset,
+            contentLength: Number.isFinite(contentLength) ? contentLength : undefined,
+            stream: req,
+        });
+
+        res.json({ success: true, receivedBytes });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * GET /api/fs/uploads/:id
+ * Bare status read (read-only aggregate shape): the session plus the server's
+ * progress reading and expiry. Never renews the session.
+ */
+async function getUploadSession(req, res, next) {
+    try {
+        res.json(await UploadSessionService.status(req.params.id));
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * POST /api/fs/uploads/:id/complete
+ * Body: { overwrite? } — an optional re-assert of the placement policy.
+ *
+ * Places the staged bytes and answers the path actually written. A repeated
+ * completion of a completed session answers the same success without
+ * touching the file again.
+ */
+async function completeUploadSession(req, res, next) {
+    try {
+        const body = req.body || {};
+        const overwrite = typeof body.overwrite === 'boolean' ? body.overwrite : undefined;
+        const { clientPath } = await UploadSessionService.complete(req.params.id, { overwrite });
+        res.json({ success: true, path: clientPath });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * DELETE /api/fs/uploads/:id
+ * Abandons the session: staged bytes first, then the record. An unknown or
+ * expired id answers 404, which the client treats as already aborted.
+ */
+async function abortUploadSession(req, res, next) {
+    try {
+        await UploadSessionService.abort(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        next(error);
+    }
+}
+
 // Single explicit export object — prevents module.exports vs exports override issues
 module.exports = {
     getTree,
@@ -714,6 +835,11 @@ module.exports = {
     uploadFile,
     downloadZip,
     setStar,
+    initiateUploadSession,
+    appendUploadChunk,
+    getUploadSession,
+    completeUploadSession,
+    abortUploadSession,
     LIST_ENRICH_CONCURRENCY,
     LIST_MAX_LIMIT,
     LIST_SORT_KEYS,

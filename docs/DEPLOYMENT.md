@@ -103,6 +103,7 @@ one**, so an unset value never widens access.
 | `AFM_UPLOAD_MAX_CONCURRENT` | no | `4` | Uploads accepted at once; the excess gets `429`. `0` disables the limit. |
 | `AFM_RATE_LIMIT_WRITE_PER_MINUTE` | no | `60` | Per-client allowance for mutating routes. `0` disables the limit. |
 | `AFM_RATE_LIMIT_READ_PER_MINUTE` | no | `600` | Per-client allowance for read routes, in a separate bucket. `0` disables the limit. |
+| `AFM_RATE_LIMIT_CHUNK_PER_MINUTE` | no | `600` | Per-client allowance for resumable chunk appends (`PUT /fs/uploads/:id/chunk`), which bypass the write bucket and carry this one. `0` disables the limit. |
 
 > Rate limits are keyed on `req.ip`. `server.js` trusts exactly one proxy hop (nginx) for that
 > address. If you put another proxy in front, change `NGINX_PROXY_HOPS` with it, or every client
@@ -181,6 +182,7 @@ UPLOAD_MAX_BYTES=5368709120       # 5 GiB; keep nginx client_max_body_size (6g) 
 # --- Abuse limits (defaults shown) ---
 # AFM_RATE_LIMIT_WRITE_PER_MINUTE=60
 # AFM_RATE_LIMIT_READ_PER_MINUTE=600
+# AFM_RATE_LIMIT_CHUNK_PER_MINUTE=600
 # AFM_LOGIN_RATE_LIMIT_PER_MINUTE=10
 
 # --- CORS: leave unset (same-origin) ---

@@ -4,7 +4,7 @@
 
    Responsibilities:
    - JSON REST (GET/POST/PUT/DELETE) via fetch
-   - Multipart upload via XHR (progress + abort)
+   - Multipart upload and resumable chunk appends via XHR (progress + abort)
    - Binary downloads via isolated iframes / targeted forms
      (no main-frame navigation, no popup blockers, no RAM bloat)
 
@@ -271,13 +271,17 @@ const API = (() => {
     }
 
     /**
-     * Build a rejected-request Error. `kind` is copied only when the server sent
-     * it as a string, so a missing token stays missing rather than guessed.
+     * Build a rejected-request Error. `kind` (and the session protocol's
+     * `receivedBytes`, where the server sends it) are copied only when present,
+     * so a missing value stays missing rather than guessed.
      */
     function failure(message, status, body) {
         const error = new Error(message);
         error.status = status;
         if (body && typeof body.kind === 'string' && body.kind) error.kind = body.kind;
+        if (body && typeof body.receivedBytes === 'number' && Number.isFinite(body.receivedBytes)) {
+            error.receivedBytes = body.receivedBytes;
+        }
         return error;
     }
 
@@ -318,19 +322,27 @@ const API = (() => {
        ══════════════════════════════════════════ */
 
     /**
-     * Multipart upload with progress callback and abort handle.
+     * XHR request carrying a binary body (a multipart FormData or one raw
+     * resumable chunk), with upload progress and an abort handle. BOTH binary
+     * transports are built here so the CSRF header, the 401 renewal and the
+     * status/kind failure contract live in one place - what `request()` is for
+     * JSON.
      *
+     * @param {'POST'|'PUT'} method
      * @param {string} endpoint
-     * @param {FormData} formData
-     * @param {(loaded: number, total: number) => void} [onProgress]
+     * @param {FormData|Blob} body
+     * @param {{ contentType?: string|null, onProgress?: (loaded: number, total: number) => void }} [options]
      * @returns {{ promise: Promise<any>, abort: () => void }}
      */
-    const upload = (endpoint, formData, onProgress) => {
+    const sendBinary = (method, endpoint, body, { contentType = null, onProgress } = {}) => {
         const xhr = new XMLHttpRequest();
         const url = `${BASE_URL}${endpoint}`;
 
         const promise = new Promise((resolve, reject) => {
-            xhr.open('POST', url);
+            xhr.open(method, url);
+            // FormData must set its own multipart boundary; a raw chunk declares
+            // itself as opaque bytes.
+            if (contentType) xhr.setRequestHeader('Content-Type', contentType);
             if (csrfToken) xhr.setRequestHeader('X-CSRF-Token', csrfToken);
 
             if (xhr.upload && typeof onProgress === 'function') {
@@ -379,7 +391,7 @@ const API = (() => {
             xhr.onerror = () => reject(failure('Upload failed due to network error', 0, { kind: 'network' }));
             xhr.onabort = () => reject(failure('Upload cancelled', 0, { kind: 'aborted' }));
 
-            xhr.send(formData);
+            xhr.send(body);
         });
 
         return {
@@ -387,6 +399,46 @@ const API = (() => {
             abort: () => xhr.abort(),
         };
     };
+
+    /**
+     * Multipart upload with progress callback and abort handle.
+     *
+     * @param {string} endpoint
+     * @param {FormData} formData
+     * @param {(loaded: number, total: number) => void} [onProgress]
+     * @returns {{ promise: Promise<any>, abort: () => void }}
+     */
+    const upload = (endpoint, formData, onProgress) =>
+        sendBinary('POST', endpoint, formData, { onProgress });
+
+    /* ══════════════════════════════════════════
+       RESUMABLE UPLOAD SESSIONS (ADR-011)
+       The one place every session URL is built: consumers pass a session id,
+       never a URL. `initiate`, `status`, `complete` and `abort` are JSON calls
+       (CSRF and error kinds handled by `request()`); `append` streams one raw
+       chunk through `sendBinary` so it keeps upload progress and an abort
+       handle.
+       ══════════════════════════════════════════ */
+
+    const sessionPath = (id) => `/fs/uploads/${encodeURIComponent(id)}`;
+
+    const uploadSession = Object.freeze({
+        /** Open or adopt the session for one file; answers {sessionId, receivedBytes, expiresAt}. */
+        initiate: (body) => post('/fs/uploads', body),
+        /** The server's own reading of a session (bare read): {receivedBytes, state, ...}. */
+        status: (id) => get(sessionPath(id)),
+        /** Append exactly one chunk at the server's stored size. */
+        append: (id, offset, chunk, onProgress) => sendBinary(
+            'PUT',
+            `${sessionPath(id)}/chunk?offset=${encodeURIComponent(offset)}`,
+            chunk,
+            { contentType: 'application/octet-stream', onProgress }
+        ),
+        /** Place the file once every declared byte is stored; answers {path}. */
+        complete: (id, body) => post(`${sessionPath(id)}/complete`, body || {}),
+        /** Abandon the session; its staged bytes are discarded. */
+        abort: (id) => del(sessionPath(id)),
+    });
 
     /* ══════════════════════════════════════════
        DOWNLOAD HELPERS — NATIVE STREAM TRIGGERS
@@ -544,6 +596,7 @@ const API = (() => {
         put,
         del,
         upload,
+        uploadSession,
         downloadFile,
         downloadMultipleFiles,
         downloadZip,

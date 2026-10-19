@@ -61,6 +61,9 @@ admin-files-manager/
 │   │   ├── SettingsService.js    # JSON-file store (data/settings.json), atomic writes, defaults on first
 │   │   │                         #   read, whitelist validation at the service boundary; singleton (ADR-006).
 │   │   │                         #   Never imports PathService — it validates a client path, never resolves it
+│   │   ├── UploadSessionService.js  # JSON store (data/upload-sessions.json): resumable-upload sessions —
+│   │   │                          #   open/complete lifecycle, TTL sweep, fingerprint adoption; staged
+│   │   │                          #   bytes live at .upload-<id>.part next to the destination
 │   │   ├── UploadService.js      # Multer engine + staging: placement decided after the body is parsed; overwrite; size cap
 │   │   ├── PreviewService.js     # Thumbnail capability + bounded transform (only if a transformer is installed)
 │   │   ├── UserService.js        # Admin user management — validates, hashes (node:crypto), strips secrets on the way out
@@ -146,6 +149,8 @@ admin-files-manager/
 │                                   not exist before the first run and is git-ignored
 │                                   (`data/*.json`, `!data/.gitkeep`). SettingsService does the
 │                                   same for data/settings.json on the first GET /api/settings.
+│                                   UploadSessionService does the same for data/upload-sessions.json
+│                                   on the first session operation.
 │                                   AdminDatabase (ADR-009) creates data/admin.sqlite the same
 │                                   way, on first boot — a separate store, not a JSON file, but
 │                                   gitignored by the same `data/*` rule.
@@ -160,6 +165,8 @@ admin-files-manager/
 │   │   ├── MetadataService.dashboard.test.js# activities / top-download ranking inputs
 │   │   ├── settingsService.test.js          # store: defaults on first read, atomic write, corrupt → 500,
 │   │   │                                    #   and validateSettingsPayload (whitelist, bounds, client paths)
+│   │   ├── uploadSessionService.test.js     # resumable sessions: fingerprint match/supersede, offset mismatch,
+│   │   │                                    #   chunk bounds, TTL/tombstone sweep, complete idempotency, abort
 │   │   ├── UserService.test.js              # create validation, duplicate username, password_hash never returned
 │   │   ├── SessionService.test.js           # login identical-failure shape, lockout, validateSession, revoke
 │   │   ├── SessionTokenService.test.js      # DPoP verify, token pair, rotation, grace window, reuse → family revoke, revocation cascade
@@ -261,7 +268,7 @@ admin-files-manager/
 | `src/config/env.js` | Imported first by `server.js` | Loads `.env` (never overriding a set variable) and exposes `validateStartup()`, which `server.js` runs before `listen`: an unusable `STORAGE_ROOT` / `AFM_DATA_DIR` / `UPLOAD_MAX_BYTES` exits 1 with a named reason. `server.js` also drains on `SIGTERM`/`SIGINT` (30 s grace) |
 | `scripts/deploy.sh` | `bash /opt/dimension/bin/deploy.sh <deploy / receive / rollback / status>` on the host | The release mechanism — see `docs/DEPLOYMENT.md` |
 | `public/index.html` | Browser GET `/` | Dashboard; other pages are sibling HTML files |
-| `test/**/*.test.js` | `npm test` (`node --test "test/**/*.test.js"`) | Zero-dependency `node:test` suites; discovery is scoped to `test/`, so a scratch `*.test.js` elsewhere cannot break the suite. Every server-booting suite points `MetadataService.dbPath` at a temp file — parallel test processes must never write the real `data/metadata.json` — and every suite that touches the settings store also repoints `SettingsService.dbPath` and clears its cache before requiring `server.js` |
+| `test/**/*.test.js` | `npm test` (`node --test "test/**/*.test.js"`) | Zero-dependency `node:test` suites; discovery is scoped to `test/`, so a scratch `*.test.js` elsewhere cannot break the suite. Every server-booting suite points `MetadataService.dbPath` at a temp file — parallel test processes must never write the real `data/metadata.json` — and every suite that touches the settings or upload-session stores also repoints `SettingsService.dbPath` / `UploadSessionService.dbPath` (clearing the cache) before requiring `server.js` |
 
 ### ⚠ Mount order in `server.js` is load-bearing, not cosmetic
 
@@ -302,7 +309,8 @@ both prefixes at once — never as a separate `app.use` in `server.js`
 │         ├─ UploadService (multer staging → final placement)    │
 │         ├─ PreviewService (bounded thumbnails, optional)       │
 │         ├─ MetadataService (data/metadata.json, fire-and-forget)│
-│         └─ SettingsService (data/settings.json; never resolves) │
+│         ├─ SettingsService (data/settings.json; never resolves) │
+│         └─ UploadSessionService (resumable sessions; staging)   │
 │       → utils/validators.js → utils/AppError.js                │
 │   → middlewares/errorHandler.js (last middleware, catches all)  │
 └────────────────────────────────────────────────────────────────┘
@@ -315,7 +323,9 @@ both prefixes at once — never as a separate `app.use` in `server.js`
 - **A service that stores a client-path *value* is not a path consumer.** `SettingsService` validates
   `general.defaultUploadFolder` with the shared validators and stores the string verbatim; it imports
   no `PathService` and resolves nothing. Resolution happens at the point of use, so rule 2's choke
-  point stays the single boundary.
+  point stays the single boundary. `UploadSessionService` also stores a client-path `destination`
+  per session, but resolves it through `PathService` at every use to locate the hidden staging file —
+  the stored value stays a client path; resolution stays the boundary's job.
 - Controllers may use `archiver` for HTTP-specific streaming but must not touch `fs` themselves
   except the download stream (`fs.createReadStream(stats.securePath)`), which is mediated by
   `PathService`. Multer's storage engine, staging and placement live in `UploadService`.
@@ -500,6 +510,7 @@ Rules worth knowing before you touch this path:
 | New disk operation | `src/services/FileSystemService.js` |
 | New aggregation over the tree | `src/services/FileSystemService.js` (return raw values; shape the DTO in the controller) |
 | New metadata/entity | `src/services/MetadataService.js` (+ the `data/metadata.json` shape in CONTRACTS.md) |
+| New persisted transfer/session state | a new service owning its own JSON store under `AFM_DATA_DIR` — `UploadSessionService` is the worked example; document the store row in DATABASE.md and the endpoints in CONTRACTS.md |
 | New file-type category / extension | `src/utils/fileTypes.js` (`CATEGORIES` + `EXTENSION_MAP`) **and** `public/assets/js/app.js` `FileTypes` in the same change — `test/utils/fileTypes.test.js` fails if they differ. Both the listing and the Dashboard breakdown classify through `classifyFile()` |
 | New validation rule | `src/utils/validators.js` |
 | New error type / status | `src/utils/AppError.js` (throw it; never `res.status(...).json(...)` an error inline) |
