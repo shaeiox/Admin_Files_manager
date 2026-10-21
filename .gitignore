@@ -39,3 +39,11 @@ portal.log
 portal-state.sqlite
 portal-state.sqlite-shm
 portal-state.sqlite-wal
+
+# Local AI agent tooling (per-developer state, never shared)
+# .claude/   - launch configs and local scratchpads
+# .freebuff/ - local project identity
+# .opencode/ - agent commands, skills, plugins and session logs
+.claude/
+.freebuff/
+.opencode/
