@@ -36,7 +36,10 @@ admin-files-manager/
 │   │   ├── api.js                # THE assembly: health + auth + fs + dashboard + settings + admin, mounted by
 │   │   │                         #   server.js at /api/v1 (contract) and /api (alias) — one router (ADR-007).
 │   │   │                         #   authenticate+csrf applied once here, after /health and /auth (ADR-009)
-│   │   ├── fs.routes.js          # /api/fs router — wires endpoints to controller fns
+│   │   ├── fs.routes.js          # /api/fs router — wires endpoints to controller fns; copy/move accept
+│   │   │                         #   an additive `async: true` that returns a tracked operation id at once
+│   │   ├── operations.routes.js  # /api/operations router — GET /:id only; its own read allowance so
+│   │   │                         #   polling cannot spend the browsing session's shared budget
 │   │   ├── dashboard.routes.js   # /api/dashboard router — /summary + /health (read-only, no fs remount)
 │   │   ├── settings.routes.js    # /api/settings router — GET (bare read) + PUT (full replace) only;
 │   │   │                         #   no POST /action, no destructive route (ADR-006)
@@ -50,6 +53,7 @@ admin-files-manager/
 │   │   ├── dashboard.controller.js  # Composes services into the dashboard DTO; shapes the response
 │   │   ├── settings.controller.js   # GET → bare document; PUT → { success, settings }; no hand-rolled checks
 │   │   ├── auth.controller.js    # login/logout/me — sets/clears the session cookie, returns the CSRF token
+│   │   ├── operations.controller.js # GET /api/operations/:id — bare status of a tracked Copy/Move; 404 = unknown
 │   │   ├── users.controller.js   # admin user CRUD — never returns password_hash (UserService strips it)
 │   │   ├── filePolicy.controller.js  # admin file-access-policy CRUD + user/group grants at a level; effective access
 │   │   ├── groups.controller.js  # admin user-group CRUD + full-replace membership
@@ -61,6 +65,8 @@ admin-files-manager/
 │   │   ├── SettingsService.js    # JSON-file store (data/settings.json), atomic writes, defaults on first
 │   │   │                         #   read, whitelist validation at the service boundary; singleton (ADR-006).
 │   │   │                         #   Never imports PathService — it validates a client path, never resolves it
+│   │   ├── OperationService.js   # In-process registry for tracked Copy/Move: id, state machine, measured
+│   │   │                         #   progress, session ownership, bounded retention. A move is never determinate
 │   │   ├── UploadService.js      # Multer engine + staging: placement decided after the body is parsed; overwrite; size cap
 │   │   ├── PreviewService.js     # Thumbnail capability + bounded transform (only if a transformer is installed)
 │   │   ├── UserService.js        # Admin user management — validates, hashes (node:crypto), strips secrets on the way out
@@ -257,7 +263,7 @@ admin-files-manager/
 
 | Entry | Trigger | What it does |
 |---|---|---|
-| `server.js` | `npm start` / `npm run dev` | Builds middleware chain (helmet → cors → json → urlencoded → morgan → static), then mounts the `src/routes/api.js` assembly (`/health`, `/fs`, `/dashboard`, `/settings`) at `/api/v1` and `/api` in one registration, adds the API 404 catch-all, HTML fallback for SPA, global `errorHandler`, listens on `config.port` |
+| `server.js` | `npm start` / `npm run dev` | Builds middleware chain (helmet → cors → json → urlencoded → morgan → static), then mounts the `src/routes/api.js` assembly (`/health`, `/fs`, `/operations`, `/dashboard`, `/settings`) at `/api/v1` and `/api` in one registration, adds the API 404 catch-all, HTML fallback for SPA, global `errorHandler`, listens on `config.port` |
 | `src/config/env.js` | Imported first by `server.js` | Loads `.env` (never overriding a set variable) and exposes `validateStartup()`, which `server.js` runs before `listen`: an unusable `STORAGE_ROOT` / `AFM_DATA_DIR` / `UPLOAD_MAX_BYTES` exits 1 with a named reason. `server.js` also drains on `SIGTERM`/`SIGINT` (30 s grace) |
 | `scripts/deploy.sh` | `bash /opt/dimension/bin/deploy.sh <deploy / receive / rollback / status>` on the host | The release mechanism — see `docs/DEPLOYMENT.md` |
 | `public/index.html` | Browser GET `/` | Dashboard; other pages are sibling HTML files |

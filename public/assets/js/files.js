@@ -158,6 +158,7 @@ const Files = (() => {
       clipboardMode: null,       // null | 'cut' | 'copy' - what Paste will do
       clipboardPaths: new Set(), // paths pending the clipboard op (cut: grayed out; copy: not, like Explorer)
       clipboardItems: [],        // {name, path, isFolder} snapshot at cut/copy time, for reporting after navigating away
+      inFlight: new Set(),    // payload keys ("kind|destination|paths") of operations now running - the double-paste guard
       activeId: null,           // the roving tab stop
       page: 1,
       perPage: 20,
@@ -1515,8 +1516,18 @@ const Files = (() => {
     const cancelBtn = $('#btnCancelCut');
     const strip = $('#clipboardStrip');
     const n = state.clipboardPaths.size;
+    // Busy means "the clipboard's CURRENT payload is already running". A
+    // different payload may well be in flight and must not lock this one out.
+    // The mode is normalised the same way startTrackedOperation normalises it, or
+    // a cut would never match the key it registered.
+    const key = `${state.clipboardMode === 'copy' ? 'copy' : 'move'}|${state.currentPath}|${[...state.clipboardPaths].join(',')}`;
+    const inFlight = state.inFlight.has(key);
     if (btn) {
       btn.hidden = n === 0;
+      // Disabled, not hidden, while an operation runs: the control stays visible
+      // and announces why it cannot be used, instead of vanishing mid-operation.
+      btn.disabled = inFlight;
+      btn.setAttribute('aria-busy', String(inFlight));
       const countEl = btn.querySelector('.paste-count');
       if (countEl) countEl.textContent = n > 0 ? `(${n})` : '';
     }
@@ -1529,6 +1540,32 @@ const Files = (() => {
       const text = strip.querySelector('.clipboard-text');
       if (text) text.textContent = n > 0 ? clipboardSentence(state.clipboardMode, n) : '';
     }
+    renderClipboardMenu();
+  }
+
+  /** Fill the pending-items disclosure; empty it when nothing is queued. */
+  function renderClipboardMenu() {
+    const menu = $('#clipboardItemsDropdown');
+    if (!menu) return;
+    const items = state.clipboardItems;
+    if (items.length === 0) { menu.innerHTML = ''; return; }
+    const verb = state.clipboardMode === 'copy' ? 'copy' : 'move';
+    // Every name and path is filesystem-derived: escaped before it reaches markup
+    // (rule 10). Rows are informational - no menuitem semantics, no actions.
+    menu.innerHTML =
+      `<div class="dropdown-label">Ready to ${verb}</div>` +
+      items.map(i => `<div class="dropdown-item clipboard-menu-item" title="${esc(i.path)}">` +
+        `${icon(i.isFolder ? 'folder' : 'fileText', 14)}<span>${esc(i.name)}</span></div>`).join('');
+  }
+
+  /** Open/close the pending-items disclosure and keep its ARIA state truthful. */
+  function setClipboardDisclosure(open) {
+    const trigger = $('#clipboardTrigger');
+    const menu = $('#clipboardItemsDropdown');
+    if (!menu) return;
+    if (open && state.clipboardPaths.size === 0) return;
+    menu.classList.toggle('is-open', open);
+    if (trigger) trigger.setAttribute('aria-expanded', String(open));
   }
 
   /** Mark items pending a clipboard op. Clears whatever was pending before. */
@@ -1563,60 +1600,377 @@ const Files = (() => {
     return true;
   }
 
-  function summarizeMove(sentPaths, data) {
-    const moved = Array.isArray(data && data.moved) ? data.moved : [];
-    const failed = Array.isArray(data && data.failed) ? data.failed : [];
-    return {
-      sent: sentPaths.length,
-      moved,
-      failed,
-      kind: failed.length === 0 ? 'complete' : 'partial',
-    };
+  /* ── tracked Copy/Move operations ──
+     Copy and Move bytes move SERVER-side, so there is nothing on the wire to
+     watch: the request that starts them returns as soon as the work is
+     registered, and the outcome is read back by id. Everything drawn below is a
+     figure the server actually measured - `determinate:false` renders a striped
+     bar with NO aria-valuenow rather than inventing a percentage, and an
+     unavailable byte total renders as such instead of as 0 B. */
+
+  const TERMINAL_STATES = new Set(['completed', 'partial', 'failed', 'cancelled']);
+  /** First interval, and the ceiling the backoff works up to while nothing changes. */
+  const OPERATION_POLL_MS = 400;
+  const OPERATION_POLL_MAX_MS = 1600;
+  /** Consecutive transport failures tolerated before the UI is released anyway. */
+  const OPERATION_MAX_POLL_FAILURES = 5;
+  /**
+   * How long a finished operation's outcome stays on the strip before it is
+   * removed. Bounded, not permanent: the result is the thing the operator waited
+   * for, but the toolbar must return to normal. Starting another operation
+   * cancels the pending removal rather than queueing behind it.
+   */
+  const OPERATION_RESULT_TTL_MS = 5000;
+
+  /** id -> { toast, timer, interval, failures, lastState, onSettled } */
+  const operations = new Map();
+  /** Release one payload key, refreshing the control. Idempotent. */
+  function releaseInFlight(key) {
+    state.inFlight.delete(key);
+    updatePasteButton();
   }
 
-  function reportMove(summary, items, destination) {
-    const nameOf = p => (items.find(i => i.path === p) || { name: baseName(p) }).name;
-    const n = summary.moved.length;
-    if (summary.kind === 'complete') {
-      Toast.success(`Moved ${n} ${n === 1 ? 'item' : 'items'}`, `to ${destination}`);
-      announce(`Moved ${n} ${n === 1 ? 'item' : 'items'} to ${destination}.`);
+  const operationEls = () => ({
+    strip: $('#operationStrip'),
+    verb: $('#operationVerb'),
+    count: $('#operationCount'),
+    file: $('#operationFile'),
+    bytes: $('#operationBytes'),
+    progress: $('#operationProgress'),
+    bar: $('#operationBar'),
+  });
+
+  function stopOperationPoll(entry) {
+    if (entry && entry.timer) clearTimeout(entry.timer);
+    if (entry) entry.timer = null;
+  }
+
+  /** Pending removal timer for a finished operation's outcome. */
+  let stripRemovalTimer = null;
+
+  /** Cancel a pending removal - a new operation reuses the strip immediately. */
+  function cancelStripRemoval() {
+    if (stripRemovalTimer) clearTimeout(stripRemovalTimer);
+    stripRemovalTimer = null;
+  }
+
+  /** Drop the progress surface entirely. Safe to call when nothing is running. */
+  function clearOperationStrip() {
+    cancelStripRemoval();
+    const els = operationEls();
+    if (els.strip) els.strip.hidden = true;
+    if (els.progress) {
+      els.progress.removeAttribute('aria-valuenow');
+      els.progress.setAttribute('aria-busy', 'false');
+    }
+    if (els.bar) {
+      els.bar.classList.remove('is-striped');
+      els.bar.style.removeProperty('--progress');
+    }
+  }
+
+  /**
+   * Paint one status read. Every interpolated value is escaped: the filename and
+   * the failure text are filesystem- and server-derived strings.
+   */
+  function renderOperation(snapshot, kind) {
+    const els = operationEls();
+    if (!els.strip) return;
+
+    els.strip.hidden = false;
+    const verb = kind === 'move' ? 'Moving' : 'Copying';
+    const terminal = TERMINAL_STATES.has(snapshot.state);
+    if (els.verb) {
+      els.verb.textContent = terminal ? verb.replace(/ing$/, 'ed') : verb;
+    }
+    if (els.count) {
+      els.count.textContent = `${snapshot.items.done} of ${snapshot.items.total}`;
+    }
+    if (els.file) {
+      els.file.textContent = snapshot.itemInProgress
+        ? snapshot.itemInProgress.name
+        : (terminal ? '' : 'Working…');
+    }
+    if (els.bytes) {
+      // An unmeasured total is stated as unavailable. It is never rendered as
+      // "0 B / 0 B", which would be a real reading of zero that did not happen.
+      els.bytes.textContent = snapshot.bytes.available
+        ? `${AFM.Format.bytes(snapshot.bytes.transferred)} / ${AFM.Format.bytes(snapshot.bytes.total)}`
+        : 'Size unavailable';
+    }
+
+    if (els.progress) {
+      els.progress.setAttribute('aria-busy', String(snapshot.state === 'preparing'));
+      if (snapshot.determinate && snapshot.percent != null) {
+        els.progress.setAttribute('aria-valuenow', String(snapshot.percent));
+      } else {
+        // No measured percentage: the value is genuinely unknown, so the control
+        // reports no value rather than a guess.
+        els.progress.removeAttribute('aria-valuenow');
+      }
+    }
+    if (els.bar) {
+      if (snapshot.determinate && snapshot.percent != null) {
+        els.bar.classList.remove('is-striped');
+        els.bar.style.setProperty('--progress', String(snapshot.percent / 100));
+      } else {
+        els.bar.classList.add('is-striped');
+        els.bar.style.setProperty('--progress', '1');
+      }
+    }
+  }
+
+  /** One terminal notification per operation, and only one. */
+  function notifyTerminal(entry, snapshot, destination) {
+    if (!entry || entry.notified) return;
+    entry.notified = true;
+
+    const nameOf = (p) => (entry.items.find((i) => i.path === p) || { name: baseName(p) }).name;
+    const verb = entry.kind === 'move' ? 'move' : 'copy';
+    const succeeded = snapshot.result && Array.isArray(snapshot.result[entry.kind === 'move' ? 'moved' : 'copied'])
+      ? snapshot.result[entry.kind === 'move' ? 'moved' : 'copied']
+      : [];
+    const n = succeeded.length || snapshot.items.done;
+    const failures = snapshot.failures || [];
+
+    if (snapshot.state === 'completed') {
+      entry.toast.update({
+        type: 'success',
+        title: `${entry.kind === 'move' ? 'Moved' : 'Copied'} ${n} ${n === 1 ? 'item' : 'items'}`,
+        msg: `to ${destination}`,
+      });
+      announce(`${entry.kind === 'move' ? 'Moved' : 'Copied'} ${n} ${n === 1 ? 'item' : 'items'} to ${destination}.`);
       return;
     }
-    const failures = summary.failed.map(f => `${nameOf(f.path)}: ${f.error || 'not moved'}`).join('; ');
-    Toast.warning(
-      `Moved ${n} of ${summary.sent} — ${summary.failed.length} not moved`,
-      `Not moved: ${failures}`,
-      12000
-    );
-    announce(`Moved ${n} of ${summary.sent}. ${summary.failed.length} could not be moved.`);
-  }
 
-  function summarizeCopy(sentPaths, data) {
-    const copied = Array.isArray(data && data.copied) ? data.copied : [];
-    const failed = Array.isArray(data && data.failed) ? data.failed : [];
-    return {
-      sent: sentPaths.length,
-      copied,
-      failed,
-      kind: failed.length === 0 ? 'complete' : 'partial',
-    };
-  }
-
-  function reportCopy(summary, items, destination) {
-    const nameOf = p => (items.find(i => i.path === p) || { name: baseName(p) }).name;
-    const n = summary.copied.length;
-    if (summary.kind === 'complete') {
-      Toast.success(`Copied ${n} ${n === 1 ? 'item' : 'items'}`, `to ${destination}`);
-      announce(`Copied ${n} ${n === 1 ? 'item' : 'items'} to ${destination}.`);
+    if (snapshot.state === 'cancelled') {
+      entry.toast.update({
+        type: 'info',
+        title: `${entry.kind === 'move' ? 'Move' : 'Copy'} cancelled`,
+        msg: `${n} of ${snapshot.items.total} had already finished.`,
+      });
+      announce('Operation cancelled.');
       return;
     }
-    const failures = summary.failed.map(f => `${nameOf(f.path)}: ${f.error || 'not copied'}`).join('; ');
-    Toast.warning(
-      `Copied ${n} of ${summary.sent} — ${summary.failed.length} not copied`,
-      `Not copied: ${failures}`,
-      12000
-    );
-    announce(`Copied ${n} of ${summary.sent}. ${summary.failed.length} could not be copied.`);
+
+    const detail = failures
+      .map((f) => `${nameOf(f.path)}: ${f.error || `not ${verb}d`}`)
+      .join('; ');
+
+    if (snapshot.state === 'partial') {
+      entry.toast.update({
+        type: 'warning',
+        title: `${entry.kind === 'move' ? 'Moved' : 'Copied'} ${n} of ${snapshot.items.total} — ${failures.length} not ${verb}d`,
+        msg: `Not ${verb}d: ${detail}`,
+      });
+      announce(`${entry.kind === 'move' ? 'Moved' : 'Copied'} ${n} of ${snapshot.items.total}. ${failures.length} failed.`);
+      return;
+    }
+
+    entry.toast.update({
+      type: 'error',
+      title: `${entry.kind === 'move' ? 'Move' : 'Copy'} failed`,
+      msg: detail || (failures[0] && failures[0].error) || `The items could not be ${verb}d.`,
+    });
+    announce(`${entry.kind === 'move' ? 'Move' : 'Copy'} failed.`);
+  }
+
+  /**
+   * Reconcile the page from the operation's terminal result. Uses exactly the
+   * data the synchronous contract has always returned, so the async and sync
+   * paths cannot disagree about what landed.
+   */
+  function applyTerminalResult(entry, snapshot, destination) {
+    const key = entry.kind === 'move' ? 'moved' : 'copied';
+    const done = snapshot.result && Array.isArray(snapshot.result[key]) ? snapshot.result[key] : [];
+    const items = entry.items;
+
+    if (entry.kind === 'copy') {
+      if (done.length && items.some((i) => i.isFolder)) loadTree();
+      loadFiles({ silent: true });
+      return;
+    }
+
+    const movedFolders = items.filter((i) => i.isFolder && done.some((m) => m.oldPath === i.path));
+    for (const folder of movedFolders) {
+      const entryMoved = done.find((m) => m.oldPath === folder.path);
+      if (entryMoved && syncAfterMutation('rename', entryMoved.oldPath, entryMoved.newPath)) break;
+    }
+    if (movedFolders.length) loadTree();
+
+    // Only what actually moved comes off the clipboard, so a failed item stays
+    // pending and a retry is just "navigate, Paste again".
+    const movedPaths = new Set(done.map((m) => m.oldPath));
+    if (movedPaths.size) {
+      state.clipboardPaths = new Set([...state.clipboardPaths].filter((p) => !movedPaths.has(p)));
+      state.clipboardItems = state.clipboardItems.filter((i) => !movedPaths.has(i.path));
+      if (state.clipboardPaths.size === 0) state.clipboardMode = null;
+      updatePasteButton();
+    }
+
+    loadFiles({ silent: true });
+  }
+
+  /**
+   * Hide the strip once nothing is running, after the result linger.
+   *
+   * A finished operation keeps its outcome on screen for
+   * OPERATION_RESULT_TTL_MS: the result is what the operator waited for, and
+   * removing it the instant it lands would be the only on-screen record of what
+   * happened to each item. Re-checked at fire time, so an operation started
+   * during the linger keeps the strip rather than losing it to a stale timer.
+   */
+  function scheduleStripRemoval() {
+    cancelStripRemoval();
+    if (operations.size) return;
+    stripRemovalTimer = setTimeout(() => {
+      stripRemovalTimer = null;
+      if (operations.size) return;
+      const els = operationEls();
+      if (els.strip) els.strip.hidden = true;
+      if (els.progress) {
+        els.progress.removeAttribute('aria-valuenow');
+        els.progress.setAttribute('aria-busy', 'false');
+      }
+      if (els.bar) {
+        els.bar.classList.remove('is-striped');
+        els.bar.style.removeProperty('--progress');
+      }
+    }, OPERATION_RESULT_TTL_MS);
+  }
+
+  /** Release every resource for an operation. Always safe, always idempotent. */
+  function finishOperation(id, snapshot) {
+    const entry = operations.get(id);
+    if (!entry) return;
+
+    stopOperationPoll(entry);
+    operations.delete(id);
+    // Release THIS operation's guard on every exit path. Leaving the key set
+    // would disable Paste permanently after the first operation - the "stuck
+    // loading" failure this tracking exists to prevent. Clearing the whole set
+    // here instead would wrongly unblock a different operation still running.
+    releaseInFlight(entry.key);
+
+    if (snapshot) {
+      notifyTerminal(entry, snapshot, entry.destination);
+      applyTerminalResult(entry, snapshot, entry.destination);
+    } else {
+      // The operation became unreadable (restart, eviction, or a foreign id).
+      // The UI must still reach a terminal state - it is never left "in progress".
+      if (entry.toast && entry.toast.update) {
+        entry.toast.update({
+          type: 'warning',
+          title: `${entry.kind === 'move' ? 'Move' : 'Copy'} status lost`,
+          msg: 'The server no longer has this operation. Refresh to see what landed.',
+        });
+      }
+    }
+
+    // The strip is shared: once nothing is running, the outcome lingers briefly
+    // and is then removed (or immediately, if a new operation takes it over).
+    if (!operations.size) scheduleStripRemoval();
+    updatePasteButton();
+  }
+
+  function scheduleNextPoll(entry, snapshot) {
+    // Back off while nothing changes, and never past the ceiling: an operation
+    // that takes minutes must not turn into a request flood.
+    entry.interval = snapshot && entry.lastState === snapshot.state
+      ? Math.min(entry.interval * 2, OPERATION_POLL_MAX_MS)
+      : OPERATION_POLL_MS;
+    entry.timer = setTimeout(() => pollOperation(entry.id), entry.interval);
+  }
+
+  async function pollOperation(id) {
+    const entry = operations.get(id);
+    if (!entry) return;
+
+    let snapshot;
+    try {
+      snapshot = await window.API.getOperation(id);
+      entry.failures = 0;
+    } catch (error) {
+      entry.failures += 1;
+      const status = error && error.status;
+      // 404 means unknown, expired, or someone else's: stop tracking rather than
+      // poll forever. Anything else is transport noise and is retried, but only
+      // for so long - the UI is never left loading indefinitely.
+      if (status === 404 || entry.failures >= OPERATION_MAX_POLL_FAILURES) {
+        finishOperation(id, null);
+        return;
+      }
+      scheduleNextPoll(entry, entry.lastState);
+      return;
+    }
+
+    if (!operations.has(id)) return;
+
+    entry.lastState = snapshot.state;
+    renderOperation(snapshot, entry.kind);
+
+    if (TERMINAL_STATES.has(snapshot.state)) {
+      finishOperation(id, snapshot);
+      return;
+    }
+    scheduleNextPoll(entry, snapshot);
+  }
+
+  /**
+   * @returns {boolean} false when THIS payload is already in flight - the guard
+   *   that stops a double activation from firing two identical operations and
+   *   reporting the second one's 409 as a failure. Keyed on the payload, not on
+   *   "is anything running": a deliberate second operation into a different
+   *   folder is a real, separate operation and must be allowed to run alongside.
+   */
+  async function startTrackedOperation(kind, items, destination) {
+    const paths = items.map((i) => i.path);
+    const verb = kind === 'move' ? 'Move' : 'Copy';
+    const key = `${kind}|${destination}|${paths.join(',')}`;
+
+    if (state.inFlight.has(key)) return false;
+    cancelStripRemoval(); // this operation reuses the strip now, not after the last one's linger
+    state.inFlight.add(key);
+    updatePasteButton();
+
+    let operationId;
+    try {
+      operationId = await window.API.startOperation(kind, { paths, destination });
+    } catch (error) {
+      // Refused before any operation existed: the server's own reason (a 409 name
+      // collision, an invalid destination), not a transport failure.
+      releaseInFlight(key);
+      Toast.error(`${verb} failed`, (error && error.message) || `The item could not be ${kind === 'copy' ? 'copied' : 'moved'}.`);
+      return false;
+    }
+
+    if (!operationId) {
+      releaseInFlight(key);
+      Toast.error(`${verb} could not start`, 'The server did not return an operation to track.');
+      return false;
+    }
+
+    // Exactly one toast per operation. Its handle is what the terminal
+    // notification retargets, so a start and its outcome never appear as a pair.
+    const toast = Toast.info(`${verb} started`, `${items.length} ${items.length === 1 ? 'item' : 'items'} to ${destination}`);
+    const entry = {
+      id: operationId, kind, items, destination, toast, key,
+      timer: null, interval: OPERATION_POLL_MS, failures: 0,
+      lastState: null, notified: false,
+    };
+    operations.set(operationId, entry);
+
+    renderOperation({
+      state: 'preparing', determinate: false, percent: null,
+      itemInProgress: null,
+      items: { done: 0, total: items.length, failed: 0 },
+      bytes: { available: false, transferred: null, total: null },
+      failures: [],
+    }, kind);
+
+    announce(`${verb} started: ${items.length} ${items.length === 1 ? 'item' : 'items'}.`);
+    pollOperation(operationId);
+    return true;
   }
 
   /** Paste the pending clipboard op (cut or copy) into the currently displayed folder. */
@@ -1625,6 +1979,12 @@ const Files = (() => {
     const mode = state.clipboardMode;
     const items = state.clipboardItems;
     const destination = state.currentPath;
+
+    // Guard: a repeat of THIS payload while it is already running must not fire
+    // a second identical operation. Its 409 collision would otherwise read as a
+    // failure. Keyed on the payload, so a different folder is still allowed.
+    const key = `${mode === 'copy' ? 'copy' : 'move'}|${destination}|${[...state.clipboardPaths].join(',')}`;
+    if (state.inFlight.has(key)) return;
 
     if (mode === 'cut' && items.every(i => parentPath(i.path) === destination)) {
       // Nothing would actually move - say so instead of firing a no-op request.
@@ -1635,51 +1995,7 @@ const Files = (() => {
       return;
     }
 
-    const paths = items.map(i => i.path);
-    const verb = mode === 'copy' ? 'Copy' : 'Move';
-    let res;
-    try {
-      res = mode === 'copy'
-        ? await window.API.post('/fs/copy', { paths, destination }, { silent: true })
-        : await window.API.put('/fs/move', { paths, destination }, { silent: true });
-    } catch (error) {
-      // Silent: api.js's generic "Network Error" toast is wrong here - this is
-      // the server's own refusal (e.g. a 409 name collision), not a transport
-      // failure. The clipboard stays pending so the operator can retry after
-      // resolving it (rename the item here, or pick a different folder).
-      Toast.error(`${verb} failed`, (error && error.message) || `The item could not be ${mode === 'copy' ? 'copied' : 'moved'}.`);
-      return;
-    }
-
-    if (mode === 'copy') {
-      const summary = summarizeCopy(paths, res && res.data);
-      reportCopy(summary, items, destination);
-      // A copy never consumes the clipboard - Paste again to duplicate the
-      // same items into another folder, exactly like Explorer's Ctrl+C.
-      if (items.some(i => i.isFolder) && summary.copied.length) loadTree();
-      loadFiles({ silent: true });
-      return;
-    }
-
-    const summary = summarizeMove(paths, res && res.data);
-    reportMove(summary, items, destination);
-
-    const movedFolders = items.filter(i => i.isFolder && summary.moved.some(m => m.oldPath === i.path));
-    for (const folder of movedFolders) {
-      const entry = summary.moved.find(m => m.oldPath === folder.path);
-      if (entry && syncAfterMutation('rename', entry.oldPath, entry.newPath)) break;
-    }
-    if (movedFolders.length) loadTree();
-
-    // Only what actually moved comes off the clipboard - a failed item stays
-    // pending so a retry (navigate, Paste again) is all the operator needs.
-    const movedPaths = new Set(summary.moved.map(m => m.oldPath));
-    state.clipboardPaths = new Set([...state.clipboardPaths].filter(p => !movedPaths.has(p)));
-    state.clipboardItems = state.clipboardItems.filter(i => !movedPaths.has(i.path));
-    if (state.clipboardPaths.size === 0) state.clipboardMode = null;
-    updatePasteButton();
-
-    loadFiles({ silent: true });
+    await startTrackedOperation(mode === 'copy' ? 'copy' : 'move', items, destination);
   }
 
   /* ── access policy (admin-only; reuses PUT /admin/files/policy from the Admin page) ── */
@@ -2908,6 +3224,28 @@ const Files = (() => {
     bind('#btnTreeNewFolder', 'click', () => handleAction('newFolder', state.currentPath));
     bind('#btnPaste', 'click', () => handleAction('paste'));
     bind('#btnCancelCut', 'click', cancelClipboard);
+
+    // Pending-items disclosure (clipboard strip). The strip reuses the shared
+    // `.dropdown-menu` mechanics - outside click and Escape are handled by
+    // Dropdown in app.js - but owns its own trigger toggle so aria-expanded
+    // stays truthful instead of one click behind. Hover opens it; leaving the
+    // strip closes it (the menu is a child, so pointing at the list keeps it
+    // open). Element listeners die with the page swap, so destroy() has
+    // nothing to remove for these.
+    bind('#clipboardStrip', 'mouseenter', () => setClipboardDisclosure(true));
+    bind('#clipboardStrip', 'mouseleave', () => setClipboardDisclosure(false));
+    bind('#clipboardTrigger', 'click', (e) => {
+      e.stopPropagation(); // the shared document toggle must not double-toggle it
+      setClipboardDisclosure(!$('#clipboardItemsDropdown').classList.contains('is-open'));
+    });
+    // Keyboard activation needs no handler: the trigger is a real button element,
+    // so Enter and Space natively dispatch click. (A role-as-button span would
+    // have needed one - and this page bans that pattern outright.)
+    // Dropdown closes the menu on an outside click or Escape without knowing
+    // about the trigger; this re-reads the menu state after those paths so the
+    // announced state never drifts from the visible one.
+    listenGlobal(document, 'click', () => setClipboardDisclosure($('#clipboardItemsDropdown').classList.contains('is-open')));
+    listenGlobal(document, 'keydown', (e) => { if (e.key === 'Escape') setClipboardDisclosure(false); });
     bind('#btnPageUpload', 'click', openFilePicker);
     bind('#hiddenFileInput', 'change', e => {
       const jobs = jobsFromFiles(e.target.files, state.currentPath);
@@ -2989,6 +3327,16 @@ const Files = (() => {
     if (treeWidthSheet && treeWidthSheet.remove) treeWidthSheet.remove();
     treeWidthSheet = null;
     closeTreeSheet();
+    // Pollers are timers this module owns. router.js swaps the page in place and
+    // calls destroy(), so an unstopped poll would keep a detached page querying
+    // the server - and would later re-render the strip over the NEW page.
+    operations.forEach((entry) => stopOperationPoll(entry));
+    operations.clear();
+    state.inFlight.clear();
+    // A pending removal left running would hide the strip belonging to the NEXT
+    // page, or fire against a detached one.
+    cancelStripRemoval();
+    clearOperationStrip();
   }
 
   return {
@@ -3016,6 +3364,10 @@ const Files = (() => {
       syncAfterMutation, cancelPendingSearch, runUploads, handleDrop, openBulkDownloadMenu,
       setColumnWidth, resetColumnWidth, onResizeKeydown, onContainerDblClick,
       cutItems, copyItems, cancelClipboard, pasteItems, setAccessPolicy,
+      startTrackedOperation, renderOperation, notifyTerminal, finishOperation,
+      scheduleStripRemoval, clearOperationStrip,
+      TERMINAL_STATES, OPERATION_POLL_MS, OPERATION_POLL_MAX_MS,
+      OPERATION_MAX_POLL_FAILURES, OPERATION_RESULT_TTL_MS,
       openTreeSheet, closeTreeSheet, isTreeSheetOpen,
     },
   };

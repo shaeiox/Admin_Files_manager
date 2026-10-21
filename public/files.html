@@ -201,7 +201,17 @@
           <!-- Shown only while a Cut/Copy is pending (files.js updatePasteButton); pastes into
                the folder currently being viewed. Cut/Paste replaces a destination-picker modal. -->
           <div class="clipboard-strip" id="clipboardStrip" role="status" hidden>
-            <span class="clipboard-text"></span>
+            <!-- The pending-items disclosure: hovering the strip or activating the
+                 sentence opens a dropdown listing exactly which files are queued for
+                 the cut/copy. A real button element (this page bans role-as-button
+                 spans); files.js owns the toggle so aria-expanded stays truthful,
+                 and the shared dropdown-menu mechanics (outside click, Escape) close
+                 it. Items are informational, so the list carries no menuitem
+                 semantics. -->
+            <button type="button" class="clipboard-text" id="clipboardTrigger"
+                    aria-controls="clipboardItemsDropdown" aria-haspopup="true"
+                    aria-expanded="false"></button>
+            <div class="dropdown-menu clipboard-menu" id="clipboardItemsDropdown"></div>
             <button type="button" class="btn btn-primary btn-sm" id="btnPaste" hidden>
               <i data-icon="clipboard" data-icon-size="15"></i>
               <span>Paste here</span><span class="paste-count sr-only"></span>
@@ -209,6 +219,25 @@
             <button type="button" class="btn btn-ghost btn-sm" id="btnCancelCut" aria-label="Cancel move" hidden>
               <span>Cancel</span>
             </button>
+          </div>
+
+          <!-- Live Copy/Move progress, rendered from the server's operation status
+               (files.js trackOperation). Hidden until an operation starts; the bar
+               is striped and carries no aria-valuenow while the operation cannot
+               report a measured percentage (a move, or a copy whose size is
+               unavailable). aria-busy marks "preparing" - work registered, nothing
+               moved yet. -->
+          <div class="operation-strip" id="operationStrip" role="status" aria-live="polite" hidden>
+            <div class="operation-head">
+              <span class="operation-verb" id="operationVerb">Working…</span>
+              <span class="operation-count" id="operationCount"></span>
+            </div>
+            <div class="operation-file" id="operationFile"></div>
+            <div class="operation-bytes" id="operationBytes"></div>
+            <div class="progress progress-sm" id="operationProgress" role="progressbar"
+                 aria-label="Copy progress" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress-bar" id="operationBar"></div>
+            </div>
           </div>
 
           <div class="toolbar-listing">

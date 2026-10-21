@@ -77,6 +77,9 @@ async function everyUrl(API, seen) {
     API.downloadMultipleFiles(['/b.txt']);
     seen.timers.forEach((t) => t.fn());
     API.downloadZip(['/a.txt']);
+    await API.getOperation('op-1');
+    await API.startOperation('copy', { paths: ['/a.txt'], destination: '/b' });
+    await API.startOperation('move', { paths: ['/a.txt'], destination: '/b' });
     return [
         ...seen.fetch.map((f) => f.url),
         ...seen.xhr.map((x) => x.url),
@@ -160,16 +163,19 @@ describe('every API URL is built inside the boundary', () => {
         assert.equal(API.thumbnailUrl('/x.png', '5&x=1'), '/api/v1/fs/thumbnail?path=%2Fx.png&size=5%26x%3D1');
     });
 
-    test('JSON, upload, download, multi-download, ZIP and thumbnail URLs all carry the resolved base', async () => {
+    test('JSON, upload, download, multi-download, ZIP, operation and thumbnail URLs all carry the resolved base', async () => {
         const { API, seen } = loadApi();
         const urls = await everyUrl(API, seen);
-        assert.equal(urls.length, 9);
+        assert.equal(urls.length, 12);
         for (const url of urls) assert.ok(url.startsWith('/api/v1/'), url);
         assert.deepEqual(urls, [
             '/api/v1/fs/list?path=%2F',
             '/api/v1/fs/folder',
             '/api/v1/settings',
             '/api/v1/fs/delete',
+            '/api/v1/operations/op-1',
+            '/api/v1/fs/copy',
+            '/api/v1/fs/move',
             '/api/v1/fs/upload',
             '/api/v1/fs/download?path=%2Fa.txt',
             '/api/v1/fs/download?path=%2Fb.txt',
@@ -197,9 +203,12 @@ describe('every API URL is built inside the boundary', () => {
         // setCsrfToken/clearCsrfToken/redirectToLogin added by ADR-009: session
         // state, not a URL builder - they don't widen this boundary. Neither does
         // devicePublicJwk (access-refresh-session-tokens): login.js sends it.
+        // getOperation/startOperation are named accessors for tracked Copy/Move
+        // operations; everyUrl() above proves both go out through BASE_URL like
+        // everything else, so neither is an escape hatch.
         assert.deepEqual(Object.keys(API).sort(), [
             'BASE_URL', 'clearCsrfToken', 'del', 'devicePublicJwk', 'downloadFile', 'downloadMultipleFiles', 'downloadZip',
-            'get', 'post', 'put', 'redirectToLogin', 'setCsrfToken', 'thumbnailUrl', 'upload',
+            'get', 'getOperation', 'post', 'put', 'redirectToLogin', 'setCsrfToken', 'startOperation', 'thumbnailUrl', 'upload',
         ]);
     });
 });

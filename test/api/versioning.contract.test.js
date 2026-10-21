@@ -489,6 +489,7 @@ function declaredEndpoints() {
     return [
         ...decls(read('api.js')).map(([m, p]) => `${m} ${p}`),
         ...mounted('/fs', 'fs.routes.js'),
+        ...mounted('/operations', 'operations.routes.js'),
         ...mounted('/dashboard', 'dashboard.routes.js'),
         ...mounted('/settings', 'settings.routes.js'),
     ].sort();
@@ -505,6 +506,7 @@ describe('the two prefixes are one implementation (legacy-api-compatibility)', (
         'GET /fs/thumbnail/capability',
         'GET /fs/tree',
         'GET /health',
+        'GET /operations/:id',
         'GET /settings',
         'POST /fs/copy',
         'POST /fs/download-zip',

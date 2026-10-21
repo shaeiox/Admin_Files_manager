@@ -62,6 +62,7 @@ class FakeEl {
     this.tabIndex = -1;
     this.textContent = '';
     this.children = {};
+    this.styleProps = {};
     this.connected = true;
   }
   set innerHTML(v) { this.html = String(v); }
@@ -87,6 +88,20 @@ class FakeEl {
   click() { this.clicked = (this.clicked || 0) + 1; }
   closest() { return null; }
   getBoundingClientRect() { return { left: 100, top: 100, bottom: 120, right: 140 }; }
+
+  /**
+   * Only the `--progress` custom property is ever set from JS in this page; the
+   * real element exposes it through the CSSStyleDeclaration API. Modelled here so
+   * the guardrail that bans other inline styles still has something to match.
+   */
+  get style() {
+    const el = this;
+    return {
+      setProperty: (k, v) => { el.styleProps[k] = v; },
+      removeProperty: (k) => { delete el.styleProps[k]; },
+      getPropertyValue: (k) => el.styleProps[k],
+    };
+  }
 }
 
 /** A fake event target whose closest(sel) answers from a map of selector -> attributes. */
@@ -148,8 +163,10 @@ const TREE = [{
 function loadFiles({ routes = {}, location = '', store = {} } = {}) {
   const doc = makeDocument();
   const timers = [];
-  const calls = { get: [], getRequests: [], post: [], put: [], del: [], downloadFile: [], downloadMultipleFiles: [], downloadZip: [], upload: [] };
+  const calls = { get: [], getRequests: [], post: [], put: [], del: [], downloadFile: [], downloadMultipleFiles: [], downloadZip: [], upload: [], operationStatus: [] };
   const toasts = [];
+  const operations = new Map();
+  let opSeq = 0;
   const menus = [];
   const copies = [];
   const modal = { confirm: true, prompt: null, lastConfirm: null, lastPrompt: null };
@@ -187,9 +204,17 @@ function loadFiles({ routes = {}, location = '', store = {} } = {}) {
     '#fileDrawer', '#drawerBackdrop', '#filesStatus', '#selectAll', '#pageTitle', '#pageSubtitle', '#sortDropdown',
     '#sortLabel', '#sortTrigger', '#viewToggle', '.app-shell', '#uploadTray', '#hiddenFileInput',
     '#btnPaste', '#btnCancelCut', '#clipboardStrip', '#treePanel', '#treeSheetBackdrop', '#btnTreeSheet',
-    '.sidebar', '.topbar', '.files-header', '#filesToolbar']) el(sel);
+    '.sidebar', '.topbar', '.files-header', '#filesToolbar',
+    '#operationStrip', '#operationVerb', '#operationCount', '#operationFile', '#operationBytes',
+    '#operationProgress', '#operationBar']) el(sel);
   el('#btnPaste').children['.paste-count'] = new FakeEl(doc, '.paste-count');
-  el('#clipboardStrip').children['.clipboard-text'] = new FakeEl(doc, '.clipboard-text');
+  // The strip's sentence is both `.clipboard-text` and the disclosure trigger
+  // (`#clipboardTrigger`); one element, two harness keys. The menu it opens is
+  // populated by files.js and queried globally.
+  const clipText = new FakeEl(doc, '.clipboard-text');
+  el('#clipboardStrip').children['.clipboard-text'] = clipText;
+  els['#clipboardTrigger'] = clipText;
+  el('#clipboardItemsDropdown');
   const drawer = el('#fileDrawer');
   drawer.children['.drawer-body'] = new FakeEl(doc, '.drawer-body');
   drawer.children['.drawer-footer'] = new FakeEl(doc, '.drawer-footer');
@@ -201,11 +226,22 @@ function loadFiles({ routes = {}, location = '', store = {} } = {}) {
 
   const AFM = sandbox.AFM;
   AFM.$ = (sel) => els[sel] || null;
+  // Real Toast.show returns { dismiss, update }; files.js retargets a start toast
+  // into its terminal outcome rather than adding a second one, so the stub must
+  // hand back the same handle and record the updates.
+  const makeToast = (type, t, m) => {
+    const record = { type, t, m, updates: [] };
+    toasts.push(record);
+    return {
+      dismiss() {},
+      update(next) { record.updates.push(next); Object.assign(record, { type: next.type ?? record.type, t: next.title ?? record.t, m: next.msg ?? record.m }); },
+    };
+  };
   AFM.Toast = {
-    success: (t, m) => toasts.push({ type: 'success', t, m }),
-    info: (t, m) => toasts.push({ type: 'info', t, m }),
-    warning: (t, m) => toasts.push({ type: 'warning', t, m }),
-    error: (t, m) => toasts.push({ type: 'error', t, m }),
+    success: (t, m) => makeToast('success', t, m),
+    info: (t, m) => makeToast('info', t, m),
+    warning: (t, m) => makeToast('warning', t, m),
+    error: (t, m) => makeToast('error', t, m),
   };
   AFM.Modal = {
     confirm: async (opts) => { modal.lastConfirm = opts; return modal.confirm; },
@@ -231,14 +267,45 @@ function loadFiles({ routes = {}, location = '', store = {} } = {}) {
     downloadFile: (p) => calls.downloadFile.push(p),
     downloadMultipleFiles: (ps) => calls.downloadMultipleFiles.push(ps),
     downloadZip: (ps) => calls.downloadZip.push(ps),
+    // Tracked operations (copy-move-progress-and-notifications). The status
+    // route is served per operation id, so a test can advance one operation
+    // without disturbing another one running concurrently.
+    startOperation: (kind, payload) => {
+      const id = `op-${++opSeq}`;
+      operations.set(id, { id, kind, payload, polls: 0 });
+      return Promise.resolve(id);
+    },
+    getOperation: (id) => {
+      calls.operationStatus.push(id);
+      const op = operations.get(id);
+      if (!op) return Promise.reject(Object.assign(new Error('Operation not found.'), { status: 404 }));
+      op.polls += 1;
+      const next = typeof op.status === 'function' ? op.status(op.polls) : op.status;
+      return Promise.resolve(next === undefined ? baseStatus(op) : next);
+    },
   };
+
+  /** A status a test can build on: in flight, not yet terminal. */
+  function baseStatus(op) {
+    return {
+      id: op.id,
+      operationKind: op.kind,
+      state: 'in_progress',
+      determinate: false,
+      percent: null,
+      itemInProgress: null,
+      items: { done: 0, total: op.payload.paths.length, failed: 0 },
+      bytes: { transferred: null, total: null, available: false },
+      failures: [], result: null, startedAt: 1, finishedAt: null,
+    };
+  }
 
   vm.runInContext(FILES_SRC, sandbox, { filename: 'files.js' });
   const Files = sandbox.Files;
 
   return {
     Files, pure: Files.pure, c: Files._controller, els, doc, calls, toasts, menus, copies, modal, timers,
-    store,
+    store, operations,
     state: () => Files._controller.getState(),
     flushTimers() {
       const pending = timers.filter(t => !t.cancelled && !t.ran);
@@ -287,6 +354,41 @@ async function bootedWith(extraRoutes = {}, store = {}) {
 }
 
 const html = (page, sel) => page.els[sel].innerHTML;
+
+/**
+ * Drive the operation files.js just started to `status`.
+ *
+ * files.js polls on a captured setTimeout, so a test advances an operation by
+ * setting what the next read returns and flushing the pending timer. Omitting
+ * `status` just lets the scheduled poll run against the default in-flight status.
+ */
+async function advanceOperation(page, status) {
+  await settleAll();
+  // The newest id issued, not the newest map entry: a finished operation stays in
+  // the harness map (files.js drops it from its own), so `.pop()` would re-pick it.
+  const newest = `op-${page.operations.size}`;
+  const op = page.operations.get(newest);
+  if (!op) throw new Error(`no operation ${newest} was started`);
+  if (status !== undefined) op.status = status;
+  page.flushTimers();
+  await settleAll();
+  return op;
+}
+
+/** A terminal status a test can hand to advanceOperation. */
+function terminal(overrides = {}) {
+  return {
+    state: 'completed',
+    determinate: false,
+    percent: null,
+    itemInProgress: null,
+    items: { done: 1, total: 1, failed: 0 },
+    bytes: { transferred: null, total: null, available: false },
+    failures: [],
+    result: { moved: [{ oldPath: '/a.ts', newPath: '/docs/a.ts' }], copied: [], failed: [] },
+    ...overrides,
+  };
+}
 
 function activeTreePaths(treeHtml) {
   return [...treeHtml.matchAll(/<div class="tree-item[^"]*"[^>]*aria-current="page"[^>]*data-tree-path="([^"]*)"/g)].map(m => m[1]);
@@ -1229,10 +1331,14 @@ describe('UI quality', () => {
     assert.equal((grid.match(/class="file-card-name" title="/g) || []).length, 4);
   });
 
-  test('no inline style in files.html and no inline style in files.js', () => {
+  test('no inline style in files.html, and none in files.js beyond the progress ratio', () => {
     assert.doesNotMatch(FILES_HTML, /style="/);
     assert.doesNotMatch(FILES_SRC, /style="/);
-    assert.doesNotMatch(FILES_SRC, /\.style\./);
+    // --progress is not an ad-hoc presentation value: components.css documents it
+    // as the inline ratio .progress-bar is built around, and uploads.js already
+    // sets it the same way. Every OTHER style assignment stays banned.
+    const otherThanProgressRatio = FILES_SRC.split('\n').filter(l => !/--progress/.test(l)).join('\n');
+    assert.doesNotMatch(otherThanProgressRatio, /\.style\./);
   });
 
   test('the stagger offset is bounded', () => {
@@ -1556,9 +1662,10 @@ describe('list columns are fixed-width and resizable', () => {
     assert.equal(stopped, 3);
   });
 
-  test('widths are applied through a stylesheet, never inline styles', () => {
+  test('column widths are applied through a stylesheet, never inline styles', () => {
     assert.match(FILES_SRC, /widthSheet\.textContent = columnWidthsCss\(state\.colWidths\)/);
-    assert.doesNotMatch(FILES_SRC, /\.style\./);
+    const otherThanProgressRatio = FILES_SRC.split('\n').filter(l => !/--progress/.test(l)).join('\n');
+    assert.doesNotMatch(otherThanProgressRatio, /\.style\./);
   });
 });
 
@@ -1660,45 +1767,59 @@ describe('Cut/Copy mark items pending a clipboard op; Paste in another folder is
     assert.equal(page.state().clipboardPaths.size, 0, 'Escape cancelled the pending cut');
   });
 
-  test('paste goes through PUT /fs/move, destination = the currently displayed folder', async () => {
-    const page = await booted({
-      'PUT /fs/move': { success: true, data: { moved: [{ oldPath: '/a.ts', newPath: '/docs/a.ts' }], failed: [] } },
-    });
+  test('paste starts a tracked move, destination = the currently displayed folder', async () => {
+    const page = await booted();
     page.c.navigateTo('/docs');
     await settleAll();
     page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
     await page.c.pasteItems();
-    await settleAll();
-    assert.deepEqual(plain(page.calls.put[0]), { url: '/fs/move', body: { paths: ['/a.ts'], destination: '/docs' } });
+    const op = await advanceOperation(page, terminal());
+
+    assert.deepEqual(plain(op.payload), { paths: ['/a.ts'], destination: '/docs' });
+    assert.equal(op.kind, 'move');
     assert.equal(page.state().clipboardPaths.size, 0, 'moved successfully: nothing stays pending');
     assert.equal(page.state().clipboardMode, null);
     const ok = page.toasts.find(t => t.type === 'success' && /Moved 1 item/.test(t.t));
-    assert.ok(ok);
+    assert.ok(ok, 'the terminal outcome was reported');
   });
 
-  test('paste in copy mode goes through POST /fs/copy, and the clipboard stays pending - a copy is repeatable, unlike a cut', async () => {
-    const page = await booted({
-      'POST /fs/copy': { success: true, data: { copied: [{ sourcePath: '/a.ts', newPath: '/docs/a.ts' }], failed: [] } },
-    });
+  test('a start notification names the operation before it finishes', async () => {
+    const page = await booted();
+    page.c.navigateTo('/docs');
+    await settleAll();
+    page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
+    await page.c.pasteItems();
+
+    // Before any terminal read: the operator already knows something started.
+    const start = page.toasts.find(t => t.type === 'info' && /Move started/.test(t.t));
+    assert.ok(start, 'a start notification appears while the operation is still running');
+    assert.match(start.m, /1 item to \/docs/);
+  });
+
+  test('paste in copy mode starts a tracked copy, and the clipboard stays pending - a copy is repeatable, unlike a cut', async () => {
+    const page = await booted();
     page.c.navigateTo('/docs');
     await settleAll();
     page.c.copyItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
     await page.c.pasteItems();
-    await settleAll();
-    assert.deepEqual(plain(page.calls.post.find(p => p.url === '/fs/copy')), { url: '/fs/copy', body: { paths: ['/a.ts'], destination: '/docs' } });
+    const op = await advanceOperation(page, terminal({
+      result: { moved: [], copied: [{ sourcePath: '/a.ts', newPath: '/docs/a.ts' }], failed: [] },
+    }));
+
+    assert.equal(op.kind, 'copy');
+    assert.deepEqual(plain(op.payload), { paths: ['/a.ts'], destination: '/docs' });
     assert.equal(page.state().clipboardPaths.size, 1, 'copy never consumes the clipboard on its own');
     assert.equal(page.state().clipboardMode, 'copy');
-    const ok = page.toasts.find(t => t.type === 'success' && /Copied 1 item/.test(t.t));
-    assert.ok(ok);
+    assert.ok(page.toasts.find(t => t.type === 'success' && /Copied 1 item/.test(t.t)));
 
     // Paste again into a different folder: the same item duplicates there too.
     page.c.navigateTo('/media');
     await settleAll();
     await page.c.pasteItems();
-    await settleAll();
-    const copyPosts = page.calls.post.filter(p => p.url === '/fs/copy');
-    assert.equal(copyPosts.length, 2, 'pasted twice from the same pending copy');
-    assert.equal(copyPosts[1].body.destination, '/media');
+    const second = await advanceOperation(page, terminal({
+      result: { moved: [], copied: [{ sourcePath: '/a.ts', newPath: '/media/a.ts' }], failed: [] },
+    }));
+    assert.equal(second.payload.destination, '/media', 'pasted twice from the same pending copy');
   });
 
   test('pasting into the folder an item is already in is a no-op with a message, no request sent (cut only - copy has no such case)', async () => {
@@ -1706,33 +1827,41 @@ describe('Cut/Copy mark items pending a clipboard op; Paste in another folder is
     page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]); // currentPath is '/': same parent
     await page.c.pasteItems();
     await settleAll();
-    assert.equal(page.calls.put.length, 0, 'no PUT /fs/move fired');
+    assert.equal(page.operations.size, 0, 'no operation was started');
     assert.ok(page.toasts.some(t => t.type === 'info' && /Already there/.test(t.t)));
     assert.equal(page.state().clipboardPaths.size, 1, 'still pending - nothing happened to cancel it');
   });
 
   test('copying into the folder an item is already in is NOT short-circuited - the server decides (a real collision)', async () => {
-    const page = await booted({
-      'POST /fs/copy': new Error('An item with this name already exists at the destination.'),
-    });
+    const page = await booted();
     page.c.copyItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]); // currentPath is '/': same parent
     await page.c.pasteItems();
-    await settleAll();
-    assert.equal(page.calls.post.filter(p => p.url === '/fs/copy').length, 1, 'the request was actually sent, unlike cut');
-    assert.ok(!page.toasts.some(t => /Already there/.test(t.t)));
+    await advanceOperation(page, terminal({
+      state: 'failed',
+      items: { done: 0, total: 1, failed: 1 },
+      failures: [{ path: '/a.ts', error: 'An item with this name already exists at the destination.', statusCode: 409 }],
+      result: { moved: [], copied: [], failed: [{ path: '/a.ts' }] },
+    }));
+
+    assert.ok(!page.toasts.some(t => /Already there/.test(t.t)), 'no short-circuit notice for a copy');
     const err = page.toasts.find(t => t.type === 'error');
-    assert.equal(err.t, 'Copy failed');
+    assert.ok(err, 'the server refusal reached the operator');
+    assert.match(err.m, /already exists at the destination/);
   });
 
   test('a total paste failure (e.g. a 409 name collision) shows a specific "Move failed" toast, not a generic one', async () => {
-    const page = await booted({
-      'PUT /fs/move': new Error('An item with this name already exists at the destination.'),
-    });
+    const page = await booted();
     page.c.navigateTo('/docs');
     await settleAll();
     page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
     await page.c.pasteItems();
-    await settleAll();
+    await advanceOperation(page, terminal({
+      state: 'failed',
+      items: { done: 0, total: 1, failed: 1 },
+      failures: [{ path: '/a.ts', error: 'An item with this name already exists at the destination.', statusCode: 409 }],
+      result: { moved: [], failed: [{ path: '/a.ts' }] },
+    }));
+
     const err = page.toasts.find((t) => t.type === 'error');
     assert.ok(err, 'an error toast appears');
     assert.equal(err.t, 'Move failed');
@@ -1741,22 +1870,23 @@ describe('Cut/Copy mark items pending a clipboard op; Paste in another folder is
     assert.equal(page.state().clipboardPaths.size, 1, 'still pending - the operator can retry');
   });
 
-  test('both the move and the copy request are sent silent, so api.js never also raises its own generic toast for either', () => {
-    const fn = FILES_SRC.slice(FILES_SRC.indexOf('async function pasteItems'), FILES_SRC.indexOf('/* ── access policy'));
-    assert.match(fn, /window\.API\.put\('\/fs\/move', \{ paths, destination \}, \{ silent: true \}\)/);
-    assert.match(fn, /window\.API\.post\('\/fs\/copy', \{ paths, destination \}, \{ silent: true \}\)/);
+  test('initiation and status are both silent, so api.js never also raises its own generic toast', () => {
+    const start = FILES_SRC.slice(
+      FILES_SRC.indexOf('async function startTrackedOperation'),
+      FILES_SRC.indexOf('/** Paste the pending clipboard op')
+    );
+    assert.match(start, /window\.API\.startOperation\(kind, \{ paths, destination \}\)/);
+    // api.js startOperation/getOperation force silent:true internally, so a
+    // server refusal or a lost status never doubles up with a generic toast.
+    const api = require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '..', '..', 'public', 'assets', 'js', 'api.js'), 'utf8');
+    assert.match(api, /get\(`\/operations\/\$\{encodeURIComponent\(operationId\)\}`, \{ silent: true/);
+    assert.match(api, /await put\(endpoint, body, \{ silent: true/);
+    assert.match(api, /await post\(endpoint, body, \{ silent: true/);
   });
 
   test('a partial move paste keeps only the failed item pending, so pasting again retries just that one', async () => {
-    const page = await booted({
-      'PUT /fs/move': {
-        success: true,
-        data: {
-          moved: [{ oldPath: '/a.ts', newPath: '/docs/a.ts' }],
-          failed: [{ path: '/b.png', error: 'Item not found: /b.png', statusCode: 404 }],
-        },
-      },
-    });
+    const page = await booted();
     page.c.navigateTo('/docs');
     await settleAll();
     page.c.cutItems([
@@ -1764,22 +1894,25 @@ describe('Cut/Copy mark items pending a clipboard op; Paste in another folder is
       { name: 'b.png', path: '/b.png', isFolder: false },
     ]);
     await page.c.pasteItems();
-    await settleAll();
+    await advanceOperation(page, terminal({
+      state: 'partial',
+      items: { done: 1, total: 2, failed: 1 },
+      failures: [{ path: '/b.png', error: 'Item not found: /b.png', statusCode: 404 }],
+      result: {
+        moved: [{ oldPath: '/a.ts', newPath: '/docs/a.ts' }],
+        copied: [],
+        failed: [{ path: '/b.png', error: 'Item not found: /b.png', statusCode: 404 }],
+      },
+    }));
+
     assert.deepEqual([...page.state().clipboardPaths], ['/b.png']);
     const warn = page.toasts.find(t => t.type === 'warning');
     assert.match(warn.t, /Moved 1 of 2/);
+    assert.match(warn.m, /b\.png: Item not found/);
   });
 
   test('a partial copy paste reports the summary but still leaves everything pending (copy never auto-clears)', async () => {
-    const page = await booted({
-      'POST /fs/copy': {
-        success: true,
-        data: {
-          copied: [{ sourcePath: '/a.ts', newPath: '/docs/a.ts' }],
-          failed: [{ path: '/b.png', error: 'Item not found: /b.png', statusCode: 404 }],
-        },
-      },
-    });
+    const page = await booted();
     page.c.navigateTo('/docs');
     await settleAll();
     page.c.copyItems([
@@ -1787,7 +1920,16 @@ describe('Cut/Copy mark items pending a clipboard op; Paste in another folder is
       { name: 'b.png', path: '/b.png', isFolder: false },
     ]);
     await page.c.pasteItems();
-    await settleAll();
+    await advanceOperation(page, terminal({
+      state: 'partial',
+      items: { done: 1, total: 2, failed: 1 },
+      failures: [{ path: '/b.png', error: 'Item not found: /b.png', statusCode: 404 }],
+      result: {
+        moved: [],
+        copied: [{ sourcePath: '/a.ts', newPath: '/docs/a.ts' }],
+        failed: [{ path: '/b.png', error: 'Item not found: /b.png', statusCode: 404 }],
+      },
+    }));
     assert.deepEqual([...page.state().clipboardPaths].sort(), ['/a.ts', '/b.png'], 'both stay pending - copy does not drop the failed OR the succeeded one');
     const warn = page.toasts.find(t => t.type === 'warning');
     assert.match(warn.t, /Copied 1 of 2/);
@@ -1807,29 +1949,32 @@ describe('Cut/Copy mark items pending a clipboard op; Paste in another folder is
   });
 
   test('Ctrl+V pastes when a clipboard op is pending, and is ignored while typing in a field', async () => {
-    const page = await booted({
-      'PUT /fs/move': { success: true, data: { moved: [{ oldPath: '/a.ts', newPath: '/docs/a.ts' }], failed: [] } },
-    });
+    const page = await booted();
     page.c.navigateTo('/docs');
     await settleAll();
     page.c.cutItems([{ name: 'a.ts', path: '/a.ts', isFolder: false }]);
 
     const inputTarget = { tagName: 'INPUT' };
     page.c.onPasteShortcut({ key: 'v', ctrlKey: true, target: inputTarget, preventDefault() {} });
-    assert.equal(page.calls.put.length, 0, 'typing into a field is not a paste shortcut');
+    await settleAll();
+    assert.equal(page.operations.size, 0, 'typing into a field is not a paste shortcut');
 
     let prevented = 0;
     page.c.onPasteShortcut({ key: 'v', ctrlKey: true, target: {}, preventDefault() { prevented++; } });
     await settleAll();
     assert.equal(prevented, 1);
-    assert.equal(page.calls.put.length, 1);
+    assert.equal(page.operations.size, 1, 'the shortcut started the tracked operation');
   });
 
-  test('move goes through PUT /fs/move, copy through POST /fs/copy, and policy through PUT /admin/files/policy - no new endpoint invented beyond those', () => {
-    assert.match(FILES_SRC, /window\.API\.put\('\/fs\/move', \{ paths, destination \}, \{ silent: true \}\)/);
-    assert.match(FILES_SRC, /window\.API\.post\('\/fs\/copy', \{ paths, destination \}, \{ silent: true \}\)/);
+  test('move and copy go through the existing fs endpoints via api.js, policy through the admin endpoint - no ad-hoc endpoint in files.js', () => {
+    // files.js no longer calls post/put directly for copy and move: it hands the
+    // payload to API.startOperation, which api.js routes to POST /fs/copy or
+    // PUT /fs/move. What must hold is that no URL is built in this module.
+    assert.match(FILES_SRC, /window\.API\.startOperation\(kind, \{ paths, destination \}\)/);
+    assert.match(FILES_SRC, /window\.API\.getOperation\(id\)/);
     assert.match(FILES_SRC, /window\.API\.put\('\/admin\/files\/policy', \{/);
     assert.doesNotMatch(FILES_SRC, /\bfetch\(/);
+    assert.doesNotMatch(FILES_SRC, /['"`]\/api\//, 'no API base or path literal in a page module');
   });
 
   test('the access-policy modal escapes the item name before it reaches markup', () => {
@@ -1932,6 +2077,113 @@ describe('command bar modes (files-page-ux-redesign)', () => {
     page.c.copyItems([LISTING.items[2]]);
     assert.equal(page.els['#clipboardStrip'].children['.clipboard-text'].textContent, '1 item ready to copy');
     assert.equal(page.els['#btnCancelCut'].getAttribute('aria-label'), 'Cancel copy');
+  });
+
+  test('the strip sentence is a disclosure trigger wired to a menu inside the strip', () => {
+    // Markup: the sentence doubles as the trigger, as a real <button> (the page
+    // bans role="button" spans, so keyboard activation is native). The menu is
+    // its sibling inside the strip, so the shared `.dropdown-menu` positions
+    // against the strip. aria-expanded ships false - it tracks the menu from there.
+    const strip = FILES_HTML.match(/id="clipboardStrip"[\s\S]*?<\/div>/)[0];
+    assert.match(strip, /<button type="button" class="clipboard-text" id="clipboardTrigger"/);
+    assert.match(strip, /aria-controls="clipboardItemsDropdown"/);
+    assert.match(strip, /aria-expanded="false"/);
+    assert.match(strip, /id="clipboardItemsDropdown"/);
+    assert.doesNotMatch(strip, /role="button"/, 'a real button, not a role="button" span');
+  });
+
+  test('cutting files lists their names in the menu; cancelling empties it', async () => {
+    const page = await booted();
+    page.c.cutItems([LISTING.items[2], LISTING.items[3]]);
+    const menu = page.els['#clipboardItemsDropdown'];
+    assert.match(menu.innerHTML, /Ready to move/);
+    assert.match(menu.innerHTML, /a\.ts/);
+    assert.match(menu.innerHTML, /b\.png/);
+    assert.match(menu.innerHTML, /title="\/a\.ts"/, 'each row shows its source path');
+
+    page.c.cancelClipboard();
+    assert.equal(menu.innerHTML, '', 'nothing pending, nothing listed');
+  });
+
+  test('a copy menu says copy, and a completed move empties the menu with the clipboard', async () => {
+    const page = await booted();
+    page.c.navigateTo('/docs');
+    await settleAll();
+    page.c.copyItems([LISTING.items[2]]);
+    assert.match(page.els['#clipboardItemsDropdown'].innerHTML, /Ready to copy/);
+
+    // A cut whose move completed: only then does the clipboard (and this menu)
+    // release the item.
+    page.c.cutItems([LISTING.items[3]]);
+    await page.c.pasteItems();
+    await advanceOperation(page, terminal({
+      result: { moved: [{ oldPath: '/b.png', newPath: '/docs/b.png' }], copied: [], failed: [] },
+    }));
+    assert.equal(page.els['#clipboardItemsDropdown'].innerHTML, '');
+  });
+
+  test('a hostile filename on the clipboard renders as text, not markup', async () => {
+    const page = await booted();
+    const hostile = '<img src=x onerror=alert(1)>.mp4';
+    page.c.cutItems([{ name: hostile, path: `/${hostile}`, isFolder: false }]);
+    const menu = page.els['#clipboardItemsDropdown'];
+    assert.ok(!menu.innerHTML.includes('<img'), 'no element was created from the name');
+    assert.ok(menu.innerHTML.includes('&lt;img'), 'the name is shown escaped');
+  });
+
+  test('hovering the strip opens the menu, leaving it closes the menu', async () => {
+    const page = await booted();
+    page.c.cutItems([LISTING.items[2]]);
+    const strip = page.els['#clipboardStrip'];
+    const menu = page.els['#clipboardItemsDropdown'];
+    const fire = (el, type, extra = {}) => (el.listeners[type] || []).forEach(fn => fn({ preventDefault() {}, stopPropagation() {}, ...extra }));
+
+    fire(strip, 'mouseenter');
+    assert.ok(menu.classList.contains('is-open'), 'hover shows the pending files');
+    fire(strip, 'mouseleave');
+    assert.ok(!menu.classList.contains('is-open'), 'leaving hides them');
+  });
+
+  test('activating the disclosure toggles it, and aria-expanded tracks it', async () => {
+    const page = await booted();
+    page.c.cutItems([LISTING.items[2]]);
+    const trigger = page.els['#clipboardTrigger'];
+    const menu = page.els['#clipboardItemsDropdown'];
+    const fire = (el, type, extra = {}) => (el.listeners[type] || []).forEach(fn => fn({ preventDefault() {}, stopPropagation() {}, ...extra }));
+
+    fire(trigger, 'click');
+    assert.ok(menu.classList.contains('is-open'));
+    assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+    fire(trigger, 'click');
+    assert.ok(!menu.classList.contains('is-open'));
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+    // Keyboard activation is the button's own behaviour (Enter/Space dispatch
+    // click natively); the markup test above pins that the trigger is a real
+    // button, so there is no keydown handler to double-fire here.
+  });
+
+  test('Escape closes the disclosure and keeps the announced state in step', async () => {
+    const page = await booted();
+    page.c.cutItems([LISTING.items[2]]);
+    const trigger = page.els['#clipboardTrigger'];
+    const menu = page.els['#clipboardItemsDropdown'];
+    (trigger.listeners.click || []).forEach(fn => fn({ preventDefault() {}, stopPropagation() {} }));
+    assert.ok(menu.classList.contains('is-open'));
+
+    // The global Escape listener files.js registers on document. Only the
+    // disclosure handler touches aria-expanded, so that assertion isolates it
+    // even though onEscape also runs and cancels the clipboard.
+    page.doc.listeners.keydown.forEach(l => l.fn({ key: 'Escape', preventDefault() {} }));
+    assert.ok(!menu.classList.contains('is-open'));
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+  });
+
+  test('the disclosure is anchored to the strip and bounded so a long selection scrolls', () => {
+    assert.match(FILES_CSS, /\.clipboard-strip\s*\{[^}]*position:\s*relative/);
+    const menu = FILES_CSS.match(/\.clipboard-menu\s*\{[^}]*\}/)[0];
+    assert.match(menu, /max-height:/, 'a long list is capped, not run off the page');
+    assert.match(menu, /overflow-y:\s*auto/);
+    assert.match(menu, /left:\s*0/, 'it drops below the strip, not its right edge');
   });
 });
 

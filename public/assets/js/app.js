@@ -326,6 +326,13 @@ const Toast = (() => {
   const activeToasts = new Map();
   let toastCounter = 0;
 
+  /**
+   * How long a toast lives once `update()` has retargeted it to a terminal
+   * outcome. Longer than the 3800ms default: the message a promoted toast
+   * carries is a result the operator has to act on, not a passing notice.
+   */
+  const TERMINAL_DURATION_MS = 8000;
+
   function ensureStack() {
     if (!stack) {
       stack = $('.toast-stack') || el('div', { class: 'toast-stack', 'aria-live': 'polite' });
@@ -439,7 +446,61 @@ const Toast = (() => {
 
     activeToasts.set(node, item);
 
-    return { dismiss: () => dismiss(node) };
+    /**
+     * Retarget an existing toast IN PLACE.
+     *
+     * `show()` only ever appends a new node, so a caller that wants to change a
+     * toast - promoting a "Copying…" notice into its outcome, say - had no way to
+     * do it without a second toast beside the first. That produced a duplicate
+     * pair on every operation. This mutates the node instead: no new element, no
+     * new expiry timer, and the stack keeps holding one toast per operation.
+     *
+     * @param {{title?: string, msg?: string, type?: string}} next
+     * @returns {boolean} false when the toast is gone (dismissed or expired)
+     */
+    function update(node, { title, msg, type } = {}) {
+      const item = activeToasts.get(node);
+      if (!item || item.state === 'exiting') return false;
+
+      if (type && type !== item.type) {
+        item.type = type;
+        node.className = `toast ${type}`;
+        const iconNode = node.querySelector('.toast-icon');
+        if (iconNode) iconNode.innerHTML = icon(iconFor[type] || 'info', 15);
+      }
+
+      // textContent, not innerHTML: a title or message can carry filesystem-
+      // derived names and server-supplied failure text, and assigning text never
+      // parses markup, so nothing here can reach the DOM as an element.
+      if (typeof title === 'string') {
+        const el = node.querySelector('.toast-title');
+        if (el) el.textContent = title;
+      }
+      if (typeof msg === 'string') {
+        let el = node.querySelector('.toast-msg');
+        if (!el) {
+          el = document.createElement('div');
+          el.className = 'toast-msg';
+          node.querySelector('.toast-content')?.appendChild(el);
+        }
+        el.textContent = msg;
+      }
+
+      // A promoted toast starts its expiry from now: it should linger long enough
+      // to be read as an outcome rather than inherit the "in flight" deadline.
+      item.duration = TERMINAL_DURATION_MS;
+      item.remaining = item.duration;
+      item.startTime = Date.now();
+      if (item.state === 'paused') item.state = 'active';
+      if (item.timer) clearTimeout(item.timer);
+      item.timer = setTimeout(() => dismiss(node), item.duration);
+      return true;
+    }
+
+    return {
+      dismiss: () => dismiss(node),
+      update: (next) => update(node, next),
+    };
   }
 
   return {

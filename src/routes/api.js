@@ -3,6 +3,7 @@
 
 const express = require('express');
 const fsRoutes = require('./fs.routes');
+const operationsRoutes = require('./operations.routes');
 const dashboardRoutes = require('./dashboard.routes');
 const settingsRoutes = require('./settings.routes');
 const authRoutes = require('./auth.routes');
@@ -65,6 +66,7 @@ router.use(authenticate);
 router.use(csrf);
 
 router.use('/fs', fsRoutes);
+router.use('/operations', operationsRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/admin', adminRoutes);

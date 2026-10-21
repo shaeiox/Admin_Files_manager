@@ -195,9 +195,13 @@ class FileSystemService {
      *
      * @param {string} oldClientPath - Existing path (e.g., "/media/old.txt")
      * @param {string} destinationClientPath - Existing destination DIRECTORY (e.g., "/archive")
+     * @param {{itemStart?: (path: string, name: string) => void, itemDone?: () => void}} [onProgress] -
+     *   Optional per-item sink. Deliberately offers NO percentage: `fs.rename` is a
+     *   single atomic syscall, so there is no intra-item state to observe and any
+     *   percentage here would be an estimate about I/O this process cannot see.
      * @returns {Promise<{oldPath: string, newPath: string}>}
      */
-    static async move(oldClientPath, destinationClientPath) {
+    static async move(oldClientPath, destinationClientPath, onProgress = null) {
         const path = require('path');
         const oldSecurePath = await PathService.resolveSecureParentPath(oldClientPath);
 
@@ -244,7 +248,11 @@ class FileSystemService {
         }
 
         try {
+            if (onProgress && typeof onProgress.itemStart === 'function') {
+                onProgress.itemStart(oldClientPath, name);
+            }
             await fs.rename(oldSecurePath, newSecurePath);
+            if (onProgress && typeof onProgress.itemDone === 'function') onProgress.itemDone();
             return {
                 oldPath: PathService.toClientPath(oldSecurePath),
                 newPath: PathService.toClientPath(newSecurePath),
@@ -258,6 +266,94 @@ class FileSystemService {
     }
 
     /**
+     * Sum the bytes of every regular file under `securePath`.
+     *
+     * Uses `lstat`, never `stat`: a symbolic link is not followed, so a link's
+     * target bytes are never counted as work this copy is going to do (and a link
+     * pointing outside the root cannot inflate a total by its target's size).
+     *
+     * @returns {Promise<number|null>} the total, or null when it cannot be measured
+     */
+    static async _measureTreeBytes(securePath) {
+        const path = require('path');
+        let total = 0;
+        try {
+            const pending = [securePath];
+            while (pending.length) {
+                const current = pending.pop();
+                const stat = await fs.lstat(current);
+                if (stat.isSymbolicLink()) continue;
+                if (stat.isDirectory()) {
+                    for (const entry of await fs.readdir(current)) {
+                        pending.push(path.join(current, entry));
+                    }
+                } else if (stat.isFile()) {
+                    total += stat.size;
+                }
+            }
+            return total;
+        } catch {
+            // Unmeasurable is a real answer, reported as such rather than as zero.
+            return null;
+        }
+    }
+
+    /**
+     * Recursive copy that reports what it is doing.
+     *
+     * LINK RULE (load-bearing). Entries are classified with `lstat`, never `stat`.
+     * A symbolic link is RE-CREATED as a link, never followed - the same
+     * dereference:false behaviour `fs.cp` had, and the same reason the tree walk
+     * at getTreeStats skips links. Following one would read (and copy) bytes from
+     * wherever it points, which is exactly the escape the write-side guard on the
+     * SOURCE and DESTINATION paths already refuses.
+     *
+     * Byte counts advance per FILE, not per chunk: `fs.copyFile` is atomic at call
+     * granularity, so there is no honest sub-file figure to report.
+     */
+    static async _copyWalk(sourcePath, destPath, onProgress = null) {
+        const path = require('path');
+        const stat = await fs.lstat(sourcePath);
+
+        if (stat.isSymbolicLink()) {
+            const link = await fs.readlink(sourcePath);
+            const resolved = path.resolve(path.dirname(sourcePath), link);
+            // Windows needs the target type; elsewhere the argument is ignored.
+            let isDirTarget = false;
+            try {
+                isDirTarget = (await fs.stat(resolved)).isDirectory();
+            } catch { /* broken link - treat as a file link, as fs.cp does */ }
+            // On Windows a directory link is recreated as a JUNCTION. A 'dir'
+            // symlink there needs Developer Mode or elevation and would fail with
+            // EPERM on a stock host; a junction needs neither and is the same kind
+            // of reparse point. File links have no junction equivalent and still
+            // need the privilege, exactly as before.
+            const type = isDirTarget ? (process.platform === 'win32' ? 'junction' : 'dir') : 'file';
+            await fs.symlink(link, destPath, type);
+            return;
+        }
+
+        if (stat.isDirectory()) {
+            await fs.mkdir(destPath);
+            for (const entry of await fs.readdir(sourcePath)) {
+                await this._copyWalk(path.join(sourcePath, entry), path.join(destPath, entry), onProgress);
+            }
+            return;
+        }
+
+        if (!stat.isFile()) {
+            // Sockets, FIFOs and devices have no copyFile equivalent. Refuse rather
+            // than silently skip, so the caller learns the tree was not fully copied.
+            throw new AppError('Failed to copy item on disk.', 500);
+        }
+
+        const name = path.basename(sourcePath);
+        if (onProgress && typeof onProgress.itemStart === 'function') onProgress.itemStart(name);
+        await fs.copyFile(sourcePath, destPath);
+        if (onProgress && typeof onProgress.fileDone === 'function') onProgress.fileDone(name, stat.size);
+    }
+
+    /**
      * Copy a file or folder into a different, already-existing directory,
      * leaving the original in place. Shares move()'s validation (existing
      * destination directory, no implicit creation, name collision refused,
@@ -267,9 +363,13 @@ class FileSystemService {
      *
      * @param {string} oldClientPath - Existing path (e.g., "/media/old.txt")
      * @param {string} destinationClientPath - Existing destination DIRECTORY (e.g., "/archive")
+     * @param {{measured?: (n: number|null) => void, itemStart?: (name: string) => void,
+     *          fileDone?: (name: string, bytes: number) => void}} [onProgress] -
+     *   Optional real-progress sink. Every value reported here is counted from work
+     *   the walk actually did; nothing is interpolated from elapsed time.
      * @returns {Promise<{sourcePath: string, newPath: string}>}
      */
-    static async copy(oldClientPath, destinationClientPath) {
+    static async copy(oldClientPath, destinationClientPath, onProgress = null) {
         const path = require('path');
         const oldSecurePath = await PathService.resolveSecureParentPath(oldClientPath);
 
@@ -301,8 +401,16 @@ class FileSystemService {
             throw new AppError('An item with this name already exists at the destination.', 409);
         }
 
+        // fs.cp cannot report anything: its options carry no progress hook. Measure
+        // the source tree FIRST so the denominator is real, then walk it explicitly.
+        // A failed measurement degrades to `null` (unavailable) - never 0, which is
+        // a real reading and would invent a total.
+        if (onProgress && typeof onProgress.measured === 'function') {
+            onProgress.measured(await this._measureTreeBytes(oldSecurePath));
+        }
+
         try {
-            await fs.cp(oldSecurePath, newSecurePath, { recursive: true, errorOnExist: true });
+            await this._copyWalk(oldSecurePath, newSecurePath, onProgress);
             return {
                 sourcePath: PathService.toClientPath(oldSecurePath),
                 newPath: PathService.toClientPath(newSecurePath),

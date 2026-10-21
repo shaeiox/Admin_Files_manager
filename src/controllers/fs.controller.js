@@ -7,6 +7,7 @@ const FileSystemService = require('../services/FileSystemService');
 const MetadataService = require('../services/MetadataService');
 const FileAccessPolicyService = require('../services/FileAccessPolicyService');
 const IntegrationSettingsService = require('../services/IntegrationSettingsService');
+const OperationService = require('../services/OperationService');
 const UploadService = require('../services/UploadService');
 const AppError = require('../utils/AppError');
 const { validateFileName, validateClientPath } = require('../utils/validators');
@@ -15,6 +16,87 @@ const { mapWithConcurrency } = require('../utils/concurrency');
 // Archiver 8 is ESM with named exports only. The v5-era callable
 // factory no longer exists and calling it throws "archiver is not a function".
 const { ZipArchive } = require('archiver');
+
+/* ══════════════════════════════════════════
+   TRACKED OPERATION SUPPORT (async Copy/Move)
+   ══════════════════════════════════════════ */
+
+/**
+ * Register an operation before any work starts, so a status read issued while
+ * the request is still running already has something truthful to report.
+ *
+ * @returns {string|null} the operation id, or null when tracking is unavailable
+ */
+function startTrackedOperation({ operationKind, paths, sessionId }) {
+    try {
+        return OperationService.create({
+            operationKind,
+            sessionId: sessionId || null,
+            itemsTotal: paths.length,
+            items: paths,
+        }).id;
+    } catch (error) {
+        // Tracking must never be the reason a copy or move fails.
+        console.error('[Operation] Could not register operation:', error.message);
+        return null;
+    }
+}
+
+/**
+ * Drive a registered operation to a terminal state, whatever happens.
+ *
+ * The work runs detached from the request that started it, so the client can
+ * read progress instead of blocking on one response. Every exit path ends in
+ * exactly one terminal state: a failure inside `work` is recorded against the
+ * operation rather than left to surface as an unhandled rejection, which is
+ * what would otherwise strand a client polling a stalled operation forever.
+ */
+function runTrackedOperation(operationId, operationKind, work) {
+    Promise.resolve()
+        .then(work)
+        .catch((error) => {
+            console.error(`[Operation] ${operationKind} failed:`, error.message);
+            try {
+                OperationService.finish(operationId, { copied: 0, moved: 0, result: { error: error.message } });
+            } catch { /* already terminal - nothing to settle */ }
+        });
+}
+
+/**
+ * Translate a service-level per-item progress sink into operation updates.
+ *
+ * `measured` is the pre-walk byte total: a real denominator, or null when the
+ * source tree could not be measured (which is reported as unavailable, never 0).
+ */
+function operationItemProgress(operationId, clientPath, withBytes = false) {
+    return {
+        measured: (total) => {
+            try { OperationService.setByteTotal(operationId, total); } catch { /* terminal */ }
+        },
+        itemStart: (name) => {
+            try { OperationService.setInFlight(operationId, clientPath, name); } catch { /* terminal */ }
+        },
+        fileDone: (_name, bytes) => {
+            try { OperationService.addFileBytes(operationId, bytes); } catch { /* terminal */ }
+        },
+        itemDone: () => {},
+    };
+}
+
+/**
+ * Settle the operation from the SAME per-item results the synchronous contract
+ * has always returned, so the async outcome and the sync outcome cannot disagree.
+ */
+function settleTrackedOperation(operationId, results, key) {
+    try {
+        OperationService.finish(operationId, {
+            [key]: results[key].length,
+            result: { [key]: results[key], failed: results.failed },
+        });
+    } catch (error) {
+        console.error('[Operation] Could not settle operation:', error.message);
+    }
+}
 
 /**
  * GET /api/fs/tree?path=...
@@ -317,10 +399,16 @@ async function renameItem(req, res, next) {
  * Body: { paths: ["/media/a.txt", "/media/folder-b"], destination: "/archive" }
  * Bulk, same partial-failure contract as DELETE /api/fs/delete: a 200 can
  * still carry per-item failures in data.failed.
+ *
+ * ASYNC OPT-IN (additive, ADR-007). With `async: true` the work is registered as
+ * a tracked operation and the response returns immediately with its id, so a
+ * client can report real progress; the outcome is then read from
+ * GET /api/fs/operations/:id. Without it the behaviour below is byte-identical
+ * to what it has always been - the default path is untouched.
  */
 async function moveItems(req, res, next) {
     try {
-        const { paths, destination } = req.body || {};
+        const { paths, destination, async: asyncRequested } = req.body || {};
 
         if (!Array.isArray(paths) || paths.length === 0) {
             throw new AppError('At least one path must be provided.', 400);
@@ -332,37 +420,26 @@ async function moveItems(req, res, next) {
 
         const results = { moved: [], failed: [] };
 
-        for (const clientPath of paths) {
-            try {
-                validateClientPath(clientPath);
-                const { oldPath: from, newPath: to } = await FileSystemService.move(clientPath, destination);
+        const operationId = asyncRequested
+            ? startTrackedOperation({ operationKind: 'move', paths, sessionId: (req.session && req.session.id) || null })
+            : null;
 
-                if (from !== to) {
-                    try {
-                        await MetadataService.renamePath(from, to);
-                    } catch (metaErr) {
-                        console.error('[Metadata] Failed to migrate on move:', metaErr.message);
-                    }
-                    FileAccessPolicyService.onPathRenamed(from, to);
-                    IntegrationSettingsService.onPathRenamed(from, to);
-
-                    MetadataService.addActivity({
-                        type: 'edit',
-                        user: 'system',
-                        action: 'moved',
-                        target: path.posix.basename(to),
-                        folder: path.posix.dirname(to),
-                    }).catch(() => { });
+        if (operationId) {
+            // Fire and forget, but never unobserved: a rejection anywhere below
+            // still drives the operation to its one terminal state, so the client
+            // is never left polling a stalled operation.
+            runTrackedOperation(operationId, 'move', async () => {
+                OperationService.start(operationId);
+                for (const clientPath of paths) {
+                    await runOneMove(operationId, clientPath, destination, results);
                 }
+                settleTrackedOperation(operationId, results, 'moved');
+            });
+            return res.json({ success: true, data: { operationId } });
+        }
 
-                results.moved.push({ oldPath: from, newPath: to });
-            } catch (err) {
-                results.failed.push({
-                    path: clientPath,
-                    error: err.message,
-                    statusCode: err.statusCode || 500,
-                });
-            }
+        for (const clientPath of paths) {
+            await runOneMove(null, clientPath, destination, results);
         }
 
         if (results.moved.length === 0 && results.failed.length > 0) {
@@ -379,6 +456,44 @@ async function moveItems(req, res, next) {
     }
 }
 
+/** Move one path, recording it against the operation when one is being tracked. */
+async function runOneMove(operationId, clientPath, destination, results) {
+    try {
+        validateClientPath(clientPath);
+        if (operationId) OperationService.setInFlight(operationId, clientPath, path.posix.basename(clientPath));
+        const { oldPath: from, newPath: to } = await FileSystemService.move(
+            clientPath,
+            destination,
+            operationId ? operationItemProgress(operationId, clientPath) : null
+        );
+
+        if (from !== to) {
+            try {
+                await MetadataService.renamePath(from, to);
+            } catch (metaErr) {
+                console.error('[Metadata] Failed to migrate on move:', metaErr.message);
+            }
+            FileAccessPolicyService.onPathRenamed(from, to);
+            IntegrationSettingsService.onPathRenamed(from, to);
+
+            MetadataService.addActivity({
+                type: 'edit',
+                user: 'system',
+                action: 'moved',
+                target: path.posix.basename(to),
+                folder: path.posix.dirname(to),
+            }).catch(() => { });
+        }
+
+        if (operationId) OperationService.completeItem(operationId, 0);
+        results.moved.push({ oldPath: from, newPath: to });
+    } catch (err) {
+        const failure = { path: clientPath, error: err.message, statusCode: err.statusCode || 500 };
+        if (operationId) OperationService.failItem(operationId, clientPath, err.message, failure.statusCode);
+        results.failed.push(failure);
+    }
+}
+
 /**
  * POST /api/fs/copy
  * Body: { paths: ["/media/a.txt", "/media/folder-b"], destination: "/archive" }
@@ -386,10 +501,13 @@ async function moveItems(req, res, next) {
  * /api/fs/delete: a 200 can still carry per-item failures in data.failed.
  * The source is left in place; a copy is a new item, so unlike move it
  * carries no metadata/access-policy migration.
+ *
+ * ASYNC OPT-IN (additive, ADR-007). `async: true` registers a tracked
+ * operation and returns its id immediately; see moveItems for the rationale.
  */
 async function copyItems(req, res, next) {
     try {
-        const { paths, destination } = req.body || {};
+        const { paths, destination, async: asyncRequested } = req.body || {};
 
         if (!Array.isArray(paths) || paths.length === 0) {
             throw new AppError('At least one path must be provided.', 400);
@@ -401,27 +519,23 @@ async function copyItems(req, res, next) {
 
         const results = { copied: [], failed: [] };
 
+        const operationId = asyncRequested
+            ? startTrackedOperation({ operationKind: 'copy', paths, sessionId: (req.session && req.session.id) || null })
+            : null;
+
+        if (operationId) {
+            runTrackedOperation(operationId, 'copy', async () => {
+                OperationService.start(operationId);
+                for (const clientPath of paths) {
+                    await runOneCopy(operationId, clientPath, destination, results);
+                }
+                settleTrackedOperation(operationId, results, 'copied');
+            });
+            return res.json({ success: true, data: { operationId } });
+        }
+
         for (const clientPath of paths) {
-            try {
-                validateClientPath(clientPath);
-                const { sourcePath, newPath } = await FileSystemService.copy(clientPath, destination);
-
-                MetadataService.addActivity({
-                    type: 'edit',
-                    user: 'system',
-                    action: 'copied',
-                    target: path.posix.basename(newPath),
-                    folder: path.posix.dirname(newPath),
-                }).catch(() => { });
-
-                results.copied.push({ sourcePath, newPath });
-            } catch (err) {
-                results.failed.push({
-                    path: clientPath,
-                    error: err.message,
-                    statusCode: err.statusCode || 500,
-                });
-            }
+            await runOneCopy(null, clientPath, destination, results);
         }
 
         if (results.copied.length === 0 && results.failed.length > 0) {
@@ -435,6 +549,35 @@ async function copyItems(req, res, next) {
         });
     } catch (error) {
         next(error);
+    }
+}
+
+/** Copy one path, recording real measured progress against the operation. */
+async function runOneCopy(operationId, clientPath, destination, results) {
+    try {
+        validateClientPath(clientPath);
+        if (operationId) OperationService.setInFlight(operationId, clientPath, path.posix.basename(clientPath));
+
+        const progress = operationId
+            ? operationItemProgress(operationId, clientPath, true)
+            : null;
+
+        const { sourcePath, newPath } = await FileSystemService.copy(clientPath, destination, progress);
+
+        MetadataService.addActivity({
+            type: 'edit',
+            user: 'system',
+            action: 'copied',
+            target: path.posix.basename(newPath),
+            folder: path.posix.dirname(newPath),
+        }).catch(() => { });
+
+        if (operationId) OperationService.completeItem(operationId, 0);
+        results.copied.push({ sourcePath, newPath });
+    } catch (err) {
+        const failure = { path: clientPath, error: err.message, statusCode: err.statusCode || 500 };
+        if (operationId) OperationService.failItem(operationId, clientPath, err.message, failure.statusCode);
+        results.failed.push(failure);
     }
 }
 

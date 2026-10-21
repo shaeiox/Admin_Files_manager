@@ -11,8 +11,11 @@
    stylesheet always wins over the UA default `[hidden] { display: none }` -
    same reason admin.css/settings.css/uploads.css each carry this same kind of
    rule for their own styled [hidden] controls. Without it, Paste/Cancel
-   (shown only while a Cut is pending) would render visible from page load. */
+   (shown only while a Cut is pending) would render visible from page load.
+   `.operation-strip` sets `display: flex` for the same reason and needs the
+   same escape hatch, or the live Copy/Move progress would never disappear. */
 #clipboardStrip[hidden],
+#operationStrip[hidden],
 #btnPaste[hidden],
 #btnCancelCut[hidden] {
   display: none;
@@ -90,9 +93,73 @@ body[data-page="files"] .app-shell::before { display: none; }
   background: var(--accent-subtle);
   font-size: var(--text-body-sm);
   color: var(--text-primary);
+  position: relative; /* anchors the pending-items dropdown below the strip */
+}
+
+/* Pending-items disclosure: drops below the strip's left edge (the shared rule
+   right-aligns it), bounded so a long selection scrolls instead of running off
+   the page; names ellipsize so one long filename cannot stretch the menu. */
+.clipboard-menu {
+  left: 0;
+  right: auto;
+  max-width: 340px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.clipboard-menu .dropdown-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The disclosure trigger is a real <button> (the page bans role="button" spans)
+   but must read as the plain sentence it replaced: no chrome of its own. */
+button.clipboard-text {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .clipboard-text { margin-right: auto; font-weight: var(--font-weight-medium); }
+
+/* Live Copy/Move progress. Sits where the clipboard strip sits, and replaces it
+   visually while an operation runs (both are direct children of .files-toolbar,
+   so they stack rather than overlap). */
+.operation-strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  padding: var(--spacing-6) var(--spacing-16);
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  font-size: var(--text-body-sm);
+  color: var(--text-primary);
+}
+
+.operation-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-8);
+}
+
+.operation-verb { font-weight: var(--font-weight-medium); }
+.operation-count { color: var(--text-secondary); }
+
+/* A filesystem-derived name: long ones truncate rather than wrap the toolbar. */
+.operation-file,
+.operation-bytes {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operation-strip .progress { margin-top: var(--spacing-2); }
 
 .toolbar-right {
   display: flex;

@@ -28,6 +28,7 @@
   | `DELETE /api/fs/delete` | write | `{ success, data }` — **a `200` may still carry failures**, see below |
   | `POST /api/fs/star` | write | `{ success, data }` |
   | `GET /api/fs/thumbnail/capability` | read | `{ available, formats, maxSize }` — bare object |
+| `GET /api/operations/:id` | read | bare operation status object — see below |
   | `GET /api/settings` | read | the settings document — **bare object**, no `success` field |
   | `PUT /api/settings` | write | `{ success, settings }` |
   | `GET /api/auth/me` | read | `{ id, username, role, status, csrfToken }` — bare object |
@@ -174,6 +175,7 @@ guard → `GET /health` → `/auth` router (self-gated) → `authenticate` → `
 | PUT | `/api/fs/move` | session | ✅ live | Bulk move into a folder; a `200` can be a partial failure |
 | POST | `/api/fs/copy` | session | ✅ live | Bulk copy into a folder; a `200` can be a partial failure |
 | DELETE | `/api/fs/delete` | session | ✅ live | Bulk delete (≤500 paths); a `200` can be a partial failure |
+| GET | `/api/operations/:id` | session (own) | ✅ live | Status of a tracked `async` Copy/Move; `404` when unknown |
 | GET | `/api/admin/users` | admin | ✅ live | List accounts |
 | POST | `/api/admin/users` | admin | ✅ live | Create an account (`201`) |
 | POST | `/api/admin/users/:id/status` | admin | ✅ live | Enable / disable; disabling revokes sessions |
@@ -763,7 +765,7 @@ best-effort after disk rename.
 
 ### PUT /api/fs/move
 
-**Body:** `{ "paths": ["/a.txt", "/b folder"], "destination": "/archive" }` (≤500 paths) → **`200`**
+**Body:** `{ "paths": ["/a.txt", "/b folder"], "destination": "/archive", "async": false }` (≤500 paths) → **`200`**
 ```json
 {
   "success": true,
@@ -785,9 +787,69 @@ best-effort after disk rename.
   moving the storage root itself. Metadata keys and a governed path's access policy migrate best-effort,
   exactly like a rename (`MetadataService.renamePath` / `FileAccessPolicyService.onPathRenamed`).
 
+### Async Copy and Move — `async: true` on either endpoint
+
+Both `PUT /api/fs/move` and `POST /api/fs/copy` accept an **optional** `"async": true`. It is additive
+(ADR-007): **omitted or `false`, the response is byte-identical to what it has always been** and no
+operation is registered.
+
+With `async: true` the work is registered as a tracked operation and the response returns **immediately**
+with its id, so a client can report real progress instead of blocking on one long response:
+
+```json
+{ "success": true, "data": { "operationId": "0f1e…" } }
+```
+
+The outcome is then read from `GET /api/operations/:id`. A request that is *rejected* (empty `paths`,
+more than 500, an invalid destination) is refused before any operation exists, so a `4xx` never yields an
+id.
+
+### GET /api/operations/:id
+
+**Response:** `200` with a **bare object** — no `{ success }` envelope, matching the read-only aggregate
+convention.
+```json
+{
+  "id": "0f1e…",
+  "operationKind": "copy",
+  "state": "in_progress",
+  "determinate": true,
+  "percent": 42,
+  "itemInProgress": { "path": "/media/clip.mp4", "name": "clip.mp4" },
+  "items": { "done": 3, "total": 10, "failed": 1 },
+  "bytes": { "transferred": 4200, "total": 10000, "available": true },
+  "failures": [ { "path": "/a.txt", "error": "An item with this name already exists at the destination.", "statusCode": 409 } ],
+  "result": { "copied": [], "failed": [] },
+  "startedAt": 1760000000000,
+  "finishedAt": null
+}
+```
+
+- **States:** `preparing` → `in_progress` → one terminal state — `completed`, `partial`, `failed` or
+  `cancelled`. A terminal state is **final**: it never changes, and an operation always reaches one.
+- **Progress is measured, never estimated.** Every figure is counted from work that actually happened.
+  There is no timer, no elapsed-time interpolation and no ETA anywhere in this payload.
+- **A move is never determinate.** `fs.rename` is a single atomic syscall with no intermediate state, so
+  `determinate` is `false` and `percent` is `null` for `operationKind: "move"`. It still reports
+  `items.done` / `items.total` and the item in flight. A percentage there would be an estimate about I/O
+  the process cannot observe.
+- **`bytes.available: false` means unavailable, not zero.** When the source tree could not be measured
+  (unreadable entry, permission error), `bytes.total` and `bytes.transferred` are `null`, `determinate`
+  becomes `false`, and no byte fraction is offered. `0` is a real reading and is never substituted for
+  "unknown".
+- **A failed item contributes to neither side of any fraction.** `percent` is computed over successful
+  work only; `items.failed` is reported separately so a bar stopping short of 100% is explained.
+- **`itemInProgress` is `null` once terminal.**
+- **Errors:** `401` without a session · `404` when the id is unknown, has aged out of retention, or
+  belongs to another session. The last three are deliberately indistinguishable, so one session cannot
+  probe for another's operations. Treat `404` as **"stop tracking"**, not as retryable.
+- Retention is bounded and in-process (ADR-008), so an operation does **not** survive a restart.
+- This route carries its own read allowance on top of the global `/api` limiter, so polling can never
+  spend a browsing session's shared budget.
+
 ### POST /api/fs/copy
 
-**Body:** `{ "paths": ["/a.txt", "/b folder"], "destination": "/archive" }` (≤500 paths) → **`200`**
+**Body:** `{ "paths": ["/a.txt", "/b folder"], "destination": "/archive", "async": false }` (≤500 paths) → **`200`**
 ```json
 {
   "success": true,

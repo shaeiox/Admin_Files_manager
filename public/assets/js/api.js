@@ -532,6 +532,36 @@ const API = (() => {
         return `${BASE_URL}/fs/thumbnail?path=${encodeURIComponent(clientPath)}&size=${encodeURIComponent(size)}`;
     }
 
+    /**
+     * Read the status of a tracked Copy/Move operation.
+     *
+     * Rejects when the server answers 404 - which it does for an id that never
+     * existed, has aged out of retention, or belongs to another session, because
+     * those three must stay indistinguishable. A caller is expected to read that
+     * as "stop tracking", never as something to retry.
+     *
+     * @param {string} operationId
+     * @param {{silent?: boolean}} [options]
+     * @returns {Promise<object>} the bare operation status object
+     */
+    async function getOperation(operationId, options = {}) {
+        return get(`/operations/${encodeURIComponent(operationId)}`, { silent: true, ...options });
+    }
+
+    /**
+     * Start a Copy or Move that is tracked as an operation, so the caller gets
+     * an id back immediately and can report real progress instead of blocking on
+     * one long response. Omit `async` to get the plain synchronous contract.
+     */
+    async function startOperation(kind, payload, options = {}) {
+        const body = { ...payload, async: true };
+        const endpoint = kind === 'move' ? '/fs/move' : '/fs/copy';
+        const response = kind === 'move'
+            ? await put(endpoint, body, { silent: true, ...options })
+            : await post(endpoint, body, { silent: true, ...options });
+        return response && response.data ? response.data.operationId : null;
+    }
+
     /* ══════════════════════════════════════════
        PUBLIC SURFACE
        Frozen: BASE_URL is resolved once and cannot be repointed mid-document.
@@ -548,6 +578,8 @@ const API = (() => {
         downloadMultipleFiles,
         downloadZip,
         thumbnailUrl,
+        getOperation,
+        startOperation,
         setCsrfToken,
         clearCsrfToken,
         redirectToLogin,
