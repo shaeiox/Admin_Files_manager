@@ -1,0 +1,161 @@
+{
+  "contract": 1,
+  "volumeId": "6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f",
+  "publishedRoot": null,
+  "releaseClientPath": "/rel",
+  "auth": {
+    "sessionMinutes": 60,
+    "maxFailedAttempts": 7,
+    "lockoutMinutes": null
+  },
+  "users": [
+    {
+      "id": 1,
+      "username": "alice",
+      "role": "user",
+      "status": "active",
+      "lockedUntil": null,
+      "credentialStamp": "5b2806c06f60e44673fec56299d24cf7",
+      "sessionsRevokedAt": null
+    },
+    {
+      "id": 2,
+      "username": "bob",
+      "role": "user",
+      "status": "active",
+      "lockedUntil": null,
+      "credentialStamp": "af9820d6003e3df486f4eeb1939be3bc",
+      "sessionsRevokedAt": 1700000000000
+    },
+    {
+      "id": 3,
+      "username": "carol",
+      "role": "user",
+      "status": "disabled",
+      "lockedUntil": null,
+      "credentialStamp": "02d84016ff63e10ee04741ad34c4eff4",
+      "sessionsRevokedAt": null
+    },
+    {
+      "id": 4,
+      "username": "dave",
+      "role": "admin",
+      "status": "active",
+      "lockedUntil": null,
+      "credentialStamp": "65be31ef22bf7db0ddc216056f348f07",
+      "sessionsRevokedAt": null
+    }
+  ],
+  "policies": [
+    {
+      "fileId": 1,
+      "clientPath": "/pub",
+      "isDirectory": true,
+      "accessMode": "public",
+      "isPublished": true,
+      "isLocked": false,
+      "availableFrom": null,
+      "availableUntil": null,
+      "defaultLevel": "download"
+    },
+    {
+      "fileId": 2,
+      "clientPath": "/team",
+      "isDirectory": true,
+      "accessMode": "restricted",
+      "isPublished": true,
+      "isLocked": false,
+      "availableFrom": null,
+      "availableUntil": null,
+      "defaultLevel": "download"
+    },
+    {
+      "fileId": 3,
+      "clientPath": "/team/view-only.txt",
+      "isDirectory": false,
+      "accessMode": "authenticated",
+      "isPublished": true,
+      "isLocked": false,
+      "availableFrom": null,
+      "availableUntil": null,
+      "defaultLevel": "view"
+    },
+    {
+      "fileId": 4,
+      "clientPath": "/rel",
+      "isDirectory": true,
+      "accessMode": "public",
+      "isPublished": true,
+      "isLocked": true,
+      "availableFrom": null,
+      "availableUntil": null,
+      "defaultLevel": "download"
+    },
+    {
+      "fileId": 5,
+      "clientPath": "/draft",
+      "isDirectory": true,
+      "accessMode": "public",
+      "isPublished": false,
+      "isLocked": false,
+      "availableFrom": null,
+      "availableUntil": null,
+      "defaultLevel": "download"
+    },
+    {
+      "fileId": 6,
+      "clientPath": "/win",
+      "isDirectory": true,
+      "accessMode": "public",
+      "isPublished": true,
+      "isLocked": false,
+      "availableFrom": 1000,
+      "availableUntil": 2000,
+      "defaultLevel": "download"
+    }
+  ],
+  "userGrants": [
+    {
+      "fileId": 2,
+      "userId": 1,
+      "permission": "grant",
+      "level": "download"
+    },
+    {
+      "fileId": 3,
+      "userId": 2,
+      "permission": "deny",
+      "level": "download"
+    }
+  ],
+  "groupMembers": [
+    {
+      "groupId": 1,
+      "userId": 2
+    },
+    {
+      "groupId": 1,
+      "userId": 4
+    }
+  ],
+  "groupGrants": [
+    {
+      "fileId": 2,
+      "groupId": 1,
+      "permission": "grant",
+      "level": "view"
+    }
+  ],
+  "nav": [
+    {
+      "clientPath": "/pub",
+      "label": "Public",
+      "hideFromHome": false
+    },
+    {
+      "clientPath": "/team",
+      "label": "Team",
+      "hideFromHome": true
+    }
+  ]
+}

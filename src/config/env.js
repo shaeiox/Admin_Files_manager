@@ -7,7 +7,10 @@ const { resolveDataDir } = require('./dataDir');
 // dotenv never overrides a variable that is already set, so a value supplied by
 // the process environment (e.g. a systemd EnvironmentFile) always wins over a
 // .env discovered in the working directory. See .env.example.
-dotenv.config();
+// Under `node --test` (NODE_TEST_CONTEXT) a developer's .env is NOT read: the
+// suites set every value they need, and a local NODE_ENV=production or data
+// folder must not decide whether they pass (isolate-app-roots: hermetic tests).
+if (!process.env.NODE_TEST_CONTEXT) dotenv.config();
 
 /** Default upload ceiling: 5 GiB. Kept in step with UploadService's own default. */
 const DEFAULT_UPLOAD_MAX_BYTES = 5 * 1024 * 1024 * 1024;
@@ -36,6 +39,9 @@ const SESSION_ABSOLUTE_TTL_SECONDS = 31536000;
 
 const env = process.env.NODE_ENV || 'development';
 
+/** This application's own code folder (the release directory). Never state, never storage. */
+const CODE_DIR = path.resolve(__dirname, '..', '..');
+
 function parseLifetime(name, source = process.env) {
     const raw = source[name];
     if (raw === undefined || raw === null || raw.trim() === '') return TOKEN_LIFETIMES[name][0];
@@ -50,6 +56,15 @@ function parseBool(raw, fallback) {
 }
 
 function parseCorsAllowedOrigins(raw) {
+    if (raw === undefined || raw === null || raw.trim() === '') return [];
+    return raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
+/** Minimum length of each AFM_PORTAL_SERVICE_TOKEN entry (isolate-app-roots D5). */
+const MIN_SERVICE_TOKEN_LENGTH = 32;
+
+/** Comma-separated service tokens; two entries allow rotation without downtime. Never trimmed inside. */
+function parseServiceTokens(raw) {
     if (raw === undefined || raw === null || raw.trim() === '') return [];
     return raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
 }
@@ -85,6 +100,14 @@ const config = {
     // upload may stage bytes. Default keeps a small reserve; 0 disables the
     // admission check.
     uploadFreeSpaceBytes: parseUploadFreeSpaceBytes(process.env.AFM_UPLOAD_FREE_SPACE_BYTES),
+
+    // File Portal integration contract (isolate-app-roots). No tokens: the
+    // integration routes do not exist. No URL: the portal log falls back to
+    // PORTAL_LOG_FILE and "Check access" is unavailable.
+    portalIntegration: {
+        serviceTokens: parseServiceTokens(process.env.AFM_PORTAL_SERVICE_TOKEN),
+        portalUrl: (process.env.AFM_PORTAL_URL || '').trim().replace(/\/+$/, ''),
+    },
 
     // Session token lifetimes in seconds. An out-of-range value reads as
     // undefined here and is refused by validateStartup() before listen.
@@ -140,6 +163,10 @@ function validateStartup(source = process.env) {
         problems.push('AFM_DATA_DIR is required when NODE_ENV=production (no working-directory fallback for the store).');
     }
 
+    // Root isolation (isolate-app-roots): refused in production; server.js
+    // reports the same findings as warnings everywhere else.
+    if ((source.NODE_ENV || 'development') === 'production') problems.push(...isolationProblems(source));
+
     const limit = source.UPLOAD_MAX_BYTES;
     if (limit !== undefined && limit !== '') {
         const parsed = Number(limit);
@@ -190,6 +217,22 @@ function validateStartup(source = process.env) {
         } catch { /* validateCorsOrigin already reported */ }
     }
 
+    // Portal integration: tokens long enough to resist guessing, never quoted;
+    // the portal URL an origin only, so no path can be smuggled into requests.
+    const serviceTokens = parseServiceTokens(source.AFM_PORTAL_SERVICE_TOKEN);
+    if (serviceTokens.some((t) => t.length < MIN_SERVICE_TOKEN_LENGTH)) {
+        problems.push(`AFM_PORTAL_SERVICE_TOKEN: every token must be at least ${MIN_SERVICE_TOKEN_LENGTH} characters.`);
+    }
+    const portalUrl = (source.AFM_PORTAL_URL || '').trim();
+    if (portalUrl) {
+        const problem = validateCorsOrigin(portalUrl.replace(/\/+$/, ''), false, false);
+        if (problem) problems.push(`AFM_PORTAL_URL ${problem}`);
+        else if (new URL(portalUrl).protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(portalUrl).hostname)) {
+            // The service token would cross the network in clear text.
+            problems.push('AFM_PORTAL_URL must use https unless the portal is on this host (127.0.0.1, ::1, localhost).');
+        } else if (!serviceTokens.length) problems.push('AFM_PORTAL_URL requires AFM_PORTAL_SERVICE_TOKEN (the portal checks the same token).');
+    }
+
     // Bootstrap-admin credentials (ADR-009): both or neither, never a
     // hardcoded default. A short password here would create an account
     // UserService itself would refuse to create through its own API.
@@ -222,6 +265,47 @@ function validateCorsOrigin(value, allowWildcard, isProduction) {
     return null;
 }
 
+/** realpath when the path exists, so a symlink cannot hide an overlap; else the resolved spelling. */
+function realOrResolved(p) {
+    try { return fs.realpathSync.native(p); } catch { return path.resolve(p); }
+}
+
+/** True when `child` is `parent` or inside it (case-folded on win32). */
+function isWithin(parent, child) {
+    const fold = (p) => (process.platform === 'win32' ? p.toLowerCase() : p);
+    const rel = path.relative(fold(parent), fold(child));
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+/**
+ * The code folder holds no state, and the storage overlaps neither the code nor
+ * the state (isolate-app-roots D2). Otherwise the file manager lists, serves and
+ * can delete the application and its own database. Only absolute values are
+ * judged; a relative one is already reported by validateStartup.
+ *
+ * @param {NodeJS.ProcessEnv} [source]
+ * @param {string} [codeDir]
+ * @returns {string[]}
+ */
+function isolationProblems(source = process.env, codeDir = CODE_DIR) {
+    const problems = [];
+    const code = realOrResolved(codeDir);
+    const absolute = (v) => (v && path.isAbsolute(v) ? realOrResolved(v) : null);
+    const data = absolute(source.AFM_DATA_DIR);
+    if (data && isWithin(code, data)) {
+        problems.push(`AFM_DATA_DIR (${data}) is inside the application folder (${code}); keep state outside the release.`);
+    }
+    const root = absolute(source.STORAGE_ROOT);
+    if (root) {
+        for (const [name, dir] of [['the application folder', code], ['AFM_DATA_DIR', data]]) {
+            if (dir && (isWithin(root, dir) || isWithin(dir, root))) {
+                problems.push(`STORAGE_ROOT (${root}) overlaps ${name} (${dir}); the file manager would expose it. Use a dedicated storage folder.`);
+            }
+        }
+    }
+    return problems;
+}
+
 /** A configured directory must exist, be a directory, and be readable and traversable. */
 function directoryProblems(name, dir) {
     let stat;
@@ -251,6 +335,9 @@ function listenHost(source = process.env) {
 }
 
 config.validateStartup = validateStartup;
+config.isolationProblems = isolationProblems;
+config.parseServiceTokens = parseServiceTokens;
+config.CODE_DIR = CODE_DIR;
 config.listenHost = listenHost;
 
 module.exports = config;

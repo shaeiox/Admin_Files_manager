@@ -47,3 +47,8 @@ portal-state.sqlite-wal
 .claude/
 .freebuff/
 .opencode/
+# Host-specific graphify state (interpreter and scan-root paths of one machine)
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+# Stray tool folders created by an unexpanded "~" in a working directory
+/~/

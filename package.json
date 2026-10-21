@@ -14,10 +14,6 @@
   "engines": {
     "node": ">=24.0.0 <25"
   },
-  "repository": {
-    "type": "git",
-    "url": "E:/GitServer/Admin-Files-Manager-fixed.git"
-  },
   "keywords": [],
   "type": "commonjs",
   "dependencies": {

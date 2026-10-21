@@ -3,6 +3,10 @@
 
 const FileAccessPolicyService = require('../services/FileAccessPolicyService');
 const AuditLogRepository = require('../db/repositories/AuditLogRepository');
+const UserRepository = require('../db/repositories/UserRepository');
+const PortalClient = require('../services/PortalClient');
+const AppError = require('../utils/AppError');
+const { validateClientPath } = require('../utils/validators');
 
 function audit(req, action, outcome, detail) {
     AuditLogRepository.record({
@@ -122,11 +126,26 @@ function listGroupPermissions(req, res, next) {
 /**
  * GET /api/admin/files/effective?path=...&userId=... -> bare { outcome, policies[] }:
  * what the File Portal decides. Omit userId for a visitor who is not signed in.
+ *
+ * With AFM_PORTAL_URL the portal itself answers (`POST /api/ops/access-check`,
+ * isolate-app-roots D7), so there is one owner of the decision. Unreachable:
+ * 503, never a guess. Unlinked: the local mirror, until it is removed (task 3.3).
  */
-function effectiveAccess(req, res, next) {
+async function effectiveAccess(req, res, next) {
     try {
-        const { userId } = req.query;
-        return res.json(FileAccessPolicyService.portalAccess(req.query.path, userId ? Number(userId) : null));
+        const clientPath = req.query.path;
+        const userId = req.query.userId ? Number(req.query.userId) : null;
+        if (!PortalClient.portalUrl()) return res.json(FileAccessPolicyService.portalAccess(clientPath, userId));
+
+        validateClientPath(clientPath);
+        if (userId !== null && !UserRepository.findById(userId)) throw new AppError('User not found.', 404);
+        const answer = await PortalClient.call('POST', '/api/ops/access-check', { clientPath, userId });
+        if (!answer.ok) throw new AppError(`The File Portal is ${answer.reason}; its decision cannot be checked.`, 503);
+        const body = answer.json;
+        if (answer.status !== 200 || !body || typeof body.outcome !== 'string' || !Array.isArray(body.policies)) {
+            throw new AppError(`The File Portal answered HTTP ${answer.status}; its decision cannot be checked.`, 503);
+        }
+        return res.json({ outcome: body.outcome, policies: body.policies });
     } catch (error) {
         return next(error);
     }

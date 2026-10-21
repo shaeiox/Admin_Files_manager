@@ -120,19 +120,24 @@ one**, so an unset value never widens access.
 
 | Variable | Required | Default | Notes |
 |---|---|---|---|
-| `PORTAL_LOG_FILE` | no | *(unset)* | Absolute path of the File Portal's trace log (the portal's `LOG_FILE`). Enables Admin → Logs → File portal. `PORTAL_ROOT` is retired and ignored (ADR-010). |
+| `AFM_PORTAL_SERVICE_TOKEN` | for the link | *(unset)* | Shared secret with the portal's `ADMIN_SERVICE_TOKEN`: comma-separated, each ≥ 32 characters (two entries = rotation). Unset: the integration routes answer `404`. Generate: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`. |
+| `AFM_PORTAL_URL` | no | *(unset)* | The portal's origin, e.g. `http://127.0.0.1:4000` (no path; `https` unless the portal is on this host). Enables Admin → Logs → File portal and "Check access" over HTTP (ADR-011). Requires the token. |
+| `PORTAL_LOG_FILE` | no | *(unset)* | **Deprecated** (removed next release): read the portal's log file directly when `AFM_PORTAL_URL` is unset. `PORTAL_ROOT` is retired and ignored (ADR-010). |
 
-#### How the link works (ADR-010)
+#### How the link works (ADR-010, ADR-011)
 
-The File Portal reads `admin.sqlite` read-only. The two services share **logical** values only, so
-the storage, the release folder and either service's releases may live anywhere:
+The File Portal reads this service's users, policies and settings over HTTP
+(`/api/v1/integration/portal/*`, see `docs/CONTRACTS.md`). This service asks the portal for its log
+and its access decisions. The only shared configuration is a URL and a token on each side, so the
+two services, their data folders and the storage can each live anywhere, on one host or two. The
+two services share **logical** values only:
 
 - **Storage identity.** On first start this service writes `STORAGE_ROOT/.dimension-volume` (a
   UUID, also stored in `admin.sqlite`). The marker is hidden and unreachable through the API.
   **Back it up with the storage**, and never copy it into another storage root.
 - **Any folder as portal root, nothing to configure.** The portal's `FILES_ROOT` may be the storage
-  or any folder in it, mounted anywhere. Example: this service's `STORAGE_ROOT=C:\Users\eleven`, the
-  portal's `FILES_ROOT=C:\Users\eleven\Downloads`. The portal climbs to the storage marker, finds it
+  or any folder in it, mounted anywhere. Example: this service's `STORAGE_ROOT=/srv/storage`, the
+  portal's `FILES_ROOT=/mnt/share/Downloads` (the same storage, mounted elsewhere). The portal climbs to the storage marker, finds it
   is the admin folder `/Downloads` (it logs `FILES_ROOT is the admin folder /Downloads`), and
   decides every path as `/Downloads/…`. Policies on `/Downloads` and on `/` apply there too, and a
   policy on `/docs` does not. Several portals may serve different folders of one storage at once.
@@ -154,8 +159,31 @@ the storage, the release folder and either service's releases may live anywhere:
   5, writes the marker), then set and lock the release folder, then remove `RELEASE_PVM` (portal)
   and `PORTAL_ROOT` (here).
 
-The portal itself (`files-server-web`) reads `admin.sqlite` from `AFM_DATA_DIR` for its access
-policies. Give its service read access to that directory if it runs as a different user.
+**Isolation rules (refuse startup in production).** `AFM_DATA_DIR` must not be inside this
+service's code folder. `STORAGE_ROOT` must not contain, or sit inside, the code folder or
+`AFM_DATA_DIR`. A storage of `/opt/` with the release under `/opt/dimension` is refused, because
+the file manager would expose and could delete its own database and code.
+
+**Migrating an existing host (isolate-app-roots):**
+
+| Step | Action |
+|---|---|
+| 1 | Deploy this release (additive: the portal keeps working as before). |
+| 2 | Stop the service and move `AFM_DATA_DIR` out of the code folder (e.g. `/var/lib/dimension`), keeping every file (`admin.sqlite*`, `metadata.json`, `settings.json`, `upload-sessions.json`). |
+| 3 | If the storage contains an application, move the storage to a dedicated tree (e.g. `/srv/dimension/storage`). **Move `.dimension-volume` with it**, and never re-stamp it (see "Moving the storage" below). |
+| 4 | Generate a token. Set `AFM_PORTAL_SERVICE_TOKEN` here and `ADMIN_SERVICE_TOKEN` on the portal. Set `AFM_PORTAL_URL` here and `ADMIN_API_URL` on the portal, and remove its `ADMIN_DB_PATH`. |
+| 5 | Start both services. Check Admin → Logs → File portal and "Check access", then remove `PORTAL_LOG_FILE`. |
+
+**Moving the storage.** The storage identity is the `.dimension-volume` file in its root:
+1. Stop both services.
+2. Move the whole tree, marker included: `rsync -aHAX /old/ /srv/dimension/storage/`, or
+   `mv` on one filesystem. Then check that `/srv/dimension/storage/.dimension-volume` holds the
+   same `volumeId` as Admin → File portal.
+3. Point `STORAGE_ROOT` (here) and `FILES_ROOT` (portal) at the new tree, then start both
+   services.
+
+Never delete the marker to get a fresh one. The stored id is never re-stamped, and the portal
+refuses a mismatch on purpose. If the marker was lost, use the recovery step above.
 
 ## Production env file
 
@@ -192,7 +220,9 @@ AFM_BOOTSTRAP_ADMIN_PASSWORD=<at-least-8-chars-generate-me>
 
 # --- Optional ---
 # APP_VERSION=2.4.0
-# PORTAL_LOG_FILE=/var/www/html/files-server-web/data/portal.log
+# --- File Portal link (ADR-011); the same token is the portal's ADMIN_SERVICE_TOKEN ---
+# AFM_PORTAL_SERVICE_TOKEN=<48 random bytes, hex>
+# AFM_PORTAL_URL=http://127.0.0.1:4000
 ```
 
 Generate the password with `openssl rand -base64 18`. Afterwards,

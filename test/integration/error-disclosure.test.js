@@ -14,7 +14,7 @@ const { applyBootstrapEnv, redirectAdminDb, login: authLogin } = require('../hel
  *
  * Phase 8 confirmed live that error responses carried `err.stack`, exposing the
  * server's absolute on-disk layout:
- *   at deleteItems (D:\Projects\Admin-Files-Manager-fixed\src\controllers\fs.controller.js:271:19)
+ *   at deleteItems (<app folder>\src\controllers\fs.controller.js:271:19)
  *
  * Removing only the stack would not have been enough: `err.message` leaks too,
  * because a raw fs error reads "ENOENT: no such file or directory, open 'C:\...'".

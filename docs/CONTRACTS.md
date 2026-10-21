@@ -144,11 +144,13 @@
 
 Every path is served identically under `/api/v1` (the contract) and `/api` (the alias). **Access**
 column: *public* = no session; *session* = access token as the `afm_access` cookie or `Authorization: Bearer`, plus
-`X-CSRF-Token` on every non-GET; *admin* = session whose user has `role = "admin"`.
+`X-CSRF-Token` on every non-GET; *admin* = session whose user has `role = "admin"`; *service* = `Authorization: Bearer` matching
+`AFM_PORTAL_SERVICE_TOKEN` (no session, no CSRF; `404` when the variable is unset).
 
 **Middleware order for every `/api` request** (`server.js`, then `src/routes/api.js`):
 general rate limiter (`/api` only) → `express.json` / `urlencoded` → `morgan` → version-segment
 guard → `GET /health` → `/auth` router (self-gated) → `authenticate` → `csrf` → resource routers
+(`/integration/portal` sits with `/auth`, before `authenticate`, behind its own token gate)
 (`/fs`, `/dashboard`, `/settings`, `/admin` + `requireAdmin`) → `/api` 404 catch-all →
 `errorHandler`.
 
@@ -202,6 +204,8 @@ guard → `GET /health` → `/auth` router (self-gated) → `authenticate` → `
 | PUT | `/api/admin/portal/config` | admin | ⛔ retired | Always `503` (ADR-010) |
 | GET | `/api/admin/logs/portal` | admin | ✅ live | File portal trace, newest first |
 | GET | `/api/admin/logs/audit` | admin | ✅ live | Admin audit log, newest first |
+| GET | `/api/integration/portal/snapshot` | service | ✅ live | File Portal contract v1 document; ETag / `304` (ADR-011) |
+| POST | `/api/integration/portal/credentials/verify` | service | ✅ live | Portal sign-in check; uniform `401` (ADR-011) |
 
 ### GET /api/health
 
@@ -1506,3 +1510,64 @@ Additive section (production-cicd-readiness). The operator runbook is `docs/DEPL
   health endpoint. **The API is still unauthenticated** and the app still binds every interface, so
   the host firewall remains a required compensating control (ADR-003, ADR-008). Cross-origin and
   cross-site request forgery are only meaningfully closed once authentication lands.
+
+## File Portal integration contract v1 (ADR-011)
+
+The File Portal reads this application's users, policies, grants and settings through these
+routes only. It never reads `admin.sqlite`. Both routes are gated by `AFM_PORTAL_SERVICE_TOKEN`:
+a comma-separated list (two entries allow rotation), each entry at least 32 characters, compared
+in constant time.
+- No token configured: both routes answer `404`.
+- A missing or wrong token: `401` `{ success:false, error:"Unauthorized" }`.
+- Ten failures per IP per minute: `429` with `Retry-After`, even for a right token.
+
+### GET /api/integration/portal/snapshot → `200` | `304`
+
+A bare JSON document with `ETag` (sha256 of the body) and `Cache-Control: no-store`. A matching
+`If-None-Match` answers `304` with an empty body. The body carries no generation time, so it only
+changes when the data does.
+
+```jsonc
+{
+  "contract": 1,
+  "volumeId": "uuid" | null,               // integration_settings.volume_id
+  "publishedRoot": "/a" | null,            // portal_root_client_path
+  "releaseClientPath": "/release" | null,
+  "auth": { "sessionMinutes": 30 | null, "maxFailedAttempts": 5 | null, "lockoutMinutes": 15 | null },
+  "users": [{ "id": 1, "username": "u", "role": "admin|user", "status": "active|disabled",
+              "lockedUntil": 0 | null, "credentialStamp": "32 hex", "sessionsRevokedAt": 0 | null }],
+  "policies": [{ "fileId": 1, "clientPath": "/a/b", "isDirectory": true, "accessMode": "public|authenticated|restricted",
+                 "isPublished": true, "isLocked": false, "availableFrom": 0 | null, "availableUntil": 0 | null,
+                 "defaultLevel": "view|download" }],
+  "userGrants":  [{ "fileId": 1, "userId": 2, "permission": "grant|deny", "level": "view|download" }],
+  "groupMembers": [{ "groupId": 1, "userId": 2 }],
+  "groupGrants": [{ "fileId": 1, "groupId": 1, "permission": "grant|deny", "level": "view|download" }],
+  "nav": [{ "clientPath": "/a", "label": "A", "hideFromHome": false }]
+}
+```
+
+- **Raw values.** Values are the stored values, not re-validated. The portal validates them exactly as it validated
+  database rows, so the transport cannot change a decision.
+- **No password records.** No password hash or salt is ever included. `credentialStamp` is a domain-separated sha256 of
+  the stored record. It changes on every password change, and the portal ends that user's sessions when it does.
+- **Versioning.** Adding a field keeps `contract`. Removing or retyping a field increments it, and the portal
+  refuses a newer contract than it knows (fail closed).
+
+### POST /api/integration/portal/credentials/verify → `200` | `401` | `429`
+
+Body `{ "username": "u", "password": "p" }`. `200 { "userId": 2, "credentialStamp": "…" }` when
+the password matches an `active` user that is not locked. Otherwise the answer is a uniform
+`401 { success:false, error:"Invalid credentials" }` that never says which check failed. A failure
+records nothing here: the portal applies its own failed-attempt lockout, and portal attempts never
+lock the account in this application. Attempts are limited per end-user address (the portal's
+`X-Portal-Client-IP`, else the peer) by `AFM_LOGIN_RATE_LIMIT_PER_MINUTE`.
+
+### Calls this application makes to the portal (`AFM_PORTAL_URL`)
+
+| Call | Used by | On failure |
+|---|---|---|
+| `GET <portal>/api/ops/log?limit=` | Admin → Logs → File portal | `{ available:false, reason }` |
+| `POST <portal>/api/ops/access-check {clientPath, userId}` | `GET /api/admin/files/effective` | `503` (never a guessed decision) |
+
+Both send the first `AFM_PORTAL_SERVICE_TOKEN` entry, time out after 3 s and follow no redirect.
+

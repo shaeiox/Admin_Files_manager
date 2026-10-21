@@ -8,6 +8,7 @@ const dashboardRoutes = require('./dashboard.routes');
 const settingsRoutes = require('./settings.routes');
 const authRoutes = require('./auth.routes');
 const adminRoutes = require('./admin.routes');
+const integrationRoutes = require('./integration.routes');
 const { authenticate } = require('../middlewares/authenticate');
 const csrf = require('../middlewares/csrf');
 
@@ -58,6 +59,10 @@ router.get('/health', (req, res) => {
 // credentials; me requires a session) and must stay mounted BEFORE the blanket
 // `authenticate` below, or login and refresh could never be reached (ADR-009).
 router.use('/auth', authRoutes);
+
+// File Portal integration contract (isolate-app-roots): service-token gated,
+// so it also stays above the session/CSRF guards. 404 when no token is set.
+router.use('/integration/portal', integrationRoutes);
 
 // Everything below requires a session - applied once, so /api/v1 and /api
 // are secured identically (AGENTS.md rule 4a). /health and /auth/login stay

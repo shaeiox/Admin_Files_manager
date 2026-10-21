@@ -1,0 +1,19 @@
+{
+  "about": "Shared by the Admin Files Manager and the File Portal (isolate-app-roots). Byte-identical in both repositories: change both together. Each case is what the portal decides for snapshot.json at `now` (epoch ms); userId null is a visitor.",
+  "cases": [
+    { "clientPath": "/pub/a.iso", "userId": null, "now": 1500, "outcome": "download", "policies": [{ "path": "/pub", "outcome": "download" }] },
+    { "clientPath": "/team/x.iso", "userId": null, "now": 1500, "outcome": "hidden", "policies": [{ "path": "/team", "outcome": "hidden" }] },
+    { "clientPath": "/team/x.iso", "userId": 1, "now": 1500, "outcome": "download", "policies": [{ "path": "/team", "outcome": "download" }] },
+    { "clientPath": "/team/x.iso", "userId": 2, "now": 1500, "outcome": "view", "policies": [{ "path": "/team", "outcome": "view" }] },
+    { "clientPath": "/team/x.iso", "userId": 4, "now": 1500, "outcome": "view", "policies": [{ "path": "/team", "outcome": "view" }] },
+    { "clientPath": "/team/view-only.txt", "userId": 1, "now": 1500, "outcome": "view", "policies": [{ "path": "/team", "outcome": "download" }, { "path": "/team/view-only.txt", "outcome": "view" }] },
+    { "clientPath": "/team/view-only.txt", "userId": 2, "now": 1500, "outcome": "hidden", "policies": [{ "path": "/team", "outcome": "view" }, { "path": "/team/view-only.txt", "outcome": "hidden" }] },
+    { "clientPath": "/rel/el9/a.rpm", "userId": null, "now": 1500, "outcome": "locked", "policies": [{ "path": "/rel", "outcome": "locked" }] },
+    { "clientPath": "/rel/el9/a.rpm", "userId": 1, "now": 1500, "outcome": "download", "policies": [{ "path": "/rel", "outcome": "download" }] },
+    { "clientPath": "/draft/a", "userId": 1, "now": 1500, "outcome": "hidden", "policies": [{ "path": "/draft", "outcome": "hidden" }] },
+    { "clientPath": "/win/a", "userId": null, "now": 1500, "outcome": "download", "policies": [{ "path": "/win", "outcome": "download" }] },
+    { "clientPath": "/win/a", "userId": null, "now": 2001, "outcome": "hidden", "policies": [{ "path": "/win", "outcome": "hidden" }] },
+    { "clientPath": "/elsewhere/a", "userId": null, "now": 1500, "outcome": "download", "policies": [] },
+    { "clientPath": "/pub/a.iso", "userId": 3, "now": 1500, "outcome": "disabled", "policies": [] }
+  ]
+}

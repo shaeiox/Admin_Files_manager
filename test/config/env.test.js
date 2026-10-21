@@ -137,3 +137,59 @@ describe('validateStartup: session token lifetimes (access-refresh-session-token
         assert.ok(!p.some((m) => /TTL_SECONDS/.test(m)), p.join(' | '));
     });
 });
+
+describe('validateStartup: root isolation (isolate-app-roots)', () => {
+    const fs = require('node:fs');
+    const os = require('node:os');
+    const path = require('node:path');
+
+    // A fake code folder with a space in its name, plus folders around it.
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'afm-iso-'));
+    const code = path.join(base, 'relocated app');
+    const data = path.join(base, 'state');
+    const storage = path.join(base, 'storage');
+    for (const d of [code, path.join(code, 'data'), data, storage]) fs.mkdirSync(d, { recursive: true });
+
+    const iso = (env) => config.isolationProblems(env, code);
+
+    test('state and storage outside the code folder: no problem', () => {
+        assert.deepEqual(iso({ AFM_DATA_DIR: data, STORAGE_ROOT: storage }), []);
+    });
+
+    test('AFM_DATA_DIR inside the code folder is reported', () => {
+        const p = iso({ AFM_DATA_DIR: path.join(code, 'data'), STORAGE_ROOT: storage });
+        assert.ok(p.some((m) => m.startsWith('AFM_DATA_DIR')), p.join('\n'));
+    });
+
+    test('STORAGE_ROOT containing the code folder is reported', () => {
+        const p = iso({ AFM_DATA_DIR: data, STORAGE_ROOT: base });
+        assert.ok(p.some((m) => m.includes('overlaps the application folder')), p.join('\n'));
+        assert.ok(p.some((m) => m.includes('overlaps AFM_DATA_DIR')), p.join('\n'));
+    });
+
+    test('STORAGE_ROOT inside the code folder is reported', () => {
+        const p = iso({ AFM_DATA_DIR: data, STORAGE_ROOT: path.join(code, 'data') });
+        assert.ok(p.some((m) => m.includes('overlaps the application folder')), p.join('\n'));
+    });
+
+    test('a symlink cannot hide the overlap', (t) => {
+        const link = path.join(base, 'link-to-code-data');
+        try { fs.symlinkSync(path.join(code, 'data'), link, 'dir'); } catch { return t.skip('symlinks unavailable'); }
+        const p = iso({ AFM_DATA_DIR: link, STORAGE_ROOT: storage });
+        assert.ok(p.some((m) => m.startsWith('AFM_DATA_DIR')), p.join('\n'));
+    });
+
+    test('a sibling with a shared name prefix is not an overlap', () => {
+        const sibling = code + '-storage';
+        fs.mkdirSync(sibling, { recursive: true });
+        assert.deepEqual(iso({ AFM_DATA_DIR: data, STORAGE_ROOT: sibling }), []);
+    });
+
+    test('production refuses, development does not', () => {
+        const env = { STORAGE_ROOT: storage, AFM_DATA_DIR: path.join(config.CODE_DIR, 'data') };
+        const prod = config.validateStartup({ ...env, NODE_ENV: 'production' });
+        const dev = config.validateStartup({ ...env, NODE_ENV: 'development' });
+        assert.ok(prod.some((m) => m.includes('inside the application folder')), prod.join('\n'));
+        assert.ok(!dev.some((m) => m.includes('inside the application folder')), dev.join('\n'));
+    });
+});

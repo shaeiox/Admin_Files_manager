@@ -52,6 +52,10 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/lib/dimension /srv/dimension/storage
+# The code is read-only even if its ownership is ever wrong (isolate-app-roots):
+# state lives in AFM_DATA_DIR, never in a release. ProtectSystem=strict already
+# covers /opt; this line states the contract where it is enforced.
+ReadOnlyPaths=/opt/dimension
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true

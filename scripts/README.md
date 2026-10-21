@@ -105,12 +105,12 @@ The response should include `"apiVersion":1`.
 ### 4. Install the push trigger (in the bare repository)
 
 ```bash
-BARE=E:/GitServer/Admin-Files-Manager-fixed.git
+BARE=<path to the bare repository>
 cp scripts/git-hooks/post-receive "$BARE/hooks/post-receive"
 cp scripts/trigger-deploy.sh      "$BARE/hooks/trigger-deploy.sh"
 git -C "$BARE" config dimension.deployTarget dimension-deploy@<host>
 git -C "$BARE" config dimension.deployBranch master
-git -C "$BARE" config dimension.sshOpts      "-i C:/Users/<you>/.ssh/dimension_deploy"
+git -C "$BARE" config dimension.sshOpts      "-i <path to>/.ssh/dimension_deploy"
 ```
 
 Leave `dimension.deployTarget` unset to keep pushes from deploying, for example while setting up.
@@ -205,8 +205,13 @@ Docs, `openspec/`, `graphify-out/` and agent folders never ship.
   temp directories, exactly as the existing suites do. To check locally, run the suite from a
   directory that has no `.env`:
   ```bash
-  cd /tmp && env -u STORAGE_ROOT node --test "D:/Projects/Admin-Files-Manager-fixed/test/**/*.test.js"
+  cd /tmp && env -u STORAGE_ROOT node --test "<repo>/test/**/*.test.js"
   ```
+  Under `node --test` the app no longer reads `.env` at all (`NODE_TEST_CONTEXT`). For the strict
+  check, run `bash scripts/relocation-check.sh`: it runs the whole suite from a read-only copy
+  at a fresh path (isolate-app-roots).
+- **No machine paths.** `test/integration/relocation.test.js` fails on a developer path, a Windows
+  `…\Projects\…` path, or a path inside either repository folder, in `src`, `test`, `scripts` or `docs`.
 - **Don't change `apiVersion` alone.** It is the activation check. If it changes, change
   `EXPECT_API_VERSION` in `deploy.sh` in the same commit, or every deploy rolls back.
 - **No new dependency** without a deliberate decision. The guardrail test pins the manifest at

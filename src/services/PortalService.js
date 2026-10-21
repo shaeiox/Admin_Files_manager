@@ -4,10 +4,13 @@
 const fs = require('fs/promises');
 const path = require('path');
 const AppError = require('../utils/AppError');
+const PortalClient = require('./PortalClient');
 
 /**
- * The File Portal (files-server-web) seen from the admin side: its JSON-lines
- * trace log, read from PORTAL_LOG_FILE (the same file as the portal's LOG_FILE).
+ * The File Portal seen from the admin side: its JSON-lines trace log. With
+ * AFM_PORTAL_URL it is asked over HTTP (`GET /api/ops/log`, isolate-app-roots),
+ * so the portal may live on any host or path. Without it, the deprecated
+ * PORTAL_LOG_FILE (the same file as the portal's LOG_FILE) is read directly.
  *
  * The admin no longer reads or writes the portal's .env (ADR-010): shared values
  * live in admin.sqlite (IntegrationSettingsService) and host paths stay in each
@@ -39,14 +42,36 @@ class PortalService {
         throw new AppError(CONFIG_RETIRED, 503);
     }
 
-    /**
-     * Newest-first entries from the portal's trace (PORTAL_LOG_FILE).
-     * Reads only the last 512 KiB, so a large log costs the same as a small one.
-     */
+    /** Newest-first entries from the portal's trace: from the portal itself when linked, else from the file. */
     static async getLog(limit) {
+        const n = Math.min(Math.max(Number.parseInt(limit, 10) || 200, 1), MAX_LOG_ENTRIES);
+        if (PortalClient.portalUrl()) return PortalService.getLogOverHttp(n);
+        return PortalService.getLogFromFile(n);
+    }
+
+    static async getLogOverHttp(n) {
+        const answer = await PortalClient.call('GET', `/api/ops/log?limit=${n}`);
+        if (!answer.ok) return { available: false, reason: `The File Portal is ${answer.reason}.`, entries: [] };
+        const body = answer.json;
+        if (answer.status !== 200 || !body || !Array.isArray(body.entries)) {
+            return { available: false, reason: `The File Portal answered HTTP ${answer.status}.`, entries: [] };
+        }
+        if (body.available === false) return { available: false, reason: 'The File Portal has its log turned off.', entries: [] };
+        return { available: true, entries: body.entries.slice(0, n) };
+    }
+
+    /**
+     * Deprecated (isolate-app-roots): reads PORTAL_LOG_FILE, which needs this host
+     * to see the portal's disk. Reads only the last 512 KiB, so a large log costs
+     * the same as a small one.
+     */
+    static async getLogFromFile(n) {
         const reason = PortalService.logProblem();
         if (reason) return { available: false, reason, entries: [] };
-        const n = Math.min(Math.max(Number.parseInt(limit, 10) || 200, 1), MAX_LOG_ENTRIES);
+        if (!PortalService.warnedFileLog) {
+            PortalService.warnedFileLog = true;
+            console.warn('[integration] PORTAL_LOG_FILE is deprecated; set AFM_PORTAL_URL so the log is read from the portal.');
+        }
         let handle;
         const notAFile = { available: false, reason: 'PORTAL_LOG_FILE is a directory, not the log file.', entries: [] };
         try {

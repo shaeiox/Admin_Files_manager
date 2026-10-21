@@ -133,6 +133,11 @@ if (configProblems.length > 0) {
     for (const problem of configProblems) console.error(`FATAL CONFIGURATION ERROR: ${problem}`);
     process.exit(1);
 }
+// Outside production the same isolation rules only warn, so ./data keeps working.
+if (config.env !== 'production') {
+    for (const problem of config.isolationProblems()) console.warn(`[config] ${problem}`);
+    if (!process.env.AFM_DATA_DIR) console.warn(`[config] AFM_DATA_DIR is unset; using ${config.dataDir}. Production requires it.`);
+}
 
 /* ─── Admin database (ADR-009) ─── */
 // Opened and migrated here, synchronously, so a schema failure stops boot
